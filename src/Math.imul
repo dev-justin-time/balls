@@ -1,0 +1,3 @@
+Use: const rng = mulberry32(12345); rng();
+
+2) PMREM disposal pattern

@@ -1,0 +1,107 @@
+/*
+ Audio module.
+ Exports: initAudio(game) - sets up rolling SFX, background music, music toggle button.
+*/
+export function initAudio(game) {
+    // Rolling SFX
+    game.rollSound = new Audio('rolling_loop.mp3');
+    game.rollSound.loop = true;
+    game.rollSound.volume = 0;
+    game.rollSoundStarted = false;
+
+    // Background music
+    game.backgroundMusic = new Audio('Elevator Music.mp3');
+    game.backgroundMusic.loop = true;
+    game.backgroundMusic.volume = 0.18;
+    game.backgroundMusicStarted = false;
+    game.musicEnabled = (localStorage.getItem('goingBalls_musicEnabled') !== 'false');
+
+    // Resume audio context on first interaction
+    const resumeAudio = () => {
+        if (!game.rollSoundStarted) {
+            game.rollSound.play().catch(() => {});
+            game.rollSoundStarted = true;
+        }
+        if (!game.backgroundMusicStarted && game.musicEnabled) {
+            game.backgroundMusic.play().catch(() => {});
+            game.backgroundMusicStarted = true;
+        }
+        window.removeEventListener('keydown', resumeAudio);
+        window.removeEventListener('mousedown', resumeAudio);
+        window.removeEventListener('touchstart', resumeAudio);
+    };
+    window.addEventListener('keydown', resumeAudio);
+    window.addEventListener('mousedown', resumeAudio);
+    window.addEventListener('touchstart', resumeAudio);
+
+    // Pause music when overlay/menu is open
+    const overlay = document.getElementById('overlay');
+    const topMenu = document.getElementById('top-menu');
+    const updateMusicOnUI = () => {
+        const menuVisible = topMenu && topMenu.classList.contains('visible');
+        const overlayVisible = overlay && overlay.style.display === 'flex';
+        if (!game.musicEnabled) {
+            game.backgroundMusic.pause();
+            return;
+        }
+        if (menuVisible || overlayVisible) {
+            game.backgroundMusic.volume = 0.06;
+            if (game.backgroundMusic.paused && game.backgroundMusicStarted) game.backgroundMusic.play().catch(()=>{});
+        } else {
+            game.backgroundMusic.volume = 0.18;
+            if (game.backgroundMusic.paused && game.backgroundMusicStarted) game.backgroundMusic.play().catch(()=>{});
+        }
+    };
+
+    if (topMenu) {
+        const observer = new MutationObserver(updateMusicOnUI);
+        observer.observe(topMenu, { attributes: true, attributeFilter: ['class'] });
+    }
+    setInterval(updateMusicOnUI, 500);
+
+    // Music toggle button
+    const musicBtn = document.getElementById('music-toggle');
+    const updateMusicButtonUI = () => {
+        if (!musicBtn) return;
+        musicBtn.innerText = game.musicEnabled ? 'MUSIC: ON' : 'MUSIC: OFF';
+        musicBtn.style.borderColor = game.musicEnabled ? '#00ff88' : 'white';
+        musicBtn.style.background = game.musicEnabled ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.35)';
+    };
+    updateMusicButtonUI();
+
+    if (musicBtn) {
+        musicBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            game.musicEnabled = !game.musicEnabled;
+            localStorage.setItem('goingBalls_musicEnabled', game.musicEnabled ? 'true' : 'false');
+            if (game.musicEnabled) {
+                game.backgroundMusic.play().catch(()=>{});
+                game.backgroundMusicStarted = true;
+            } else {
+                try { game.backgroundMusic.pause(); } catch (e) {}
+            }
+            updateMusicButtonUI();
+        });
+    }
+}
+
+// SFX player - simple clone-based pool
+const _sfxPool = {};
+
+export function playSound(name) {
+    try {
+        const a = _sfxPool[name];
+        if (!a) return;
+        const clone = a.cloneNode();
+        clone.play().catch(()=>{});
+        clone.addEventListener('ended', () => { try { clone.remove(); } catch(e){} });
+    } catch (e) {}
+}
+
+export function registerSfx(name, url) {
+    try {
+        const a = new Audio(url);
+        a.preload = 'auto';
+        _sfxPool[name] = a;
+    } catch (e) { /* ignore */ }
+}

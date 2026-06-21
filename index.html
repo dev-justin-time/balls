@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Going Balls - Web Edition</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #87ceeb;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            touch-action: none;
+        }
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+        }
+        #overlay h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        #overlay button {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: #ffcc00;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 4px 0 #ccaa00;
+            transition: transform 0.1s;
+        }
+        #overlay button:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #ccaa00;
+        }
+        /* Top UI for Menu/Shop */
+        #top-menu {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        #top-menu.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .menu-btn {
+            background: rgba(0,0,0,0.5);
+            border: 2px solid white;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            border: 3px solid #ffcc00;
+            border-radius: 20px;
+            padding: 20px;
+            width: 80%;
+            max-width: 400px;
+            display: none;
+            flex-direction: column;
+            color: white;
+            z-index: 1000;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal h2 { margin-top: 0; color: #ffcc00; text-align: center; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .item-card {
+            background: #333;
+            border: 2px solid #555;
+            padding: 0;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            width: 100%;
+            min-height: 280px; /* doubled height for larger preview / full ball view */
+            display: block;
+            perspective: 900px; /* enable 3D space for children */
+        }
+        .item-card:hover { }
+        .item-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 280px; /* match doubled card height for inner content */
+            transform-style: preserve-3d;
+            transition: transform 420ms cubic-bezier(.2,.9,.25,1);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+        }
+        /* flip on hover (desktop) and on touch via .flipped class (JS will toggle if needed) */
+        .item-card:hover .item-card-inner,
+        .item-card.flipped .item-card-inner {
+            transform: rotateY(180deg);
+        }
+        .item-card-front,
+        .item-card-back {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 6px;
+            padding: 12px;
+            box-sizing: border-box;
+        }
+        .item-card-front {
+            background: linear-gradient(180deg, #2e2e2e, #252525);
+            color: #fff;
+        }
+        .item-card-back {
+            background: linear-gradient(180deg, rgba(10,10,10,0.95), rgba(30,30,30,0.95));
+            color: #e6f7ff;
+            transform: rotateY(180deg);
+            font-size: 13px;
+            justify-content: center;
+            padding: 12px;
+        }
+        .item-card.selected .item-card-front {
+            border: 2px solid #ffcc00;
+        }
+        .item-card.locked { opacity: 0.92; }
+        .item-card .price { font-size: 12px; color: #ffcc00; font-weight: bold; }
+        .item-preview {
+            width: 128px; /* enlarged preview to show full ball */
+            height: 128px;
+            background-size: cover;
+            background-position: center;
+            border: 2px solid rgba(255,255,255,0.08);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+            border-radius: 50%;
+            margin-top: 14px;
+            margin-bottom: 8px;
+            align-self: center;
+        }
+        .ball-preview { border-radius: 50%; width:128px; height:128px; }
+        .sky-preview { border-radius: 8px; width: 140px; height: 88px; }
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 30px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 1100;
+            line-height: 1;
+        }
+        .close-modal:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        #total-coins {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        #joystick-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 180px;
+            height: 180px;
+            pointer-events: auto;
+            z-index: 100;
+        }
+        /* Roblox-style joystick overrides */
+        .nipple .back {
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 2px solid rgba(255, 255, 255, 0.3) !important;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+        .nipple .front {
+            background: rgba(255, 255, 255, 0.4) !important;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+        #jump-btn {
+            position: absolute;
+            bottom: 60px;
+            right: 30px;
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 3px solid white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 14px;
+            pointer-events: auto;
+            touch-action: none;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+        }
+        #jump-btn:active {
+            background: rgba(255, 255, 255, 0.6);
+            transform: scale(0.9);
+        }
+
+        /* Fullscreen leaderboard modal override */
+        #leaderboard-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            transform: none;
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            border-radius: 0;
+            padding: 28px;
+            box-sizing: border-box;
+            display: none; /* toggled by JS as before */
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: stretch;
+            z-index: 1500;
+            overflow: auto;
+            background: rgba(8,8,10,0.96);
+            border: none;
+        }
+
+        /* Slight layout tweaks inside the fullscreen leaderboard */
+        #leaderboard-modal h2 {
+            margin-top: 4px;
+            margin-bottom: 12px;
+            font-size: 22px;
+            text-align: left;
+            color: #ffcc00;
+            width: 100%;
+        }
+        #leaderboard-list {
+            flex: 1 1 auto;
+            overflow: auto;
+            padding-bottom: 20px;
+        }
+        #leaderboard-modal .close-modal {
+            top: 18px;
+            right: 18px;
+            width: 44px;
+            height: 44px;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div class="stats">
+            <div id="coin-display">Session: 0</div>
+            <div id="distance-display">Progress: 0%</div>
+        </div>
+    </div>
+
+    <!-- Loading overlay shown while textures / models load -->
+    <div id="loading-overlay" style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, rgba(0,0,0,0.85), rgba(0,0,0,0.6)); z-index:99999; color:white; flex-direction:column; gap:12px; pointer-events:auto;">
+        <div style="font-size:20px; font-weight:700;">Loading assets...</div>
+        <div id="loading-progress" style="width:60%; max-width:420px; height:14px; background:rgba(255,255,255,0.08); border-radius:8px; overflow:hidden;">
+            <div id="loading-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#ffcc00,#ffd86b);"></div>
+        </div>
+        <div id="loading-text" style="font-size:13px; opacity:0.9;">Initializing...</div>
+    </div>
+
+    <div id="total-coins">Wallet: 0</div>
+
+    <div id="top-menu">
+        <button class="menu-btn" id="help-btn-open">?</button>
+        <button class="menu-btn" id="balls-btn-open">BALLS</button>
+        <button class="menu-btn" id="skins-btn-open">SKINS</button>
+        <button class="menu-btn" id="skies-btn-open">SKIES</button>
+        <button class="menu-btn" id="leaderboard-btn-open">LEADERBOARD</button>
+        <button class="menu-btn" id="music-toggle">MUSIC</button>
+        <button class="menu-btn" id="settings-btn-open" title="Settings" aria-label="Settings">⚙️</button>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="modal">
+        <button class="close-modal">&times;</button>
+        <h2>LEADERBOARD</h2>
+        <div style="text-align:center; margin-bottom:8px; color:#fff;">
+            Best times / high scores (local)
+        </div>
+        <div id="leaderboard-list" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+        <div style="display:flex; gap:8px; margin-top:12px; justify-content:center;">
+            <button id="clear-leaderboard" class="menu-btn" style="pointer-events:auto;">CLEAR</button>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal">
+        <button class="close-modal">&times;</button>
+        <h2>HOW TO PLAY</h2>
+        <p>• <b>Desktop:</b> Use WASD or Arrows to roll. Press T to toggle mouse lock.</p>
+        <p>• <b>Mobile:</b> Use the joystick to roll, Jump button to hop.</p>
+        <p>• <b>Goal:</b> Reach the finish line without falling off!</p>
+        <p>• <b>Shop:</b> Collect coins to unlock new ball styles and sky themes.</p>
+    </div>
+
+    <!-- Skins Modal -->
+    <div id="skins-modal" class="modal">
+        <button class="close-modal">&times;</button>
+        <h2>BALL SHOP</h2>
+        <div class="grid" id="skins-grid"></div>
+    </div>
+
+    <!-- Ball Index Modal -->
+    <div id="balls-modal" class="modal" style="max-width:600px;">
+        <button class="close-modal">&times;</button>
+        <h2>BALL INDEX</h2>
+        <div style="text-align:center; margin-bottom:8px; color:#fff;">
+            Detailed descriptions and community stats for each ball skin
+        </div>
+        <div id="balls-list" style="display:flex; flex-direction:column; gap:10px; margin-top:8px;"></div>
+    </div>
+
+    <!-- Skies Modal -->
+    <div id="skies-modal" class="modal">
+        <button class="close-modal">&times;</button>
+        <h2>SKY SHOP</h2>
+        <div class="grid" id="skies-grid"></div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <button class="close-modal">&times;</button>
+        <h2>SETTINGS</h2>
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-weight:bold; color:#fff;">Music</div>
+                <button id="settings-music-toggle" class="menu-btn" style="pointer-events:auto;">Toggle</button>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-weight:bold; color:#fff;">Sound FX</div>
+                <button id="settings-sfx-toggle" class="menu-btn" style="pointer-events:auto;">Toggle</button>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-weight:bold; color:#fff;">Pointer Lock Hint</div>
+                <button id="settings-pointerlock-toggle" class="menu-btn" style="pointer-events:auto;">Toggle</button>
+            </div>
+
+            <!-- Joystick power controls -->
+            <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.06);">
+                <div style="color:#fff; font-weight:bold;">Joystick Power</div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input id="joystick-power" type="range" min="0.2" max="2.5" step="0.05" value="1.0" style="width:100%; pointer-events:auto;">
+                    <div id="joystick-power-val" style="min-width:48px; text-align:center; color:#ffd700;">1.00x</div>
+                </div>
+
+                <div style="color:#fff; font-weight:bold;">Joystick Deadzone</div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input id="joystick-deadzone" type="range" min="0.01" max="0.4" step="0.01" value="0.10" style="width:100%; pointer-events:auto;">
+                    <div id="joystick-deadzone-val" style="min-width:48px; text-align:center; color:#ffd700;">0.10</div>
+                </div>
+                <div style="font-size:12px; color:#ccc;">Adjust how strongly the joystick responds and how large the deadzone is.</div>
+            </div>
+
+            <div style="text-align:center; color:#ddd; font-size:13px;">Settings persist per session where applicable.</div>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <h1 id="overlay-title">LEVEL COMPLETE!</h1>
+        <button id="next-btn">CONTINUE</button>
+    </div>
+
+    <div id="joystick-container"></div>
+    <div id="jump-btn">JUMP</div>
+
+    <!-- Mini gear quick-access (bottom-right) -->
+    <button id="mini-gear" aria-label="Quick Settings" title="Settings" style="position:fixed; right:12px; bottom:12px; width:44px; height:44px; border-radius:50%; background:rgba(0,0,0,0.45); border:2px solid rgba(255,255,255,0.12); color:#fff; display:flex; align-items:center; justify-content:center; z-index:1200; pointer-events:auto; font-size:18px;">⚙️</button>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.160.0",
+            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/",
+            "cannon-es": "https://esm.sh/cannon-es@0.20.0",
+            "nipplejs": "https://esm.sh/nipplejs@0.10.1"
+        }
+    }
+    </script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>

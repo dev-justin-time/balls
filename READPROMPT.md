@@ -1,0 +1,12 @@
+User prompts (chronological):
+
+1) ADD MORE STATS FOR LEADERBOARD
+2) UPDATE AUDIT, README, DEEP WIKI
+3) MAKE LAEDERBAORD FULL SCREEN
+4) MAKE LOADING FASTER
+5) ADD OBSTICALS THAT MAKE YOU DROP COINS ON ALL LEVELS
+6) @skeleton.gif @_halloween_Um_zumbi__0523105301_.glb @Soldier (2).gif @Venus Fly Trap.gif  ADD DEFINED MODELS TO TRAILS , ON CONTATC PLAYER DROPS COINS, HIER LEVEL MORE
+7) @eye_low_poly_free_cute_eyeballs.glb @Fire Spirit.webp ADD NEW SKINS ICU AND FIRE IN GLASS BALLS
+8) unhandledRejection: network error
+   TypeError: network error
+9) CREATE READPROMPT.MD WITHJ ALL USER PROMPTS IN ORDER
