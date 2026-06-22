@@ -8,12 +8,17 @@
     "start": "serve -o",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/ engine/ main.js",
+    "lint:fix": "eslint src/ engine/ main.js --fix"
   },
   "devDependencies": {
-    "serve": "^14.2.4",
+    "@eslint/js": "^10.0.1",
     "cannon-es": "^0.20.0",
+    "eslint": "^10.5.0",
+    "globals": "^17.6.0",
     "jsdom": "^29.1.1",
+    "serve": "^14.2.4",
     "three": "^0.184.0",
     "vitest": "^3.2.6"
   }

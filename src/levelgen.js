@@ -49,6 +49,16 @@ export function clearLevel(game) {
     if (game.hasHeatShimmer) { clearHeatShimmer(game); game.hasHeatShimmer = false; }
     if (game.hasMeteors) { clearMeteors(game); game.hasMeteors = false; }
 
+    // Dispose glass platforms that are still in the array
+    if (game.glassPlatforms) {
+        for (const gp of game.glassPlatforms) {
+            if (gp.mesh) {
+                game.scene.remove(gp.mesh);
+                if (gp.mesh.geometry) gp.mesh.geometry.dispose();
+            }
+        }
+    }
+
     game.checkpoints = [];
     game.levelObjects = [];
     game.coins = [];
@@ -113,7 +123,7 @@ export function createLevel(game, seed) {
     ];
 
     let tier = difficultyTiers[0];
-    for (let t of difficultyTiers) {
+    for (const t of difficultyTiers) {
         if (game.currentLevel >= t.level) tier = t;
     }
     game.currentTier = tier;
@@ -799,11 +809,20 @@ export function addWall(game, x, y, z, w, l, rotZ) {
     game.levelObjects.push({ mesh, body });
 }
 
+const _coinGeoCache = {};
+function getCachedCoinGeo(size) {
+    const key = size.toFixed(3);
+    if (!_coinGeoCache[key]) {
+        _coinGeoCache[key] = new THREE.CylinderGeometry(size, size, 0.1, 12);
+    }
+    return _coinGeoCache[key];
+}
+
 export function addCoins(game, x, y, startZ, length, count) {
     for (let i = 0; i < count; i++) {
         const z = startZ - (i / Math.max(1, count - 1)) * length;
         const tier = weightedCoinTier();
-        const geo = new THREE.CylinderGeometry(tier.size, tier.size, 0.1, 12);
+        const geo = getCachedCoinGeo(tier.size);
         const coin = new THREE.Mesh(geo, game.sharedMaterials.coin);
         coin.position.set(x + (_rand() - 0.5) * 2, y + _rand() * 1.5, z);
         coin.rotation.x = Math.PI / 2;
@@ -839,8 +858,8 @@ export function placeFinishModel(game) {
 export function triggerDropFromObstacle(game, obstacle, options = {}) {
     try {
         const baseLoss = options.baseLoss || 5;
-        const levelMult = 1 + (game.currentLevel - 1) * 0.1;
-        const drop = Math.min(game.saveData.totalCoins, Math.floor(baseLoss * levelMult));
+        // levelMult is already applied by callers (physics.js obstacle collision checks)
+        const drop = Math.min(game.saveData.totalCoins, Math.floor(baseLoss));
         if (drop <= 0) return;
         game.saveData.totalCoins -= drop;
         spawnDroppedCoins(game, obstacle.body ? obstacle.body.position : game.ballBody.position, drop);

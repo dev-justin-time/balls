@@ -151,7 +151,7 @@ export function updatePhysics(game, dt) {
             if (skyConf.conditions.speedBoost) speedMult *= skyConf.conditions.speedBoost;
             if (skyConf.conditions.speedDebuff) speedMult *= skyConf.conditions.speedDebuff;
         }
-        if (game.isGrounded && inputX !== 0 || inputY !== 0) {
+        if (game.isGrounded && (inputX !== 0 || inputY !== 0)) {
             const vel = game.ballBody.velocity;
             const currentSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
             if (currentSpeed < MAX_VELOCITY * speedMult) {

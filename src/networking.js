@@ -221,11 +221,11 @@ export async function initNetworking() {
                     const existing = coll.getList() || [];
                     if (!existing || existing.length === 0) {
                         const seeded = [
-                            { ball_key: 'rainbow', played: 120, wins: 48, avg_time: 34.2, best_time: 18.6 },
-                            { ball_key: 'wood', played: 42, wins: 10, avg_time: 47.1, best_time: 29.3 },
-                            { ball_key: 'metal', played: 88, wins: 32, avg_time: 30.8, best_time: 16.9 },
-                            { ball_key: 'lava', played: 15, wins: 3, avg_time: 52.4, best_time: 41.2 },
-                            { ball_key: 'groovy', played: 5, wins: 1, avg_time: 28.7, best_time: 28.7 }
+                            { ballKey: 'rainbow', played: 120, wins: 48, avgTime: 34.2, bestTime: 18.6 },
+                            { ballKey: 'wood', played: 42, wins: 10, avgTime: 47.1, bestTime: 29.3 },
+                            { ballKey: 'metal', played: 88, wins: 32, avgTime: 30.8, bestTime: 16.9 },
+                            { ballKey: 'lava', played: 15, wins: 3, avgTime: 52.4, bestTime: 41.2 },
+                            { ballKey: 'groovy', played: 5, wins: 1, avgTime: 28.7, bestTime: 28.7 }
                         ];
                         for (const r of seeded) {
                             try {
@@ -257,5 +257,4 @@ export async function initNetworking() {
     console.warn(`WebsimSocket.initialize() failed after ${ROOM_INIT_MAX_RETRIES + 1} attempts — continuing in offline/fallback mode.`);
     __roomReadyFn = () => false;
     return room;
-}
 }

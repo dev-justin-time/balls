@@ -510,7 +510,7 @@ function renderSkinsGrid(game) {
 
         const card = document.createElement('div');
         card.className = `item-card ${isSelected ? 'selected' : ''} ${!isUnlocked ? 'locked' : ''}`;
-        let previewStyle = conf && conf.tex ? `background-image: url(${conf.tex});` : 'background-color: #666;';
+        const previewStyle = conf && conf.tex ? `background-image: url(${conf.tex});` : 'background-color: #666;';
         const price = Number(conf && conf.price ? conf.price : 0);
 
         card.innerHTML = `
@@ -643,7 +643,7 @@ export function getLeaderboard(game, room) {
         const dedup = {};
         entries.forEach(e => { dedup[e.id || e.time + '_' + e.level] = e; });
         game._remoteLeaderboard.forEach(e => { dedup[e.id || e.time + '_' + e.level] = e; });
-        entries = Object.values(dedup);
+        entries = Object.values(dedup);  
     }
 
     return entries.sort((a, b) => (b.level || 0) - (a.level || 0) || parseFloat(a.time || 99) - parseFloat(b.time || 99)).slice(0, 50);

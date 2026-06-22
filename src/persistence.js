@@ -117,7 +117,7 @@ export function initPersistence(game) {
             game.saveData.weatherPrefs.bias[w] = (game.saveData.weatherPrefs.bias[w] || 0) + 1;
             const keys = Object.keys(game.saveData.weatherPrefs.bias);
             if (keys.length > 10) {
-                keys.forEach(k => game.saveData.weatherPrefs.bias[k] = Math.max(0, game.saveData.weatherPrefs.bias[k] - 1));
+                keys.forEach(k => { game.saveData.weatherPrefs.bias[k] = Math.max(0, game.saveData.weatherPrefs.bias[k] - 1); });
             }
             saveGame(game);
         }

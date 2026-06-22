@@ -19,8 +19,8 @@ export function renderBallIndexUI(containerId, game, room) {
                 safe.played = Number.isFinite(Number(r.played)) ? Math.max(0, Math.min(1e7, Math.floor(Number(r.played)))) : 0;
                 safe.wins = Number.isFinite(Number(r.wins)) ? Math.max(0, Math.min(1e7, Math.floor(Number(r.wins)))) : 0;
 
-                safe.avgTime = Number.isFinite(Number(r.avg_time)) ? Math.max(0, Math.min(1e5, Number(r.avg_time))) : null;
-                safe.bestTime = Number.isFinite(Number(r.best_time)) ? Math.max(0, Math.min(1e5, Number(r.best_time))) : null;
+                safe.avgTime = Number.isFinite(Number(r.avgTime || r.avg_time)) ? Math.max(0, Math.min(1e5, Number(r.avgTime || r.avg_time))) : null;
+                safe.bestTime = Number.isFinite(Number(r.bestTime || r.best_time)) ? Math.max(0, Math.min(1e5, Number(r.bestTime || r.best_time))) : null;
             } catch (e) {
                 return null;
             }

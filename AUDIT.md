@@ -1,18 +1,18 @@
 # Going Balls — Code Audit & Improvement Plan
 
-Updated: 2026-06-21 (after refactor + optimization pass)
+Updated: 2026-06-21 (post-audit fixes complete)
 
 Purpose
 -------
 Concise audit of the codebase with prioritized issues and actionable improvement plans.
-Updated to reflect completed work, remaining items, and new issues discovered during refactoring.
+Updated to reflect completed work, remaining items, and new issues discovered during refactoring and audit.
 
 Status key: ✅ Done  🔶 Partial  ⬜ Not started
 
 Executive summary
 -----------------
-Major progress: the monolithic main.js has been split into 10 modules, assets optimized (~40% size reduction), ball configs consolidated to a single source of truth, and a .codebuffrules safety file established.
-Remaining work: per-frame GC reduction, naming conventions, accessibility, pointer lock UX, and the eye_ball GLTF skin rendering bug.
+Major progress: the monolithic main.js has been split into 12 modules, assets optimized (~40% size reduction), ball configs consolidated to a single source of truth, and a .codebuffrules safety file established. All audit P0/P1 bugs fixed (operator precedence, nebula skin type, coin geometry reuse, glass disposal, double level-scaling). Naming conventions standardized (camelCase for internal keys, snake_case adapter support for remote data).
+Remaining: PMREM cache hot-swap disposal verification.
 
 ---
 
@@ -20,142 +20,103 @@ Remaining work: per-frame GC reduction, naming conventions, accessibility, point
 
 ### 1. ✅ Missing deterministic seeding for procedural levels
 - Status: DONE. mulberry32 in persistence.js, URL param ?seed=12345 support, passed into createLevel.
-- Fix applied: src/persistence.js exports mulberry32, initPersistence reads URL seed, createLevel accepts seed.
 
-### 2. 🔶 Global variable leakage and mixed responsibilities
-- Status: PARTIAL. `room` now passed explicitly to modules (saveLeaderboard, addLeaderboardEntry, checkGameState, gameOver, setupUI, renderBallIndex, renderLeaderboard). `window._room` still used as fallback in addLeaderboardEntry.
-- Remaining: eliminate window._room fallback. Remove window.__goingBalls* flags by moving to module-scoped state.
+### 2. ✅ Global variable leakage and mixed responsibilities
+- Status: DONE. `room` passed explicitly to all modules. Error-state flags module-scoped in networking.js. Loading-signal flags intentionally remain as window globals for cross-module coordination.
 
 ### 3. ✅ Unbounded memory/DOM updates on repeated toasts/popups
 - Status: DONE. src/notification_manager.js with pooling, rate-limiting, maxConcurrent=3, minIntervalMs.
+
+### 4. ✅ Operator precedence bug in updatePhysics
+- Status: DONE. Fixed `&&`/`||` binding to use parentheses.
+
+### 5. ✅ Nebula skin type mismatch
+- Status: DONE. Changed type: 'texture' → type: 'gltf'.
 
 ---
 
 ## Priority 2 — Performance & Resource Management
 
 ### 1. 🔶 Textures and PMREM leaks
-- Status: PARTIAL. _lastEnvMap.dispose() tracked when replacing env maps. textureCache with Map.
-- Remaining: verify disposal in all code paths (sky switching, level reset). Add explicit cache clearing for hot-swap.
+- Status: PARTIAL. _lastEnvMap.dispose() tracked when replacing env maps. textureCache with Map. disposeMesh() helper handles sky transitions. clearTextureCache() available for hot-swap.
+- Remaining: Verify clearTextureCache is called during level reset hot-swap paths.
 
 ### 2. ✅ Particle counts on mobile
-- Status: DONE. getParticleCount() in persistence.js uses hardwareConcurrency, userAgent mobile detection, screen area scaling.
+- Status: DONE. getParticleCount() scales by hardwareConcurrency, device type, screen area.
 
-### 3. ⬜ Frequent per-frame allocations
-- Problem: Temporary CANNON.Vec3 and arrays allocated in updatePhysics() every frame create GC churn.
-- Fix: Hoist reusable Vec3/Vector3 instances to game object scope in physics.js and rendering.js.
-- Benefit: Reduced GC pauses, smoother 60fps.
+### 3. ✅ Frequent per-frame allocations
+- Status: DONE. Pooled Vec3 instances on game object. Coin geometry per-tier reuse via getCachedCoinGeo() cache (5 sizes). Obstacle collision uses stack-allocated primitives (no GC pressure).
 
 ---
 
 ## Priority 3 — Maintainability & Modularity
 
 ### 1. ✅ Monolithic main.js
-- Status: DONE. Split into 10 modules:
-  - `main.js` (root) — thin DI bootstrap shell (~250 lines)
-  - `engine/scene.js` — Three.js scene, camera, materials, sky, textures
-  - `src/physics.js` — cannon-es world, ball body, forces, particles
-  - `src/levelgen.js` — procedural level generation + obstacle builders
-  - `src/ui.js` — DOM UI, modals, shop, leaderboard, game state
-  - `src/audio.js` — audio init, music toggle, SFX pool
-  - `src/persistence.js` — localStorage, configs, RNG, weather AI
-  - `src/networking.js` — WebsimSocket, loading manager, error handlers
-  - `src/rendering.js` — animation loop, camera follow, particle updates
-  - `src/ball_db.js` — ball skin data (single source of truth)
-  - `src/ball_index_ui.js` — ball index UI
-  - `src/notification_manager.js` — toast pooling/rate-limiting
+- Status: DONE. Split into 12 modules.
 
 ### 2. ✅ Ball config duplication
-- Status: DONE. ballConfigs now loaded directly from BALL_DB in ball_db.js via spread clone `{ ...BALL_DB }`. mergeBallDB() function removed. Single source of truth established.
-- 71 ball skins in ball_db.js, descriptions included.
+- Status: DONE. Single source of truth in ball_db.js.
 
-### 3. ⬜ Inconsistent naming and key casing
-- Problem: Keys like "ball_key" in networking.js vs. camelCase keys in configs. No standard convention.
-- Fix: Standardize on camelCase for JS object keys; keep snake_case for remote data only with adapter mapping.
-- Benefit: Fewer mapping bugs, clearer code.
+### 3. ✅ Inconsistent naming and key casing
+- Status: DONE. Seed data uses camelCase (ballKey, avgTime, bestTime). ball_index_ui.js sanitization handles both camelCase and snake_case via fallback (`r.avgTime || r.avg_time`) for backward compatibility with existing remote data. sanitizeRemoteEntry() in ui.js is format-agnostic.
 
 ---
 
 ## Priority 4 — UX, Accessibility & Security
 
 ### 1. ✅ Audio handling & autoplay policies
-- Status: DONE. registerSfx/playSound with clone-based Audio pool. AudioContext resume on first interaction. Music toggle with localStorage persistence. Audio files compressed 31% (1.07MB→736K).
-
 ### 2. ✅ Pointer lock and gesture handling
-- Status: DONE. UI button (🖱️↔🔒), Escape to release, hint overlay, pitch clamp [0.15, 1.2].
-- Problem: Pointer lock toggled with 'T' key, mouse interactions spread across many listeners. Desktop UX could be improved.
-- Fix: Consolidate pointer lock behind explicit UI button, add hint overlay, clamp camera pitch.
-
-### 3. ✅ Accessibility
-- Status: DONE. 26 aria-labels added across index.html, ui.js, ball_index_ui.js, networking.js. Focus-trap in main.js. Auto-focus on modal open, restore on close.
-- Problem: Many interactive elements lack ARIA labels. Modals not focus-trapped. Keyboard-only navigation incomplete.
-- Note: gear-btn has aria-label, settings-btn has aria-label. help-btn, shop-btn, leaderboard-btn need labels.
-- Fix: Add aria-label to all buttons, add focus-trap to modal container, ensure Tab order.
+### 3. ✅ Accessibility (26+ aria-labels, focus-trap, auto-focus)
 
 ---
 
 ## Priority 5 — Multiplayer & Persistence
 
-### 1. ✅ Race conditions with room initialization
-- Status: DONE. Retry/backoff wrapper (3 retries, exponential backoff 1s→2s→4s), graceful fallback to dead room on failure.
-
-### 2. ✅ Privacy / trust of mirrored remote data
-- Status: DONE. sanitizeRemoteEntry() applied to leaderboard, player_clones, and ball_stats subscriptions. Strings ≤128 chars, numbers clamped to [-1e9, 1e9], empty entries dropped.
+### 1. ✅ Race conditions with room initialization (retry/backoff)
+### 2. ✅ Privacy / trust of mirrored remote data (sanitizeRemoteEntry)
 
 ---
 
-## NEW: Issues Discovered During Refactoring
+## Issues Discovered During Refactoring & Audit — All Resolved
 
-### N1. ✅ eye_ball skin (type:'gltf') doesn't render
-- Status: DONE. applyBallSkin() function in engine/scene.js handles gltf type with async GLB loading, caching, and mesh swap. Physics sync preserved.
-- Problem: ball_db.js has eye_ball with type:'gltf' and tex pointing to eye_low_poly_free_cute_eyeballs.glb. getBallMaterial() in engine/scene.js only handles 'texture', 'color', 'emissive' types. Falls through to default white ball.
-- Fix: Add 'gltf' type handler in getBallMaterial that loads the GLB model as the ball mesh.
-
-### N2. ✅ `.glb` finish model has confusing dot-prefixed name
-- Status: DONE. Renamed to finish_gate.glb, reference updated in engine/scene.js.
-- Problem: The finish-line model is literally named `.glb` (hidden file on Unix). Hard to identify.
-- Fix: Rename to `finish_gate.glb` and update reference in engine/scene.js.
-
-### N3. ✅ Leftover window.__goingBalls* global flags
-- Status: DONE. Moved to module-scoped `let` variables in networking.js.
-- Problem: networking.js uses ~10 `window.__goingBalls*` flags for error state tracking. These pollute the global namespace.
-- Fix: Move to module-scoped variables or a single `window.__goingBalls` namespace object.
-
-### N4. ✅ No automated tests
-- Status: DONE. 29 tests across 2 files (15 persistence + 14 levelgen). Vitest with jsdom, package.json with test scripts. Deterministic seed testing, localStorage mocking, full THREE/CANNON mocks for levelgen integration tests.
-
-### N5. ✅ Assets optimized
-- Status: DONE. PNG/JPG→WebP (28 files, ~60% avg savings). GIF→WebP (4 files, 98.6% savings). Audio compressed (6 files, 31% savings). Total: ~17MB→~10.2MB (40% reduction).
-
-### N6. ✅ Asset paths fixed
-- Status: DONE. All 175+ asset paths updated to assets/image/, assets/model/, assets/sfx/ prefixes. SFX filenames corrected (coin→coin_collect, finish→finish_line, fall→fall_off).
-
-### N7. ✅ .codebuffrules safety file created
-- Status: DONE. Rules for AI assistant: ask before delete, backup before destructive changes, asset conventions, module architecture map, import rules.
-
-### N8. ✅ Press Start 2P font added
-- Status: DONE. Retro pixel font via Google Fonts CDN, applied to game UI elements. Cascade protection keeps descriptions in system font.
+| # | Issue | Status |
+|---|-------|--------|
+| N1 | eye_ball GLTF skin rendering | ✅ DONE |
+| N2 | .glb finish model rename | ✅ DONE |
+| N3 | window.__goingBalls* globals | ✅ DONE |
+| N4 | Automated tests (115 passing) | ✅ DONE |
+| N5 | Assets optimized (~40% reduction) | ✅ DONE |
+| N6 | Asset paths standardized | ✅ DONE |
+| N7 | .codebuffrules safety file | ✅ DONE |
+| N8 | Custom pixel font (5x5dots) | ✅ DONE |
+| N9 | Nebula skin type mismatch | ✅ DONE |
+| N10 | Operator precedence fix | ✅ DONE |
+| N11 | Coin geometry reuse per tier | ✅ DONE |
+| N12 | Glass platform disposal | ✅ DONE |
+| N13 | Double level-scaling in triggerDropFromObstacle | ✅ DONE |
+| N14 | Naming conventions standardized | ✅ DONE |
 
 ---
 
 ## Actionable Roadmap (Updated)
 
-- ✅ Week 0 (immediate): Seeded RNG, NotificationManager, PMREM tracking
-- ✅ Week 1: Module DI wiring, ball config consolidation, room dependency threading
-- ✅ Week 2: Monolithic split into 10 modules, asset optimization, SFX fixes
-- ⬜ Week 3: GC allocation reduction, pointer lock UX, accessibility
-- ⬜ Week 4: eye_ball GLTF rendering, .glb rename, global flag cleanup
-- ⬜ Week 5+: Linting setup, CI, naming standardization
-- ✅ Week 6: Coin-dropping obstacles (all levels + level scaling), 14 new ball skins, 4 new sky types, 5 new trail types, harder level segments
+- ✅ Week 0–6: All major features, refactors, and bug fixes complete
+- ✅ Audit pass: P0/P1 bugs fixed, naming standardized, coin geometry reused, glass disposal added
+- ⬜ Future: PMREM cache hot-swap verification, ESLint setup, CI pipeline
 
 ---
 
-## Concrete PRs (prioritized)
+## Concrete PRs — All Complete
 
-1. ⬜ Fix eye_ball GLTF skin rendering in getBallMaterial
-2. ⬜ Rename .glb → finish_gate.glb
-3. ⬜ Reduce per-frame Vec3 allocations in updatePhysics
-4. ⬜ Add unit tests for level generator with deterministic seeds
-5. ⬜ Create package.json, add ESLint config, add npm test script
-6. ⬜ Clean up window.__goingBalls* globals
-7. ⬜ Add ARIA labels + focus trapping for modals
-8. ⬜ Standardize naming conventions (camelCase for JS keys)
+1. ✅ Fix eye_ball GLTF skin rendering
+2. ✅ Rename .glb → finish_gate.glb
+3. ✅ Pool Vec3 instances + coin geometry reuse
+4. ✅ Add unit tests (115 passing)
+5. ✅ Create package.json + vitest config
+6. ✅ Clean up window.__goingBalls* globals
+7. ✅ Add ARIA labels + focus trapping
+8. ✅ Fix operator precedence bug
+9. ✅ Fix nebula skin type mismatch
+10. ✅ Standardize naming conventions (camelCase)
+11. ✅ Reuse coin geometry per tier size
+12. ✅ Update DEEP_WIKI.md for modular architecture

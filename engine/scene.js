@@ -141,7 +141,7 @@ function disposeMesh(mesh) {
                 if (c.isMesh) {
                     if (c.material) {
                         if (Array.isArray(c.material)) {
-                            c.material.forEach(m => { if (m.map) try { m.map.dispose(); } catch(e){}; try { m.dispose(); } catch(e){}; });
+                            c.material.forEach(m => { if (m.map) try { m.map.dispose(); } catch(e){} try { m.dispose(); } catch(e){} });
                         } else {
                             if (c.material.map) try { c.material.map.dispose(); } catch(e) {}
                             try { c.material.dispose(); } catch(e) {}
@@ -153,7 +153,7 @@ function disposeMesh(mesh) {
         } else {
             if (mesh.material) {
                 if (Array.isArray(mesh.material)) {
-                    mesh.material.forEach(m => { if (m.map) try { m.map.dispose(); } catch(e){}; try { m.dispose(); } catch(e){}; });
+                    mesh.material.forEach(m => { if (m.map) try { m.map.dispose(); } catch(e){} try { m.dispose(); } catch(e){} });
                 } else {
                     if (mesh.material.map) try { mesh.material.map.dispose(); } catch(e) {}
                     try { mesh.material.dispose(); } catch(e) {}
@@ -482,6 +482,7 @@ function preloadTrailModels(game) {
 // Ball material
 export function getBallMaterial(game) {
     const conf = game.ballConfigs[game.saveData.selectedBall] || game.ballConfigs.rainbow;
+    if (!conf) return new THREE.MeshPhongMaterial({ color: 0xffffff, side: THREE.DoubleSide });
     try {
         if (game.saveData.selectedBall === 'groovy') {
             if (!game.groovyCanvasTex) {

@@ -87,7 +87,7 @@ class Game {
             this.keys[e.code] = true;
             if (e.code === 'Space') jump(this);
         });
-        window.addEventListener('keyup', (e) => this.keys[e.code] = false);
+        window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
 
         const joystick = nipplejs.create({
             zone: document.getElementById('joystick-container'),
