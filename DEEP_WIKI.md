@@ -1,7 +1,7 @@
 # Going Balls — Deep Developer Wiki
 
-Version: 1.1  
-Generated: 2026-06-21
+Version: 1.2  
+Generated: 2026-06-22
 
 Purpose
 -------
@@ -30,6 +30,7 @@ Table of Contents
 - Hazards & coin-drop system
 - Performance optimization checklist
 - Testing
+- CI/CD pipeline
 - Debugging & common errors
 - Build, test, and deployment
 - FAQ & troubleshooting
@@ -38,17 +39,17 @@ Table of Contents
 
 Project overview
 ----------------
-Going Balls — Web Edition is a lightweight, mobile-first 3D rolling-platformer that combines Cannon-es physics with Three.js rendering. The codebase favors robustness: graceful asset fallback, aggressive error handling, and client-side persistence (localStorage) with optional multiplayer persistence via WebsimSocket room collections.
+Going Balls — Web Edition is a lightweight, mobile-first 3D rolling-platformer that combines Cannon-es physics with Three.js rendering. The codebase favors robustness: graceful asset fallback, aggressive error handling, and client-side persistence (localStorage) with optional multiplayer persistence via WebsimSocket room collections. Deployed to GitHub Pages with CI/CD via GitHub Actions.
 
 Module architecture
 -------------------
-The codebase is split into 10 focused modules plus the root bootstrap file. All modules use ES module `import`/`export` and follow a dependency-injection pattern where the `game` object is passed as the first parameter.
+The codebase is split into 11 focused modules plus the root bootstrap file. All modules use ES module `import`/`export` and follow a dependency-injection pattern where the `game` object is passed as the first parameter.
 
 ```
-main.js                    — Thin DI bootstrap: creates Game class, wires modules
-├── engine/scene.js        — Three.js scene, camera, renderer, materials, sky, textures, ball skin application
+main.js                    — Thin DI bootstrap: creates Game class, wires modules (~350 lines)
+├── engine/scene.js        — Three.js scene, camera, renderer, materials, sky, textures, ball skin application, disposeMesh()
 ├── src/physics.js         — cannon-es world, ball body, forces, obstacle collision, particle weather effects
-├── src/levelgen.js        — Procedural level generation, segment builders, coin spawning
+├── src/levelgen.js        — Procedural level generation, segment builders, coin spawning, geometry disposal
 ├── src/ui.js              — DOM UI, modals, shop, skins/skies/powerups grids, leaderboard, game state
 ├── src/audio.js           — Audio init, music toggle, SFX pool (clone-based)
 ├── src/persistence.js     — localStorage save/load, configs, mulberry32 RNG, weather AI
@@ -74,11 +75,11 @@ main.js                    — Thin DI bootstrap: creates Game class, wires modu
 File structure & key assets
 ---------------------------
 ```
-index.html               — App shell, import map (three/cannon-es/nipplejs via esm.sh), CSS, UI skeleton
+index.html               — App shell, import map (three/cannon-es/nipplejs via esm.sh), CSS, UI skeleton, SEO meta tags, manifest link
 main.js                  — Bootstrap: Game class, controls, DI wiring (~350 lines)
-engine/scene.js          — Three.js scene setup, materials, sky rendering, PMREM, ball skin swap
+engine/scene.js          — Three.js scene setup, materials, sky rendering, PMREM, ball skin swap, disposeMesh()
 src/physics.js           — cannon-es world, ball physics, weather particles, obstacle collision
-src/levelgen.js          — Procedural level generator (~40 segment types), coin/checkpoint/finish
+src/levelgen.js          — Procedural level generator (~40 segment types), coin/checkpoint/finish, geometry disposal
 src/ui.js                — All DOM UI: shop modals, grids, leaderboard, settings, game state checks
 src/audio.js             — Audio init, music/SFX management, clone-based audio pool
 src/persistence.js       — localStorage save/load, mulberry32 RNG, sky/powerup/weather configs
@@ -87,7 +88,12 @@ src/rendering.js         — requestAnimationFrame loop, camera follow, particle
 src/ball_db.js           — BALL_DB: 65+ ball skin definitions (single source of truth)
 src/ball_index_ui.js     — Ball Index UI: renders cards with remote stats, buy/equip/level actions
 src/notification_manager.js — DOM toast pooling with rate limiting and max concurrent
-tests/                   — Vitest tests: persistence, levelgen, asset loading
+sw.js                    — Service worker with SHA-stamped cache busting (stale-while-revalidate)
+manifest.json            — PWA manifest (fullscreen, installable)
+lighthouserc.json        — Lighthouse CI config (performance ≥0.5, accessibility ≥0.7)
+eslint.config.js         — ESLint flat config (recommended + style rules)
+.github/workflows/ci.yml — CI/CD: ESLint → vitest → Lighthouse CI → GitHub Pages deploy
+tests/                   — Vitest tests: persistence, levelgen, asset loading, ball skin (141 total)
 assets/image/            — Textures (.webp, .gif)
 assets/model/            — 3D models (.glb, .gltf)
 assets/sfx/              — Audio (.mp3)
@@ -103,6 +109,7 @@ Runtime architecture
 - **Materials:** Shared material pool (wood, finish, coin, pendulum, spinner, rope, wall, speed, hazard, neon, glass). PBR-like behavior via MeshPhongMaterial + PMREM environment.
 - **Scene lifecycle:** `applySkyConfig()` handles smooth crossfades, env map generation, and resource disposal for previous sky.
 - **Ball skin system:** `getBallMaterial()` handles texture/color/emissive types. `applyBallSkin()` additionally handles gltf type with async GLB loading, caching, and mesh swap. Original sphere mesh preserved as `_defaultBallMesh` for restoration.
+- **disposeMesh():** Exported utility that traverses a mesh tree, disposes all child geometries and materials (including texture maps), and removes from parent. Used for sky transitions, GLTF ball skin swaps, and trail instance cleanup.
 
 ### Physics
 - **Engine:** cannon-es
@@ -165,7 +172,7 @@ Condition skies apply coin multipliers (via checkGameState), speed modifiers (vi
 - **Collections:** leaderboard, player_clones, ball_stats — subscribed when room is ready
 - **Sanitization:** `sanitizeRemoteEntry()` applied to all incoming data — strings ≤128 chars, numbers clamped to [-1e9, 1e9], empty entries dropped
 - **Permission model:** Local writes always allowed; remote writes best-effort
-- **Ball stats seeding:** 5 sample records created on first successful connection
+- **Ball stats seeding:** 5 sample records created on first successful connection (camelCase keys: ballKey, avgTime, bestTime)
 
 Configuration and tuning parameters
 -----------------------------------
@@ -241,28 +248,42 @@ Extending levels and obstacles
 Hazards & coin-drop system
 --------------------------
 - Pendulums, spinners, movers, and meteors drop coins on contact with the player ball
-- Coin loss scales with level: `baseLoss * (1 + (currentLevel - 1) * multiplier)`
+- Coin loss scales with level: `baseLoss * (1 + (currentLevel - 1) * multiplier)` — applied once by callers (physics.js), NOT double-scaled
 - Dropped coins spawn as collectible pickups (user can reclaim them)
 - 10 trail sprite/model types attach to hazards for visual flair: skeleton, zombie, eye, soldier2, venus, dragon, bowling_strike, easter, life, love
+- Trail instances are properly disposed via `disposeMesh()` on level reset
 
 Testing
 -------
 - **Framework:** Vitest with jsdom environment
-- **Test files:** `tests/persistence.test.js`, `tests/levelgen.test.js`, `tests/asset_loading.test.js` — 115 tests total
+- **Test files:** `tests/persistence.test.js`, `tests/levelgen.test.js`, `tests/asset_loading.test.js`, `tests/ball_skin.test.js` — 141 tests total
 - **Run:** `npm test` or `npx vitest run`
 - **Coverage:** `npm run test:coverage`
-- **What's tested:** Deterministic RNG seeding, localStorage save/load/corruption recovery, level generation with fixed seeds, asset path validation, Three.js/CANNON mock integrity
+- **What's tested:** Deterministic RNG seeding, localStorage save/load/corruption recovery, level generation with fixed seeds, asset path validation, Three.js/CANNON mock integrity, getBallMaterial (7 tests), applyBallSkin (8 tests), levelUpSkin (7 tests)
+
+CI/CD pipeline
+--------------
+- **Trigger:** Push to `main` or PR to `main`
+- **Jobs:**
+  1. `lint-and-test` — ESLint + vitest (141 tests)
+  2. `lighthouse` — Lighthouse CI audit (performance ≥0.5, accessibility ≥0.7, best-practices ≥0.7)
+  3. `deploy` — GitHub Pages (gates on lint-and-test + lighthouse)
+- **Deploy:** Stages only deployable files (`index.html`, `main.js`, `sw.js`, `src/`, `engine/`, `assets/`) into `_deploy/`, stamps `sw.js` with git SHA for cache busting, uploads via `actions/upload-pages-artifact@v3`
+- **Service worker:** SHA-stamped cache version on every deploy, stale-while-revalidate for assets, network-first for navigation, old cache purging on activate
 
 Performance optimization checklist
 ----------------------------------
 - Reduce canvas size / `renderer.setPixelRatio(1)` on low-power devices (auto-detected)
 - Limit particle counts for rain/wind/snow/fire on mobile via `getParticleCount()` — scales by hardwareConcurrency, screen area, device type
 - Pool Vec3 instances on game object to avoid per-frame GC allocations
-- Reuse geometries where possible (coin geometry per-tier reuse is a known TODO)
+- Reuse geometries where possible — coin geometry per-tier reuse via `getCachedCoinGeo()` cache (5 sizes)
+- `clearLevel()` disposes geometry for levelObjects, coins, pendulums, spinners, movers, glass platforms, and trail instances
+- `disposeMesh()` traverses GLB clones and disposes nested geometries/materials
 - Use `frustumCulled = false` sparingly; particle systems grouped into single BufferGeometry
 - Shadow map: 2048×2048 PCFSoft — consider reducing on weaker devices
 - Auto-save throttled to every 5 seconds
 - Audio SFX uses clone-based pool to avoid AudioContext bottleneck
+- `clearTextureCache()` available for full scene rebuilds (not called during level reset since shared materials reference cached textures)
 
 Debugging & common errors
 -------------------------
@@ -276,9 +297,11 @@ Debugging & common errors
 Build, test, and deployment
 ---------------------------
 - **Static deployment:** Host index.html, main.js, src/, engine/, and assets/ on any static file server
-- **Local dev:** `npm run dev` (uses `serve -o`) or `npx http-server .` to avoid CORS issues
+- **Local dev:** `npm run dev` (uses `serve --open`) or `npx http-server .` to avoid CORS issues
+- **Linting:** `npm run lint` (ESLint with flat config) or `npm run lint:fix` for auto-fix
 - **Asset compression:** All images should be .webp; GLB models should be optimized; audio compressed with ffmpeg
 - **No build step required:** ES modules loaded directly via import map (three, cannon-es, nipplejs from esm.sh CDN)
+- **CI/CD:** Push to `main` triggers ESLint → vitest → Lighthouse → GitHub Pages deploy
 
 FAQ & troubleshooting
 ---------------------
@@ -297,6 +320,9 @@ A: `createLevel(game, seed)` uses mulberry32 PRNG seeded from the `seed` paramet
 **Q: How do condition skies affect gameplay?**  
 A: Condition skies (storm, inferno, frostbite, voidstorm) set `game.skyConfigs[selectedSky].conditions` which are read by `checkGameState` (coin multipliers), `updatePhysics` (speed modifiers), and `createLevel` (weather particle spawning).
 
+**Q: Why does `serve -o` fail?**  
+A: `serve` v14+ dropped the `-o` flag. Use `serve --open` instead.
+
 API reference (short)
 ---------------------
 - `room.collection('leaderboard').getList()`, `.create(obj)`, `.subscribe(callback)`
@@ -307,8 +333,7 @@ API reference (short)
 
 Changelog
 ---------
-- **1.1** (2026-06-21): Updated for modular architecture (10 modules), added sky conditions, hazards/coin-drop system, testing section, ball skin system docs, condition skies table.
-- **1.0** (2026-06-21): Initial deep wiki — architecture, developer guidance, and extension points.
+See [CHANGELOG.md](./CHANGELOG.md) for the full version history and detailed change entries.
 
 Appendix: Quick dev tips
 ------------------------

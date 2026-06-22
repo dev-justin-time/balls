@@ -1,6 +1,6 @@
 # Going Balls — Code Audit & Improvement Plan
 
-Updated: 2026-06-21 (post-audit fixes complete)
+Updated: 2026-06-22 (all audit items complete)
 
 Purpose
 -------
@@ -114,7 +114,7 @@ All audit items complete — no remaining work.
 1. ✅ Fix eye_ball GLTF skin rendering
 2. ✅ Rename .glb → finish_gate.glb
 3. ✅ Pool Vec3 instances + coin geometry reuse
-4. ✅ Add unit tests (115 passing)
+4. ✅ Add unit tests (141 passing)
 5. ✅ Create package.json + vitest config
 6. ✅ Clean up window.__goingBalls* globals
 7. ✅ Add ARIA labels + focus trapping

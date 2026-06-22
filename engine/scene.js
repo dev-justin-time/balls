@@ -133,7 +133,7 @@ export function loadTexture(game, url) {
     }
 }
 
-function disposeMesh(mesh) {
+export function disposeMesh(mesh) {
     if (!mesh) return;
     try {
         if (mesh.traverse) {

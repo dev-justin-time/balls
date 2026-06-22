@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { mulberry32, getParticleCount, saveGame } from './persistence.js';
-import { applySkyConfig } from '../engine/scene.js';
+import { applySkyConfig, disposeMesh } from '../engine/scene.js';
 import { createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, createHeatShimmer, clearHeatShimmer, createMeteors, clearMeteors } from './physics.js';
 
 /** Module-level RNG used by all helper functions. Overridden by createLevel() with a seeded RNG, restored afterward. */
@@ -40,19 +40,19 @@ export function clearLevel(game) {
             game.scene.remove(p.line);
             if (p.line.geometry) p.line.geometry.dispose();
         }
-        if (p.trail) { game.scene.remove(p.trail); }
+        if (p.trail) { disposeMesh(p.trail); }
     });
     game.spinners.forEach(s => {
         if (s.body) game.world.removeBody(s.body);
         game.scene.remove(s.mesh);
         if (s.mesh && s.mesh.geometry) s.mesh.geometry.dispose();
-        if (s.trail) { game.scene.remove(s.trail); }
+        if (s.trail) { disposeMesh(s.trail); }
     });
     game.movers.forEach(m => {
         if (m.body) game.world.removeBody(m.body);
         game.scene.remove(m.mesh);
         if (m.mesh && m.mesh.geometry) m.mesh.geometry.dispose();
-        if (m.trail) { game.scene.remove(m.trail); }
+        if (m.trail) { disposeMesh(m.trail); }
     });
     if (game.raining) clearRain(game);
     if (game.windy) clearWind(game);
@@ -579,7 +579,7 @@ export function addPlatform(game, x, y, z, width, length, color = null) {
             game.levelObjects.push({ mesh: stripR, body: null });
 
             const underGeo = new THREE.BoxGeometry(width + 0.06, 0.02, 0.06);
-            const underMat = game.sharedMaterials.neon.clone ? game.sharedMaterials.neon : game.sharedMaterials.neon;
+            const underMat = game.sharedMaterials.neon.clone();
             const under = new THREE.Mesh(underGeo, underMat);
             under.position.set(x, y + 0.01, z - (length / 2) + 0.02);
             under.receiveShadow = false;
