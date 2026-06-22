@@ -199,6 +199,14 @@ export function setupGlobalErrorHandlers(notifier) {
 }
 
 export async function initNetworking() {
+    // WebsimSocket is only available in the Websim runtime.
+    // When running locally (e.g. localhost via `serve`), fall back to offline mode.
+    if (typeof WebsimSocket === 'undefined') {
+        console.info('WebsimSocket not available — running in offline/local mode.');
+        __roomReadyFn = () => false;
+        return { collection: () => ({ getList: () => [], create: async () => {} }), isReady: false };
+    }
+
     const room = new WebsimSocket();
 
     // Retry loop with exponential backoff
