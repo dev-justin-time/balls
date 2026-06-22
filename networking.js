@@ -4,10 +4,7 @@
  the WebSimSocket room BEFORE any asset loading begins, so
  fallback/error handling is in place from the start.
 */
-import * as THREE from 'three';
-import { setupLoadingManager, initNetworking } from './src/networking.js';
-
-console.log('[networking.js] Bootstrap started — setting up loading manager and initializing networking BEFORE main.js loads assets.');
+import { setupLoadingManager, initNetworking, setupGlobalErrorHandlers } from './src/networking.js';
 
 // Set up loading progress/error hooks BEFORE any assets load
 setupLoadingManager();
@@ -15,6 +12,4 @@ setupLoadingManager();
 // Initialize networking (top-level await — blocks main.js until ready)
 const room = await initNetworking();
 
-console.log('[networking.js] Networking initialized. Now main.js will begin loading.');
-
-export { room };
+export { room, setupGlobalErrorHandlers };
