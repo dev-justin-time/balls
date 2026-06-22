@@ -1,0 +1,239 @@
+/*
+ Persistence + Data module.
+ Exports: initPersistence(game), saveGame(game), getParticleCount(game, type, defaultCount)
+
+ Handles: localStorage save/load, RNG seeding, ball/sky/powerup configs,
+ weather AI, BALL_DB merging, particle count estimation.
+*/
+import { BALL_DB } from './ball_db.js';
+
+// Mulberry32 seeded RNG
+export function mulberry32(a) {
+    return function() {
+        let t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+export function initPersistence(game) {
+    // --- RNG Setup ---
+    game.rng = null;
+    game.rnd = () => (game.rng ? game.rng() : Math.random());
+
+    // Read optional seed from URL param ?seed=12345
+    try {
+        if (typeof window !== 'undefined' && window.location && window.location.search) {
+            const params = new URLSearchParams(window.location.search);
+            const s = params.get('seed');
+            if (s !== null) {
+                const parsed = parseInt(s, 10);
+                if (!Number.isNaN(parsed)) {
+                    game._seed = parsed;
+                    game.rng = mulberry32(parsed >>> 0);
+                    console.info('Deterministic seed enabled:', parsed);
+                }
+            }
+        }
+    } catch (e) { /* ignore URL parsing failures */ }
+
+    // --- Default save data ---
+    const defaultData = {
+        totalCoins: 0,
+        unlockedBalls: ['rainbow'],
+        unlockedSkies: ['day'],
+        selectedBall: 'rainbow',
+        selectedSky: 'day',
+        skinLevels: { rainbow: 1 },
+        powerups: {},
+        weatherPrefs: {
+            lastWeather: 'clear',
+            bias: {}
+        }
+    };
+    game.saveData = JSON.parse(localStorage.getItem('goingBallsData_v1')) || defaultData;
+
+    // --- Ball configs ---
+    game.ballConfigs = {
+        rainbow: { name: 'Rainbow', price: 0, tex: 'assets/image/dsfk.webp', type: 'texture', ability: { key: 'coins', base: 1.0, perLevel: 0.15 } },
+        wood: { name: 'Wood', price: 50, tex: 'assets/image/wood_texture.webp', type: 'texture', ability: { key: 'jump', base: 1.0, perLevel: 0.07 } },
+        metal: { name: 'Chrome', price: 150, tex: 'assets/image/ball_metal.webp', type: 'texture', ability: { key: 'speed', base: 1.0, perLevel: 0.06 } },
+        lava: { name: 'Lava', price: 300, tex: 'assets/image/ball_lava.webp', type: 'texture', ability: { key: 'coins', base: 1.05, perLevel: 0.12 } },
+        basketball: { name: 'Basketball', price: 80, tex: 'assets/image/Basketball.webp', type: 'texture', ability: { key: 'jump', base: 1.02, perLevel: 0.05 } },
+        bowling: { name: 'Bowling', price: 120, tex: 'assets/image/bolos.webp', type: 'texture', ability: { key: 'speed', base: 1.0, perLevel: 0.05 } },
+        diamond: { name: 'Diamond', price: 1000, tex: 'assets/image/ball_metal.webp', type: 'texture', ability: { key: 'coins', base: 1.2, perLevel: 0.12 } },
+        obsidian: { name: 'Obsidian', price: 1500, tex: 'assets/image/ball_lava.webp', type: 'texture', ability: { key: 'jump', base: 1.15, perLevel: 0.08 } },
+        galaxy: { name: 'Galaxy', price: 2000, tex: 'assets/image/dsfk.webp', type: 'texture', ability: { key: 'speed', base: 1.12, perLevel: 0.08 } },
+        golden: { name: 'Golden', price: 5000, tex: 'assets/image/ball_metal.webp', type: 'texture', ability: { key: 'coins', base: 1.35, perLevel: 0.14 } },
+        nebula: { name: 'Nebula', price: 220, tex: 'assets/model/scene_NEBULA.gltf', type: 'texture', ability: { key: 'coins', base: 1.05, perLevel: 0.08 } },
+        ember: { name: 'Ember', price: 180, tex: 'assets/image/ball_lava.webp', type: 'texture', ability: { key: 'jump', base: 1.03, perLevel: 0.06 } },
+        polished: { name: 'Polished', price: 200, tex: 'assets/image/ball_metal.webp', type: 'texture', ability: { key: 'speed', base: 1.04, perLevel: 0.05 } },
+        oak: { name: 'Oak', price: 60, tex: 'assets/image/wood_texture.webp', type: 'texture', ability: { key: 'jump', base: 1.01, perLevel: 0.04 } },
+        sunset: { name: 'Sunset', price: 140, tex: 'assets/image/sky_sunset.webp', type: 'texture', ability: { key: 'coins', base: 1.02, perLevel: 0.05 } },
+        midnight: { name: 'Midnight', price: 260, tex: 'assets/image/sky_night.webp', type: 'texture', ability: { key: 'speed', base: 1.06, perLevel: 0.06 } },
+        aurora: { name: 'Aurora', price: 420, tex: 'assets/image/sky_void.webp', type: 'texture', ability: { key: 'coins', base: 1.08, perLevel: 0.07 } },
+        mosaic: { name: 'Mosaic', price: 350, tex: 'assets/image/dsfk.webp', type: 'texture', ability: { key: 'speed', base: 1.05, perLevel: 0.06 } },
+        marble: { name: 'Marble', price: 190, tex: 'assets/image/ball_metal.webp', type: 'texture', ability: { key: 'jump', base: 1.04, perLevel: 0.05 } },
+        citrus: { name: 'Citrus', price: 75, tex: 'assets/image/Basketball.webp', type: 'texture', ability: { key: 'coins', base: 1.01, perLevel: 0.03 } },
+        cobalt: { name: 'Cobalt', price: 130, tex: 'assets/image/bolos.webp', type: 'texture', ability: { key: 'speed', base: 1.03, perLevel: 0.04 } },
+        graphite: { name: 'Graphite', price: 300, tex: 'assets/image/ball_metal.webp', type: 'texture', ability: { key: 'coins', base: 1.06, perLevel: 0.06 } },
+        ember_core: { name: 'Ember Core', price: 450, tex: 'assets/image/ball_lava.webp', type: 'texture', ability: { key: 'jump', base: 1.06, perLevel: 0.07 } },
+        prism: { name: 'Prism', price: 380, tex: 'assets/image/dsfk.webp', type: 'texture', ability: { key: 'coins', base: 1.07, perLevel: 0.06 } },
+        driftwood: { name: 'Driftwood', price: 95, tex: 'assets/image/wood_texture.webp', type: 'texture', ability: { key: 'jump', base: 1.02, perLevel: 0.04 } },
+        chrome_stripe: { name: 'Chrome Stripe', price: 240, tex: 'assets/image/ball_metal.webp', type: 'texture', ability: { key: 'speed', base: 1.05, perLevel: 0.06 } },
+        lava_flow: { name: 'Lava Flow', price: 320, tex: 'assets/image/ball_lava.webp', type: 'texture', ability: { key: 'coins', base: 1.09, perLevel: 0.07 } },
+        retro_orb: { name: 'Retro Orb', price: 160, tex: 'assets/image/sky_sunset.webp', type: 'texture', ability: { key: 'speed', base: 1.02, perLevel: 0.03 } },
+        starlight: { name: 'Starlight', price: 600, tex: 'assets/image/sky_night.webp', type: 'texture', ability: { key: 'coins', base: 1.12, perLevel: 0.08 } },
+        cloudburst: { name: 'Cloudburst', price: 110, tex: 'assets/image/1eprhbtmvoo51.webp', type: 'texture', ability: { key: 'jump', base: 1.03, perLevel: 0.05 } },
+        sunmetal: { name: 'Sunmetal', price: 520, tex: 'assets/image/ball_metal.webp', type: 'texture', ability: { key: 'speed', base: 1.08, perLevel: 0.07 } },
+        magma_core: { name: 'Magma Core', price: 700, tex: 'assets/image/ball_lava.webp', type: 'texture', ability: { key: 'coins', base: 1.15, perLevel: 0.09 } },
+        coral: { name: 'Coral', price: 85, tex: 'assets/image/Basketball.webp', type: 'texture', ability: { key: 'jump', base: 1.01, perLevel: 0.03 } },
+        sapphire: { name: 'Sapphire', price: 420, tex: 'assets/image/bolos.webp', type: 'texture', ability: { key: 'coins', base: 1.1, perLevel: 0.07 } },
+        voidglass: { name: 'Voidglass', price: 980, tex: 'assets/image/dsfk.webp', type: 'texture', ability: { key: 'speed', base: 1.12, perLevel: 0.08 } },
+        p2opp: { name: 'P2OPP (Glass)', price: 7500, tex: 'assets/image/p2opp.webp', type: 'texture', ability: { key: 'coins', base: 1.25, perLevel: 0.1 } },
+        groovy: { name: 'Groovy', price: 12000, tex: 'assets/image/dancing-groovy.webp', type: 'texture', ability: { key: 'speed', base: 1.40, perLevel: 0.18 } },
+        rock_k: { name: 'Rock K', price: 120, tex: 'assets/image/rock_k.webp', type: 'texture', ability: { key: 'jump', base: 1.03, perLevel: 0.04 } },
+        marble_orochiaro: { name: 'Orochiaro Marble', price: 200, tex: 'assets/image/marble_orochiaro_white_t.webp', type: 'texture', ability: { key: 'coins', base: 1.04, perLevel: 0.05 } },
+        marble_grey: { name: 'Marble Grey', price: 180, tex: 'assets/image/Marble-grey_t.webp', type: 'texture', ability: { key: 'speed', base: 1.03, perLevel: 0.04 } },
+        marble_luar: { name: 'Marble Luar', price: 175, tex: 'assets/image/Marble-luar_t.webp', type: 'texture', ability: { key: 'jump', base: 1.02, perLevel: 0.03 } },
+        marble9: { name: 'Ocean Marble', price: 210, tex: 'assets/image/marble9.webp', type: 'texture', ability: { key: 'coins', base: 1.05, perLevel: 0.05 } },
+        purpleveins: { name: 'Purple Veins', price: 160, tex: 'assets/image/purpleveins.webp', type: 'texture', ability: { key: 'speed', base: 1.02, perLevel: 0.03 } },
+        marble8: { name: 'Beige Marble', price: 165, tex: 'assets/image/marble8.webp', type: 'texture', ability: { key: 'coins', base: 1.03, perLevel: 0.04 } },
+        alien_11: { name: 'Alien Warm', price: 220, tex: 'assets/image/alien_11.webp', type: 'texture', ability: { key: 'coins', base: 1.04, perLevel: 0.05 } },
+        alien_14_variant: { name: 'Alien Wavy Variant', price: 230, tex: 'assets/image/alien_14.webp', type: 'texture', ability: { key: 'speed', base: 1.03, perLevel: 0.04 } },
+        alien_6: { name: 'Alien Emboss', price: 200, tex: 'assets/image/alien_6.webp', type: 'texture', ability: { key: 'jump', base: 1.04, perLevel: 0.05 } },
+        alien28c: { name: 'Frosty Ice', price: 210, tex: 'assets/image/alien28c.webp', type: 'texture', ability: { key: 'speed', base: 1.02, perLevel: 0.04 } },
+        alien_13: { name: 'Alien Rust', price: 205, tex: 'assets/image/alien_13.webp', type: 'texture', ability: { key: 'coins', base: 1.03, perLevel: 0.04 } },
+        alien_8: { name: 'Circular Rings', price: 190, tex: 'assets/image/alien_8.webp', type: 'texture', ability: { key: 'speed', base: 1.02, perLevel: 0.03 } },
+        alien41: { name: 'Green Abstract', price: 195, tex: 'assets/image/alien41.webp', type: 'texture', ability: { key: 'jump', base: 1.02, perLevel: 0.03 } },
+        colored_stone1: { name: 'Blue Stone', price: 170, tex: 'assets/image/colored_stone1.webp', type: 'texture', ability: { key: 'coins', base: 1.02, perLevel: 0.03 } },
+        alien_7: { name: 'Neon Ripples', price: 240, tex: 'assets/image/alien_7.webp', type: 'texture', ability: { key: 'speed', base: 1.04, perLevel: 0.05 } },
+        alien_3: { name: 'Alien Face', price: 260, tex: 'assets/image/alien_3.webp', type: 'texture', ability: { key: 'coins', base: 1.05, perLevel: 0.05 } },
+        alien_14: { name: 'Alien Wavy Ridged', price: 225, tex: 'assets/image/alien_14.webp', type: 'texture', ability: { key: 'jump', base: 1.03, perLevel: 0.04 } }
+    };
+
+    // Merge external BALL_DB into ballConfigs
+    mergeBallDB(game);
+
+    // --- Powerup configs ---
+    game.powerupConfigs = {
+        magnet: { name: 'Magnet', price: 180, rarity: 'common', maxLevel: 5, description: 'Attract nearby coins within short range; higher levels increase radius and pull strength.' },
+        turbo:  { name: 'Turbo',  price: 300, rarity: 'uncommon', maxLevel: 5, description: 'Short burst of speed when activated; levels increase duration and multiplier.' },
+        shield: { name: 'Shield', price: 420, rarity: 'rare', maxLevel: 5, description: 'Absorb one fall/hazard hit; level increases durability/time.' },
+        x2coins:{ name: 'Coin Doubler', price: 500, rarity: 'epic', maxLevel: 3, description: 'Temporarily doubles coin pickup value; higher levels lengthen duration.' }
+    };
+
+    // --- Sky configs ---
+    game.skyConfigs = {
+        day:    { name: 'Blue Sky',    price: 0,   tex: 'assets/image/sky_day.webp',    color: 0x87ceeb },
+        sunset: { name: 'Sunset',      price: 100, tex: 'assets/image/sky_sunset.webp', color: 0xff7f50 },
+        night:  { name: 'Midnight',    price: 250, tex: 'assets/image/sky_night.webp',  color: 0x0a0a2a },
+        void:   { name: 'Cosmic',      price: 500, tex: 'assets/image/sky_void.webp',   color: 0x000000 },
+        clouds: { name: 'Cloudscape',  price: 80,  tex: 'assets/image/1eprhbtmvoo51.webp', color: 0xddeeff },
+        mosaic: { name: 'Rainbow Mosaic', price: 300, tex: 'assets/image/dsfk.webp', color: 0x223344 },
+        aurora: { name: 'Aurora Glow', price: 800, tex: 'assets/image/sky_void.webp', color: 0x055e7f },
+        retro:  { name: 'Retro Sunset', price: 200, tex: 'assets/image/sky_sunset.webp', color: 0xffb07a }
+    };
+
+    // --- Weather AI ---
+    game.weatherTypes = ['clear', 'rain', 'wind', 'snow', 'mixed'];
+    game.weatherAI = {
+        chooseWeather: (level) => {
+            const bias = game.saveData.weatherPrefs && game.saveData.weatherPrefs.bias ? game.saveData.weatherPrefs.bias : {};
+            const base = game.weatherTypes.map(w => {
+                let score = 1;
+                if (w === 'rain' && level % 5 === 0) score += 2;
+                if (w === 'wind' && level % 7 === 0) score += 2;
+                if (w === 'snow' && level > 8 && level % 6 === 0) score += 1.5;
+                if (w === 'mixed' && level > 12) score += 1;
+                score += (bias[w] || 0) * 0.2;
+                return score;
+            });
+            const total = base.reduce((s, v) => s + v, 0);
+            let r = Math.random() * total;
+            for (let i = 0; i < base.length; i++) {
+                if (r < base[i]) return game.weatherTypes[i];
+                r -= base[i];
+            }
+            return 'clear';
+        },
+        recordWeather: (w) => {
+            game.saveData.weatherPrefs = game.saveData.weatherPrefs || { bias: {}, lastWeather: 'clear' };
+            game.saveData.weatherPrefs.lastWeather = w;
+            game.saveData.weatherPrefs.bias[w] = (game.saveData.weatherPrefs.bias[w] || 0) + 1;
+            const keys = Object.keys(game.saveData.weatherPrefs.bias);
+            if (keys.length > 10) {
+                keys.forEach(k => game.saveData.weatherPrefs.bias[k] = Math.max(0, game.saveData.weatherPrefs.bias[k] - 1));
+            }
+            saveGame(game);
+        }
+    };
+}
+
+export function mergeBallDB(game) {
+    try {
+        if (typeof BALL_DB !== 'undefined') {
+            const entries = Array.isArray(BALL_DB)
+                ? BALL_DB
+                : Object.entries(BALL_DB).map(([key, val]) => ({ key, ...val }));
+
+            for (const b of entries) {
+                try {
+                    const k = (b.key || '').toString();
+                    if (!k) continue;
+                    if (game.ballConfigs[k]) {
+                        const existing = game.ballConfigs[k];
+                        existing.price = (existing.price !== undefined) ? existing.price : (b.price !== undefined ? b.price : 0);
+                        existing.tex = existing.tex || b.tex || existing.tex;
+                        existing.type = existing.type || b.type || 'texture';
+                        existing.description = existing.description || b.description || '';
+                        existing.ability = existing.ability || b.ability || null;
+                    } else {
+                        game.ballConfigs[k] = {
+                            name: b.name || k,
+                            price: (b.price !== undefined) ? b.price : 0,
+                            tex: b.tex || '',
+                            type: b.type || 'texture',
+                            ability: b.ability || null,
+                            description: b.description || ''
+                        };
+                    }
+                } catch (err) {
+                    console.warn('Failed to merge BALL_DB entry', b && b.key, err);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('BALL_DB merge failed', e);
+    }
+}
+
+export function saveGame(game) {
+    localStorage.setItem('goingBallsData_v1', JSON.stringify(game.saveData));
+}
+
+export function getParticleCount(game, type, defaultCount) {
+    try {
+        const hc = navigator.hardwareConcurrency || 2;
+        const isMobile = /Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+        const area = (window && window.innerWidth && window.innerHeight) ? (window.innerWidth * window.innerHeight) : 1280 * 720;
+        let quality = 1.0;
+        if (isMobile) quality *= 0.45;
+        if (hc <= 2) quality *= 0.6;
+        else if (hc <= 4) quality *= 0.8;
+        const areaFactor = Math.min(1.5, Math.max(0.6, area / (1280 * 720)));
+        quality *= areaFactor;
+        quality = Math.max(0.15, Math.min(1.0, quality));
+        let typeBias = 1.0;
+        if (type === 'rain') typeBias = 1.0;
+        else if (type === 'snow') typeBias = 0.6;
+        else if (type === 'wind') typeBias = 0.35;
+        const scaled = Math.round(defaultCount * quality * typeBias);
+        const minByType = { rain: 120, snow: 80, wind: 20 };
+        const min = minByType[type] || 30;
+        return Math.max(min, Math.min(defaultCount, scaled));
+    } catch (e) {
+        return defaultCount;
+    }
+}

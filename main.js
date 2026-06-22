@@ -7,17 +7,17 @@
 */
 import * as THREE from 'three';
 import nipplejs from 'nipplejs';
-import { NotificationManager } from './notification_manager.js';
+import { NotificationManager } from './src/notification_manager.js';
 
 // Module imports
-import { initPersistence, saveGame, getParticleCount } from './persistence.js';
-import { initAudio, registerSfx, playSound } from './audio.js';
-import { initNetworking, setupLoadingManager, setupGlobalErrorHandlers } from './networking.js';
-import { initScene, getBallMaterial } from './engine/scene.js';
-import { onWindowResize, animate } from './rendering.js';
-import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind } from './physics.js';
-import { createLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins } from './levelgen.js';
-import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset } from './ui.js';
+import { initPersistence, saveGame, getParticleCount } from './src/persistence.js';
+import { initAudio, registerSfx, playSound } from './src/audio.js';
+import { initNetworking, setupLoadingManager, setupGlobalErrorHandlers } from './src/networking.js';
+import { initScene, getBallMaterial, clearTextureCache } from './engine/scene.js';
+import { onWindowResize, animate } from './src/rendering.js';
+import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind } from './src/physics.js';
+import { createLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins } from './src/levelgen.js';
+import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset } from './src/ui.js';
 
 // --- Loading Manager (must run before asset loading) ---
 setupLoadingManager();
@@ -35,11 +35,6 @@ const notifier = new NotificationManager({
 // --- Global error handlers ---
 setupGlobalErrorHandlers(notifier);
 
-// Make room globally accessible for compatibility
-window._room = room;
-
-// Expose notifier globally for compatibility
-window._notifier = notifier;
 
 // ============================================================================
 // Game class — thin DI shell
@@ -51,10 +46,10 @@ class Game {
 
         // --- Audio ---
         initAudio(this);
-        registerSfx('coin', 'coin.mp3');
-        registerSfx('jump', 'jump.mp3');
-        registerSfx('finish', 'finish.mp3');
-        registerSfx('fall', 'fall.mp3');
+        registerSfx('coin', 'assets/sfx/coin_collect.mp3');
+        registerSfx('jump', 'assets/sfx/jump.mp3');
+        registerSfx('finish', 'assets/sfx/finish_line.mp3');
+        registerSfx('fall', 'assets/sfx/fall_off.mp3');
 
         // --- Scene / Rendering ---
         initScene(this);
@@ -224,15 +219,15 @@ class Game {
 
     setupUI() { setupUI(this, room); }
     updateWalletUI() { updateWalletUI(this); }
-    checkGameState(dt) { checkGameState(this, dt); }
-    gameOver(win) { gameOver(this, win); }
+    checkGameState(dt) { checkGameState(this, dt, room); }
+    gameOver(win) { gameOver(this, win, room); }
     showTimeBonus(bonus) { showTimeBonus(this, bonus); }
     reset() { reset(this); }
     renderGrids() { renderGrids(this); }
     renderBallIndex() { renderBallIndex(this, room); }
     getLeaderboard() { return getLeaderboard(this, room); }
-    saveLeaderboard(entries) { saveLeaderboard(this, entries); }
-    addLeaderboardEntry(entry) { addLeaderboardEntry(this, entry); }
+    saveLeaderboard(entries) { saveLeaderboard(this, entries, room); }
+    addLeaderboardEntry(entry) { addLeaderboardEntry(this, entry, room); }
     renderLeaderboard() { renderLeaderboard(this, room); }
     handlePurchase(type, key, price) { handlePurchase(this, type, key, price); }
     levelUpSkin(key, cost) { levelUpSkin(this, key, cost); }
@@ -244,12 +239,12 @@ class Game {
 
     getBallMaterial() { return getBallMaterial(this); }
     playSound(name) { playSound(name); }
+    clearTextureCache() { clearTextureCache(this); }
 }
 
 // ============================================================================
 // Bootstrap
 // ============================================================================
 const game = new Game();
-window.gameInstance = game;
 
 window.addEventListener('resize', () => onWindowResize(game));

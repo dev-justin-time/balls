@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { mulberry32, getParticleCount, saveGame } from './persistence.js';
-import { applySkyConfig } from './engine/scene.js';
+import { applySkyConfig } from '../engine/scene.js';
 import { createRain, clearRain, createWind, clearWind } from './physics.js';
 
 export function clearLevel(game) {

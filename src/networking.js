@@ -5,7 +5,14 @@
  global error handlers, loading manager setup.
  Note: top-level await requires the caller to handle async init.
 */
-import { NotificationManager } from './notification_manager.js';
+import * as THREE from 'three';
+
+// Module-scoped state (was window.__goingBalls* globals)
+let __shownFallbackToast = false;
+let __assetFallback = false;
+let __networkErrorCount = 0;
+let __networkErrorLogged = false;
+let __roomReadyFn = () => false;
 
 const loadingManager = {
     active: false
@@ -48,8 +55,8 @@ export function setupLoadingManager() {
             const name = (url && url.split) ? url.split('/').pop() : String(url);
             if (loadingText()) loadingText().innerText = `Failed to load: ${name} — using fallback assets`;
 
-            if (!window.__goingBallsShownFallbackToast) {
-                window.__goingBallsShownFallbackToast = true;
+            if (!__shownFallbackToast) {
+                __shownFallbackToast = true;
                 try {
                     let t = document.getElementById('asset-fallback-toast');
                     if (!t) {
@@ -82,7 +89,7 @@ export function setupLoadingManager() {
                     }
                 } catch (e) {}
             }
-            window.__goingBallsAssetFallback = true;
+            __assetFallback = true;
         } catch (e) { /* silent */ }
     };
 }
@@ -112,11 +119,11 @@ export function setupGlobalErrorHandlers(notifier) {
             const offline = (typeof navigator !== 'undefined' && 'onLine' in navigator && !navigator.onLine);
 
             if (isNetworkError || offline) {
-                window.__goingBallsNetworkErrorCount = (window.__goingBallsNetworkErrorCount || 0) + 1;
+                __networkErrorCount++;
 
-                if (!window.__goingBallsNetworkErrorLogged) {
-                    window.__goingBallsNetworkErrorLogged = true;
-                    try { window.__goingBallsAssetFallback = true; } catch (e) {}
+                if (!__networkErrorLogged) {
+                    __networkErrorLogged = true;
+                    try { __assetFallback = true; } catch (e) {}
 
                     try {
                         if (typeof notifier !== 'undefined' && notifier && typeof notifier.notify === 'function') {
@@ -126,7 +133,7 @@ export function setupGlobalErrorHandlers(notifier) {
                 }
 
                 try {
-                    const c = window.__goingBallsNetworkErrorCount || 0;
+                    const c = __networkErrorCount;
                     if (c <= 4) console.info('Network/resource unhandled rejection detected:', msg || reason);
                     else if (c <= 12) console.debug('Additional network unhandled rejection (suppressed):', msg || reason);
                 } catch (e) {}
@@ -161,12 +168,12 @@ export async function initNetworking() {
         await room.initialize();
         room.isReady = true;
 
-        window.__goingBallsRoomReady = () => (room && room.isReady && typeof room.collection === 'function');
+        __roomReadyFn = () => (room && room.isReady && typeof room.collection === 'function');
 
         // Seed ball_stats collection
         (async () => {
             try {
-                if (!window.__goingBallsRoomReady()) return;
+                if (!__roomReadyFn()) return;
                 const coll = room.collection('ball_stats');
                 const existing = coll.getList() || [];
                 if (!existing || existing.length === 0) {
@@ -196,9 +203,7 @@ export async function initNetworking() {
         return room;
     } catch (e) {
         console.warn('WebsimSocket.initialize() failed — continuing in offline/fallback mode.', e && (e.message || e));
-        window.__goingBallsRoomInitFailed = true;
-        room.isReady = false;
-        window.__goingBallsRoomReady = () => false;
+        __roomReadyFn = () => false;
         return room;
     }
 }

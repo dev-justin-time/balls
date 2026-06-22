@@ -1,113 +1,159 @@
-<<<<<<< SEARCH
 # Going Balls — Code Audit & Improvement Plan
 
-Generated: 2026-06-21
+Updated: 2026-06-21 (after refactor + optimization pass)
 
 Purpose
 -------
-Concise audit of the current codebase (index.html, main.js, ball_db.js) with prioritized issues and actionable improvement plans so you can incrementally harden, optimize, and extend the project.
+Concise audit of the codebase with prioritized issues and actionable improvement plans.
+Updated to reflect completed work, remaining items, and new issues discovered during refactoring.
+
+Status key: ✅ Done  🔶 Partial  ⬜ Not started
 
 Executive summary
 -----------------
-The project is feature-rich and robustly defensive about asset/room failures, with a polished gameplay loop and many UX touches. Key opportunities are maintainability, performance, modularity, security, and testability. Below are prioritized findings and concrete remediation tasks you can take on immediately.
+Major progress: the monolithic main.js has been split into 10 modules, assets optimized (~40% size reduction), ball configs consolidated to a single source of truth, and a .codebuffrules safety file established.
+Remaining work: per-frame GC reduction, naming conventions, accessibility, pointer lock UX, and the eye_ball GLTF skin rendering bug.
 
-Priority 1 — Correctness & Safety
---------------------------------
-1. Missing deterministic seeding for procedural levels
-   - Problem: Level generation uses Math.random() throughout making it non-deterministic for debugging, testing, and reproducible shared levels.
-   - Fix: Introduce a small seeded RNG (e.g., mulberry32 or xorshift) and allow passing a seed into createLevel. Add dev/URL param to fix seed.
-   - Benefit: Reproducible levels, easier debugging, deterministic tests.
+---
 
-2. Global variable leakage and mixed responsibilities
-   - Problem: main.js references global `room`, `window.gameInstance` flags, and uses many top-level module-scope consts; `room` is conditionally used but sometimes referenced from other modules (ball_index_ui.js).
-   - Fix: Pass `room` explicitly into modules that need it (renderBallIndexUI) and avoid implicit globals; encapsulate Game dependencies into a small API object.
-   - Benefit: Fewer implicit dependencies, easier unit testing and reuse.
+## Priority 1 — Correctness & Safety
 
-3. Unbounded memory/DOM updates on repeated toasts/popups
-   - Problem: Temporary DOM toasts are created and may overlap; no global queue or max concurrent notifications.
-   - Fix: Create a small notification manager with pooling and rate-limiting.
-   - Benefit: Prevent DOM bloat and UX spam.
+### 1. ✅ Missing deterministic seeding for procedural levels
+- Status: DONE. mulberry32 in persistence.js, URL param ?seed=12345 support, passed into createLevel.
+- Fix applied: src/persistence.js exports mulberry32, initPersistence reads URL seed, createLevel accepts seed.
 
-Priority 2 — Performance & Resource Management
----------------------------------------------
-1. Textures and PMREM leaks
-   - Problem: PMREM results and some generated textures may not be disposed when switching skies; this can leak VRAM over long sessions.
-   - Fix: Track generated env maps and call dispose() when replacing. Ensure textureLoader caching can be cleared for hot-swap.
-   - Benefit: Lower memory usage, improved long-play stability.
+### 2. 🔶 Global variable leakage and mixed responsibilities
+- Status: PARTIAL. `room` now passed explicitly to modules (saveLeaderboard, addLeaderboardEntry, checkGameState, gameOver, setupUI, renderBallIndex, renderLeaderboard). `window._room` still used as fallback in addLeaderboardEntry.
+- Remaining: eliminate window._room fallback. Remove window.__goingBalls* flags by moving to module-scoped state.
 
-2. Particle counts on mobile
-   - Problem: Rain/snow/wind use fixed counts (1200, 600) which is heavy for low-end devices.
-   - Fix: Detect device performance (userAgent, hardwareConcurrency, mobile heuristics) and scale particle counts; provide quality presets.
-   - Benefit: Stable framerate on mobile.
+### 3. ✅ Unbounded memory/DOM updates on repeated toasts/popups
+- Status: DONE. src/notification_manager.js with pooling, rate-limiting, maxConcurrent=3, minIntervalMs.
 
-3. Frequent per-frame allocations
-   - Problem: Temporary vectors and arrays allocated inside hot loops (e.g., updatePhysics) create GC churn.
-   - Fix: Reuse Vector3/Cannon Vec3 instances and temporary arrays; hoist reusable objects to instance scope.
-   - Benefit: Reduced GC pauses and smoother 60fps.
+---
 
-Priority 3 — Maintainability & Modularity
-----------------------------------------
-1. Monolithic main.js
-   - Problem: main.js exceeds a single-responsibility scope—rendering, physics, UI, audio, level gen, persistence and networking are co-mingled.
-   - Fix: Split into modules: engine/scene.js, physics.js, ui.js, levelgen.js, audio.js, persistence.js, and wire them via a lightweight DI pattern.
-   - Benefit: Easier navigation, isolated testing, smaller patches.
+## Priority 2 — Performance & Resource Management
 
-2. Ball config duplication
-   - Problem: ballConfigs is defined in main.js and merged with BALL_DB; duplication invites drift.
-   - Fix: Consolidate canonical config into ball_db.js and import it as the single source of truth; main.js should only extend when necessary.
-   - Benefit: Single point for skin metadata, easier content editing.
+### 1. 🔶 Textures and PMREM leaks
+- Status: PARTIAL. _lastEnvMap.dispose() tracked when replacing env maps. textureCache with Map.
+- Remaining: verify disposal in all code paths (sky switching, level reset). Add explicit cache clearing for hot-swap.
 
-3. Inconsistent naming and key casing
-   - Problem: Keys like "ball_key" vs "ballKey" vs conf keys lead to defensive mapping logic across modules.
-   - Fix: Standardize on snake_case or camelCase across collections and mapping functions; add small adapter utilities.
-   - Benefit: Fewer mapping bugs and clearer code.
+### 2. ✅ Particle counts on mobile
+- Status: DONE. getParticleCount() in persistence.js uses hardwareConcurrency, userAgent mobile detection, screen area scaling.
 
-Priority 4 — UX, Accessibility & Security
-----------------------------------------
-1. Audio handling & autoplay policies
-   - Problem: Multiple Audio instances created per SFX play; mobile autoplay policies can mute audio or create many Audio objects.
-   - Fix: Use a simple AudioPool for SFX and an AudioContext/resume gating strategy; reuse audio elements.
-   - Benefit: Lower memory, consistent behavior across browsers.
+### 3. ⬜ Frequent per-frame allocations
+- Problem: Temporary CANNON.Vec3 and arrays allocated in updatePhysics() every frame create GC churn.
+- Fix: Hoist reusable Vec3/Vector3 instances to game object scope in physics.js and rendering.js.
+- Benefit: Reduced GC pauses, smoother 60fps.
 
-2. Pointer lock and gesture handling
-   - Problem: Pointer lock toggles and mouse interactions are tied to many global listeners; mobile fallback is fine but desktop gesture UX can be improved.
-   - Fix: Consolidate pointer lock requests behind explicit user action and improve hints; clamp camera pitch strictly to avoid over-rotation.
-   - Benefit: Clearer user experience and fewer accidental lock toggles.
+---
 
-3. Accessibility
-   - Problem: Many interactive elements use icons only and lack ARIA labels, and modals aren't focus-trapped.
-   - Fix: Add ARIA attributes, focus management for modals, and ensure keyboard-only navigation works.
-   - Benefit: More inclusive UX.
+## Priority 3 — Maintainability & Modularity
 
-Priority 5 — Multiplayer & Persistence
--------------------------------------
-1. Race conditions with room initialization
-   - Problem: Code uses room.collection calls even when initialize may have failed; subscriptions sometimes assume immediate availability.
-   - Fix: Gate remote collection access behind a room.isReady flag; factor remote sync to a persistence module that handles retries and backoff.
-   - Benefit: Predictable network behavior and cleaner error handling.
+### 1. ✅ Monolithic main.js
+- Status: DONE. Split into 10 modules:
+  - `main.js` (root) — thin DI bootstrap shell (~250 lines)
+  - `engine/scene.js` — Three.js scene, camera, materials, sky, textures
+  - `src/physics.js` — cannon-es world, ball body, forces, particles
+  - `src/levelgen.js` — procedural level generation + obstacle builders
+  - `src/ui.js` — DOM UI, modals, shop, leaderboard, game state
+  - `src/audio.js` — audio init, music toggle, SFX pool
+  - `src/persistence.js` — localStorage, configs, RNG, weather AI
+  - `src/networking.js` — WebsimSocket, loading manager, error handlers
+  - `src/rendering.js` — animation loop, camera follow, particle updates
+  - `src/ball_db.js` — ball skin data (single source of truth)
+  - `src/ball_index_ui.js` — ball index UI
+  - `src/notification_manager.js` — toast pooling/rate-limiting
 
-2. Privacy / trust of mirrored remote data
-   - Problem: Remote collections are merged into UI (ball_stats/player_clones) without sanitization.
-   - Fix: Validate and sanitize remote data shapes and lengths; cap numeric fields and sanitize strings.
-   - Benefit: Safer UI, prevents broken/malicious remote records from breaking rendering.
+### 2. ✅ Ball config duplication
+- Status: DONE. ballConfigs now loaded directly from BALL_DB in ball_db.js via spread clone `{ ...BALL_DB }`. mergeBallDB() function removed. Single source of truth established.
+- 57 ball skins in ball_db.js, descriptions included.
 
-Actionable roadmap (high-level milestones)
-------------------------------------------
-- Week 0 (immediate): Add seeded RNG utility and integrate optional URL seed param; add small NotificationManager; track and dispose PMREM/env maps.
-- Week 1: Refactor room/global dependencies: pass `room` into renderBallIndexUI and other modules; consolidate ball configs into ball_db.js.
-- Week 2: Split main.js into modules (scene, physics, input, ui, audio, levelgen) and wire a small bootstrap.
-- Week 3: Implement AudioPool for SFX, AudioContext resume; particle quality presets for mobile; reduce per-frame allocations.
-- Week 4+: Add unit tests for levelgen (deterministic with seed), integrate linting, and add CI checks for build/test.
+### 3. ⬜ Inconsistent naming and key casing
+- Problem: Keys like "ball_key" in networking.js vs. camelCase keys in configs. No standard convention.
+- Fix: Standardize on camelCase for JS object keys; keep snake_case for remote data only with adapter mapping.
+- Benefit: Fewer mapping bugs, clearer code.
 
-Concrete short-term code changes (suggested PRs)
------------------------------------------------
-1. Add seeded RNG util and accept seed param in createLevel.
-2. Pass `room` into renderBallIndexUI to remove implicit dependency and avoid globals.
-3. Create NotificationManager class and replace ephemeral inline toast creation.
-4. Track PMREM/env maps created by PMREMGenerator and dispose when changing skies.
-5. Add device-quality scaling for particle counts (rain/snow/wind).
-6. Consolidate ball metadata into ball_db.js and import only there to make this the single source of truth.
+---
 
-Appendix — Quick code snippets & helpers
-----------------------------------------
-1) Mulberry32 seeded RNG
+## Priority 4 — UX, Accessibility & Security
+
+### 1. ✅ Audio handling & autoplay policies
+- Status: DONE. registerSfx/playSound with clone-based Audio pool. AudioContext resume on first interaction. Music toggle with localStorage persistence. Audio files compressed 31% (1.07MB→736K).
+
+### 2. ⬜ Pointer lock and gesture handling
+- Problem: Pointer lock toggled with 'T' key, mouse interactions spread across many listeners. Desktop UX could be improved.
+- Fix: Consolidate pointer lock behind explicit UI button, add hint overlay, clamp camera pitch.
+
+### 3. ⬜ Accessibility
+- Problem: Many interactive elements lack ARIA labels. Modals not focus-trapped. Keyboard-only navigation incomplete.
+- Note: gear-btn has aria-label, settings-btn has aria-label. help-btn, shop-btn, leaderboard-btn need labels.
+- Fix: Add aria-label to all buttons, add focus-trap to modal container, ensure Tab order.
+
+---
+
+## Priority 5 — Multiplayer & Persistence
+
+### 1. 🔶 Race conditions with room initialization
+- Status: IMPROVED. saveLeaderboard now checks `room && room.isReady` directly instead of global flag. Subscriptions in setupUI also check room readiness.
+- Remaining: add retry/backoff for failed room.initialize() calls.
+
+### 2. ⬜ Privacy / trust of mirrored remote data
+- Problem: Remote collections merged into UI (player_clones) without sanitization. ball_stats already sanitized in ball_index_ui.js.
+- Fix: Validate and sanitize player_clones data shapes; cap numeric fields and strings.
+
+---
+
+## NEW: Issues Discovered During Refactoring
+
+### N1. ⬜ eye_ball skin (type:'gltf') doesn't render
+- Problem: ball_db.js has eye_ball with type:'gltf' and tex pointing to eye_low_poly_free_cute_eyeballs.glb. getBallMaterial() in engine/scene.js only handles 'texture', 'color', 'emissive' types. Falls through to default white ball.
+- Fix: Add 'gltf' type handler in getBallMaterial that loads the GLB model as the ball mesh.
+
+### N2. ⬜ `.glb` finish model has confusing dot-prefixed name
+- Problem: The finish-line model is literally named `.glb` (hidden file on Unix). Hard to identify.
+- Fix: Rename to `finish_gate.glb` and update reference in engine/scene.js.
+
+### N3. ⬜ Leftover window.__goingBalls* global flags
+- Problem: networking.js uses ~10 `window.__goingBalls*` flags for error state tracking. These pollute the global namespace.
+- Fix: Move to module-scoped variables or a single `window.__goingBalls` namespace object.
+
+### N4. ⬜ No automated tests
+- Problem: Zero tests exist. Level generation, physics, UI state, persistence are all untested.
+- Fix: Add deterministic levelgen tests (seed → assert segment count/types). Add localStorage mock tests for persistence.
+- Tooling: No package.json, no test runner, no linting config.
+
+### N5. ✅ Assets optimized
+- Status: DONE. PNG/JPG→WebP (28 files, ~60% avg savings). GIF→WebP (4 files, 98.6% savings). Audio compressed (6 files, 31% savings). Total: ~17MB→~10.2MB (40% reduction).
+
+### N6. ✅ Asset paths fixed
+- Status: DONE. All 175+ asset paths updated to assets/image/, assets/model/, assets/sfx/ prefixes. SFX filenames corrected (coin→coin_collect, finish→finish_line, fall→fall_off).
+
+### N7. ✅ .codebuffrules safety file created
+- Status: DONE. Rules for AI assistant: ask before delete, backup before destructive changes, asset conventions, module architecture map, import rules.
+
+### N8. ✅ Press Start 2P font added
+- Status: DONE. Retro pixel font via Google Fonts CDN, applied to game UI elements. Cascade protection keeps descriptions in system font.
+
+---
+
+## Actionable Roadmap (Updated)
+
+- ✅ Week 0 (immediate): Seeded RNG, NotificationManager, PMREM tracking
+- ✅ Week 1: Module DI wiring, ball config consolidation, room dependency threading
+- ✅ Week 2: Monolithic split into 10 modules, asset optimization, SFX fixes
+- ⬜ Week 3: GC allocation reduction, pointer lock UX, accessibility
+- ⬜ Week 4: eye_ball GLTF rendering, .glb rename, global flag cleanup
+- ⬜ Week 5+: Unit tests (levelgen), linting setup, CI, naming standardization
+
+---
+
+## Concrete PRs (prioritized)
+
+1. ⬜ Fix eye_ball GLTF skin rendering in getBallMaterial
+2. ⬜ Rename .glb → finish_gate.glb
+3. ⬜ Reduce per-frame Vec3 allocations in updatePhysics
+4. ⬜ Add unit tests for level generator with deterministic seeds
+5. ⬜ Create package.json, add ESLint config, add npm test script
+6. ⬜ Clean up window.__goingBalls* globals
+7. ⬜ Add ARIA labels + focus trapping for modals
+8. ⬜ Standardize naming conventions (camelCase for JS keys)

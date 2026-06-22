@@ -1,0 +1,57 @@
+# Going Balls — AI Assistant Rules
+# Loaded automatically for all Codebuff sessions on this project.
+
+## CRITICAL: Ask Before Delete
+- NEVER delete any file without first asking the user to confirm.
+- Use the ask_user tool to present what would be deleted and why.
+- This applies to: source files, asset files, configuration, documentation, and generated files.
+- Exception: temporary build artifacts in .gitignore'd directories (e.g., node_modules/, dist/) may be cleaned without asking — but still confirm with the user before doing so.
+
+## CRITICAL: Backup Before Destructive Changes
+- Before making any change that removes or substantially rewrites functionality:
+  1. Create a backup copy of the affected file(s) with a `.bak` extension or timestamp suffix.
+  2. Inform the user where the backup is stored.
+  Example: `cp src/file.js src/file.js.bak-2026-06-21`
+- "Substantially rewriting" includes: refactoring methods out of a class, restructuring module exports, replacing algorithm logic.
+- Simple additions (new CSS rules, new functions, property additions) do not require backup.
+- The user can always restore from git history, but a local backup provides an immediate safety net.
+
+## Asset Management
+- All image files (.png, .jpg, .webp, .gif) live under `assets/image/`.
+- All 3D model files (.glb, .gltf, .bin) live under `assets/model/`.
+- All audio files (.mp3) live under `assets/sfx/`.
+- All font files (.ttf, .woff, .woff2) live under `assets/font/`.
+- When adding new assets, place them in the correct subdirectory.
+- When referencing assets in code, use the full `assets/<type>/<filename>` path.
+
+## Code Architecture
+- `main.js` (root) — thin DI bootstrap shell. No business logic. Wires modules together.
+- `engine/scene.js` — Three.js scene, camera, renderer, materials, sky, textures.
+- `src/physics.js` — cannon-es world, ball body, forces, particles.
+- `src/levelgen.js` — procedural level generation and obstacle builders.
+- `src/ui.js` — DOM UI, modals, shop, leaderboard, game state.
+- `src/audio.js` — audio init, music toggle, SFX pool.
+- `src/persistence.js` — localStorage save/load, configs, RNG.
+- `src/networking.js` — WebsimSocket init, loading manager, error handlers.
+- `src/rendering.js` — animation loop, camera follow, particle updates.
+- `src/ball_db.js` — canonical ball skin data (single source of truth).
+- `src/ball_index_ui.js` — ball index UI rendering.
+- `src/notification_manager.js` — toast notification pool and rate limiter.
+- `index.html` — app shell, CSS, import map, UI skeleton.
+
+## Import Conventions
+- Root `main.js` imports modules with `./src/<module>.js` or `./engine/<module>.js`.
+- Modules inside `src/` that need `engine/scene.js` use `../engine/scene.js`.
+- Modules inside `src/` reference each other with `./<module>.js`.
+- Use ES module `import`/`export` exclusively — no CommonJS.
+
+## Code Style
+- Mimic existing patterns: try/catch wrapping, defensive null checks, early returns.
+- Use `game` as the first parameter for module functions (DI pattern).
+- Shared materials, configs, and state go on the `game` object.
+- Document each module with a JSDoc-style header comment listing exports.
+
+## Before Committing Changes
+- Run the code-reviewer-deepseek agent on significant changes.
+- Fix all issues found before marking work as complete.
+- Verify import paths are correct across all changed files.

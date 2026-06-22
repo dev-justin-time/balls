@@ -15,7 +15,7 @@
 import { renderBallIndexUI } from './ball_index_ui.js';
 import { saveGame } from './persistence.js';
 import { playSound } from './audio.js';
-import { applySkyConfig, getBallMaterial } from './engine/scene.js';
+import { applySkyConfig, getBallMaterial } from '../engine/scene.js';
 import { createLevel } from './levelgen.js';
 
 export function setupUI(game, room) {
@@ -161,13 +161,13 @@ export function setupUI(game, room) {
 
 export function updateWalletUI(game) {
     try {
-        const el = document.getElementById('coin-count');
+        const el = document.getElementById('total-coins');
         if (el) el.innerText = `${game.saveData.totalCoins} 🪙`;
     } catch (e) {}
 }
 
 // --- Game State ---
-export function checkGameState(game, dt) {
+export function checkGameState(game, dt, room) {
     try {
         // Coin collection
         const coinMult = game._abilityCoins || 1.0;
@@ -248,7 +248,7 @@ export function checkGameState(game, dt) {
             const bx = game.ballBody.position.x;
             const bz = game.ballBody.position.z;
             if (Math.abs(bx - fx) < 6 && Math.abs(bz - fz) < 8) {
-                gameOver(game, true);
+                gameOver(game, true, room);
             }
         }
     } catch (e) {
@@ -256,7 +256,7 @@ export function checkGameState(game, dt) {
     }
 }
 
-export function gameOver(game, win) {
+export function gameOver(game, win, room) {
     game.isGameOver = true;
     game.isWin = win;
     const overlay = document.getElementById('overlay');
@@ -277,7 +277,7 @@ export function gameOver(game, win) {
             coins: game.saveData.totalCoins,
             ball: game.saveData.selectedBall || 'rainbow',
             score: game.score
-        });
+        }, room);
 
         overlay.style.display = 'flex';
         overlay.innerHTML = `
@@ -559,10 +559,10 @@ export function getLeaderboard(game, room) {
     return entries.sort((a, b) => (b.level || 0) - (a.level || 0) || parseFloat(a.time || 99) - parseFloat(b.time || 99)).slice(0, 50);
 }
 
-export function saveLeaderboard(game, entries) {
+export function saveLeaderboard(game, entries, room) {
     localStorage.setItem('goingBalls_leaderboard', JSON.stringify(entries.slice(0, 50)));
     // Mirror to remote
-    if (window.__goingBallsRoomReady && window.__goingBallsRoomReady()) {
+    if (room && room.isReady && typeof room.collection === 'function') {
         try {
             const coll = room.collection('leaderboard');
             entries.slice(0, 5).forEach(async (e) => {
@@ -572,12 +572,12 @@ export function saveLeaderboard(game, entries) {
     }
 }
 
-export function addLeaderboardEntry(game, entry) {
+export function addLeaderboardEntry(game, entry, room) {
     entry.id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     entry.date = new Date().toISOString();
-    const entries = getLeaderboard(game, window._room);
+    const entries = getLeaderboard(game, room);
     entries.push(entry);
-    saveLeaderboard(game, entries);
+    saveLeaderboard(game, entries, room);
 }
 
 export function renderLeaderboard(game, room) {

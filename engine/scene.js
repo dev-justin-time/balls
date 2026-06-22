@@ -70,7 +70,7 @@ export function initScene(game) {
     preloadTrailModels(game);
 
     // Load finish GLB
-    game.gltfLoader.load('.glb',
+    game.gltfLoader.load('assets/model/.glb',
         (gltf) => {
             game.finishModel = gltf.scene;
             if (game.placeFinishModel) game.placeFinishModel();
@@ -83,8 +83,8 @@ export function initScene(game) {
     );
 
     // Textures
-    game.ballTexture = loadTexture(game, 'Gemini_Generated_Image_dsfkzqdsfkzqdsfk.png');
-    game.woodTexture = loadTexture(game, 'wood_texture.png');
+    game.ballTexture = loadTexture(game, 'assets/image/dsfk.webp');
+    game.woodTexture = loadTexture(game, 'assets/image/wood_texture.webp');
     game.woodTexture.wrapS = THREE.RepeatWrapping;
     game.woodTexture.wrapT = THREE.RepeatWrapping;
     game.woodTexture.repeat.set(1, 4);
@@ -200,6 +200,11 @@ export function applySkyConfig(game, sky) {
                                     cubeCamera.update(game.renderer, game.scene);
                                     const envMap = game.pmremGenerator.fromCubemap(cubeRenderTarget.texture).texture;
                                     try { game.scene.environment = envMap; game.scene.background = envMap; } catch (e) {}
+                                    // Update tracked envMap for reflective materials (p2opp)
+                                    if (game._lastEnvMap && game._lastEnvMap !== envMap) {
+                                        try { game._lastEnvMap.dispose && game._lastEnvMap.dispose(); } catch(e){}
+                                    }
+                                    game._lastEnvMap = envMap;
                                     try { cubeRenderTarget.dispose(); } catch(e){}
                                     try { game.scene.remove(root); } catch(e){}
                                 } catch (e) {
@@ -370,6 +375,11 @@ export function applySkyConfig(game, sky) {
             try { tex.encoding = THREE.sRGBEncoding; } catch (e) {}
         } else {
             try { disposeMesh(previousSky); game.skyMesh = null; } catch (e) {}
+            // Dispose old envMap when switching to color-only sky (no reflections)
+            if (game._lastEnvMap) {
+                try { game._lastEnvMap.dispose && game._lastEnvMap.dispose(); } catch(e){}
+                game._lastEnvMap = null;
+            }
             try {
                 game.scene.background = new THREE.Color(sky && sky.color ? sky.color : 0x87ceeb);
                 if (!game.scene.fog) game.scene.fog = new THREE.Fog(targetFogHex, 20, 150);
@@ -382,6 +392,19 @@ export function applySkyConfig(game, sky) {
         console.warn('applySkyConfig error', e);
         try { game.scene.background = new THREE.Color(sky && sky.color ? sky.color : 0x87ceeb); } catch (e) {}
     }
+}
+
+// Clear all cached textures (GPU resources). Intended for full scene rebuilds
+// (level reset, hot-swap restart) — not mid-game use, as active materials
+// may still reference these textures and would render black.
+export function clearTextureCache(game) {
+    if (!game || !game.textureCache) return;
+    try {
+        for (const tex of game.textureCache.values()) {
+            try { tex.dispose && tex.dispose(); } catch(e) {}
+        }
+        game.textureCache.clear();
+    } catch (e) {}
 }
 
 export function createFallbackFinishModel() {
@@ -403,11 +426,11 @@ export function createFallbackFinishModel() {
 
 function preloadTrailModels(game) {
     const trailLoads = [
-        { key: 'skeleton', url: 'skeleton.gif' },
-        { key: 'zombie', url: '_halloween_Um_zumbi__0523105301_.glb' },
-        { key: 'eye', url: 'eye_low_poly_free_cute_eyeballs.glb' },
-        { key: 'soldier2', url: 'Soldier (2).gif' },
-        { key: 'venus', url: 'Venus Fly Trap.gif' }
+        { key: 'skeleton', url: 'assets/image/skeleton.webp' },
+        { key: 'zombie', url: 'assets/model/_halloween_Um_zumbi__0523105301_.glb' },
+        { key: 'eye', url: 'assets/model/eye_low_poly_free_cute_eyeballs.glb' },
+        { key: 'soldier2', url: 'assets/image/Soldier (3).webp' },
+        { key: 'venus', url: 'assets/image/Venus Fly Trap.webp' }
     ];
 
     const createSpriteFromImage = (src, size = 0.8) => {
@@ -478,19 +501,18 @@ export function getBallMaterial(game) {
                 tex.needsUpdate = true;
             } catch (e) {}
 
-            try {
-                if (conf.tex && typeof conf.tex === 'string' && conf.tex.toLowerCase().endsWith('.gif')) {
-                    return new THREE.MeshPhongMaterial({
-                        map: tex,
-                        side: THREE.DoubleSide,
-                        shininess: 80,
-                        transparent: true,
-                        opacity: 0.92,
-                        envMap: game._lastEnvMap || null,
-                        reflectivity: 0.3
-                    });
-                }
-            } catch (e) { /* fall through */ }
+            // Glass-like treatment for p2opp skin (was GIF, now WebP)
+            if (game.saveData.selectedBall === 'p2opp') {
+                return new THREE.MeshPhongMaterial({
+                    map: tex,
+                    side: THREE.DoubleSide,
+                    shininess: 80,
+                    transparent: true,
+                    opacity: 0.92,
+                    envMap: game._lastEnvMap || null,
+                    reflectivity: 0.3
+                });
+            }
 
             return new THREE.MeshPhongMaterial({
                 map: tex,
@@ -520,7 +542,7 @@ export function createGroovyCanvas(game) {
         game.groovyCtx = ctx;
         game.groovyImg = new Image();
         game.groovyImg.crossOrigin = 'anonymous';
-        game.groovyImg.src = 'dancing-groovy.webp';
+        game.groovyImg.src = 'assets/image/dancing-groovy.webp';
         game.groovyImg.onerror = () => { game.groovyImg = null; };
         game.groovyCanvasTex = new THREE.CanvasTexture(canvas);
         game.groovyCanvasTex.minFilter = THREE.LinearMipMapLinearFilter;

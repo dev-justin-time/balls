@@ -1,6 +1,0 @@
-4) Pass `room` into ball_index_ui:
-- Change renderBallIndexUI(containerId, game, room) and call with renderBallIndexUI('balls-list', this, room).
-
-Closing notes
--------------
-This audit focuses on pragmatic, incremental improvements that materially increase stability and maintainability without changing the game's visible behavior. Prioritize seeded RNG, modularization, memory disposal, and controlled DOM/audio pooling first — they yield the highest ROI.

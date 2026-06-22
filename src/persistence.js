@@ -54,67 +54,8 @@ export function initPersistence(game) {
     };
     game.saveData = JSON.parse(localStorage.getItem('goingBallsData_v1')) || defaultData;
 
-    // --- Ball configs ---
-    game.ballConfigs = {
-        rainbow: { name: 'Rainbow', price: 0, tex: 'Gemini_Generated_Image_dsfkzqdsfkzqdsfk.png', type: 'texture', ability: { key: 'coins', base: 1.0, perLevel: 0.15 } },
-        wood: { name: 'Wood', price: 50, tex: 'wood_texture.png', type: 'texture', ability: { key: 'jump', base: 1.0, perLevel: 0.07 } },
-        metal: { name: 'Chrome', price: 150, tex: 'ball_metal.png', type: 'texture', ability: { key: 'speed', base: 1.0, perLevel: 0.06 } },
-        lava: { name: 'Lava', price: 300, tex: 'ball_lava.png', type: 'texture', ability: { key: 'coins', base: 1.05, perLevel: 0.12 } },
-        basketball: { name: 'Basketball', price: 80, tex: 'Basketball.png', type: 'texture', ability: { key: 'jump', base: 1.02, perLevel: 0.05 } },
-        bowling: { name: 'Bowling', price: 120, tex: 'bolos.png', type: 'texture', ability: { key: 'speed', base: 1.0, perLevel: 0.05 } },
-        diamond: { name: 'Diamond', price: 1000, tex: 'ball_metal.png', type: 'texture', ability: { key: 'coins', base: 1.2, perLevel: 0.12 } },
-        obsidian: { name: 'Obsidian', price: 1500, tex: 'ball_lava.png', type: 'texture', ability: { key: 'jump', base: 1.15, perLevel: 0.08 } },
-        galaxy: { name: 'Galaxy', price: 2000, tex: 'Gemini_Generated_Image_dsfkzqdsfkzqdsfk.png', type: 'texture', ability: { key: 'speed', base: 1.12, perLevel: 0.08 } },
-        golden: { name: 'Golden', price: 5000, tex: 'ball_metal.png', type: 'texture', ability: { key: 'coins', base: 1.35, perLevel: 0.14 } },
-        nebula: { name: 'Nebula', price: 220, tex: 'scene_NEBULA.gltf', type: 'texture', ability: { key: 'coins', base: 1.05, perLevel: 0.08 } },
-        ember: { name: 'Ember', price: 180, tex: 'ball_lava.png', type: 'texture', ability: { key: 'jump', base: 1.03, perLevel: 0.06 } },
-        polished: { name: 'Polished', price: 200, tex: 'ball_metal.png', type: 'texture', ability: { key: 'speed', base: 1.04, perLevel: 0.05 } },
-        oak: { name: 'Oak', price: 60, tex: 'wood_texture.png', type: 'texture', ability: { key: 'jump', base: 1.01, perLevel: 0.04 } },
-        sunset: { name: 'Sunset', price: 140, tex: 'sky_sunset.png', type: 'texture', ability: { key: 'coins', base: 1.02, perLevel: 0.05 } },
-        midnight: { name: 'Midnight', price: 260, tex: 'sky_night.png', type: 'texture', ability: { key: 'speed', base: 1.06, perLevel: 0.06 } },
-        aurora: { name: 'Aurora', price: 420, tex: 'sky_void.png', type: 'texture', ability: { key: 'coins', base: 1.08, perLevel: 0.07 } },
-        mosaic: { name: 'Mosaic', price: 350, tex: 'Gemini_Generated_Image_dsfkzqdsfkzqdsfk.png', type: 'texture', ability: { key: 'speed', base: 1.05, perLevel: 0.06 } },
-        marble: { name: 'Marble', price: 190, tex: 'ball_metal.png', type: 'texture', ability: { key: 'jump', base: 1.04, perLevel: 0.05 } },
-        citrus: { name: 'Citrus', price: 75, tex: 'Basketball.png', type: 'texture', ability: { key: 'coins', base: 1.01, perLevel: 0.03 } },
-        cobalt: { name: 'Cobalt', price: 130, tex: 'bolos.png', type: 'texture', ability: { key: 'speed', base: 1.03, perLevel: 0.04 } },
-        graphite: { name: 'Graphite', price: 300, tex: 'ball_metal.png', type: 'texture', ability: { key: 'coins', base: 1.06, perLevel: 0.06 } },
-        ember_core: { name: 'Ember Core', price: 450, tex: 'ball_lava.png', type: 'texture', ability: { key: 'jump', base: 1.06, perLevel: 0.07 } },
-        prism: { name: 'Prism', price: 380, tex: 'Gemini_Generated_Image_dsfkzqdsfkzqdsfk.png', type: 'texture', ability: { key: 'coins', base: 1.07, perLevel: 0.06 } },
-        driftwood: { name: 'Driftwood', price: 95, tex: 'wood_texture.png', type: 'texture', ability: { key: 'jump', base: 1.02, perLevel: 0.04 } },
-        chrome_stripe: { name: 'Chrome Stripe', price: 240, tex: 'ball_metal.png', type: 'texture', ability: { key: 'speed', base: 1.05, perLevel: 0.06 } },
-        lava_flow: { name: 'Lava Flow', price: 320, tex: 'ball_lava.png', type: 'texture', ability: { key: 'coins', base: 1.09, perLevel: 0.07 } },
-        retro_orb: { name: 'Retro Orb', price: 160, tex: 'sky_sunset.png', type: 'texture', ability: { key: 'speed', base: 1.02, perLevel: 0.03 } },
-        starlight: { name: 'Starlight', price: 600, tex: 'sky_night.png', type: 'texture', ability: { key: 'coins', base: 1.12, perLevel: 0.08 } },
-        cloudburst: { name: 'Cloudburst', price: 110, tex: '1eprhbtmvoo51.png', type: 'texture', ability: { key: 'jump', base: 1.03, perLevel: 0.05 } },
-        sunmetal: { name: 'Sunmetal', price: 520, tex: 'ball_metal.png', type: 'texture', ability: { key: 'speed', base: 1.08, perLevel: 0.07 } },
-        magma_core: { name: 'Magma Core', price: 700, tex: 'ball_lava.png', type: 'texture', ability: { key: 'coins', base: 1.15, perLevel: 0.09 } },
-        coral: { name: 'Coral', price: 85, tex: 'Basketball.png', type: 'texture', ability: { key: 'jump', base: 1.01, perLevel: 0.03 } },
-        sapphire: { name: 'Sapphire', price: 420, tex: 'bolos.png', type: 'texture', ability: { key: 'coins', base: 1.1, perLevel: 0.07 } },
-        voidglass: { name: 'Voidglass', price: 980, tex: 'Gemini_Generated_Image_dsfkzqdsfkzqdsfk.png', type: 'texture', ability: { key: 'speed', base: 1.12, perLevel: 0.08 } },
-        p2opp: { name: 'P2OPP (Glass)', price: 7500, tex: 'p2opp.gif', type: 'texture', ability: { key: 'coins', base: 1.25, perLevel: 0.1 } },
-        groovy: { name: 'Groovy', price: 12000, tex: 'dancing-groovy.webp', type: 'texture', ability: { key: 'speed', base: 1.40, perLevel: 0.18 } },
-        rock_k: { name: 'Rock K', price: 120, tex: 'rock_k.jpg', type: 'texture', ability: { key: 'jump', base: 1.03, perLevel: 0.04 } },
-        marble_orochiaro: { name: 'Orochiaro Marble', price: 200, tex: 'marble_orochiaro_white_t.jpg', type: 'texture', ability: { key: 'coins', base: 1.04, perLevel: 0.05 } },
-        marble_grey: { name: 'Marble Grey', price: 180, tex: 'Marble-grey_t.jpg', type: 'texture', ability: { key: 'speed', base: 1.03, perLevel: 0.04 } },
-        marble_luar: { name: 'Marble Luar', price: 175, tex: 'Marble-luar_t.jpg', type: 'texture', ability: { key: 'jump', base: 1.02, perLevel: 0.03 } },
-        marble9: { name: 'Ocean Marble', price: 210, tex: 'marble9.jpg', type: 'texture', ability: { key: 'coins', base: 1.05, perLevel: 0.05 } },
-        purpleveins: { name: 'Purple Veins', price: 160, tex: 'purpleveins.jpg', type: 'texture', ability: { key: 'speed', base: 1.02, perLevel: 0.03 } },
-        marble8: { name: 'Beige Marble', price: 165, tex: 'marble8.jpg', type: 'texture', ability: { key: 'coins', base: 1.03, perLevel: 0.04 } },
-        alien_11: { name: 'Alien Warm', price: 220, tex: 'alien_11.jpg', type: 'texture', ability: { key: 'coins', base: 1.04, perLevel: 0.05 } },
-        alien_14_variant: { name: 'Alien Wavy Variant', price: 230, tex: 'alien_14 (1).jpg', type: 'texture', ability: { key: 'speed', base: 1.03, perLevel: 0.04 } },
-        alien_6: { name: 'Alien Emboss', price: 200, tex: 'alien_6.jpg', type: 'texture', ability: { key: 'jump', base: 1.04, perLevel: 0.05 } },
-        alien28c: { name: 'Frosty Ice', price: 210, tex: 'alien28c.jpg', type: 'texture', ability: { key: 'speed', base: 1.02, perLevel: 0.04 } },
-        alien_13: { name: 'Alien Rust', price: 205, tex: 'alien_13.jpg', type: 'texture', ability: { key: 'coins', base: 1.03, perLevel: 0.04 } },
-        alien_8: { name: 'Circular Rings', price: 190, tex: 'alien_8.jpg', type: 'texture', ability: { key: 'speed', base: 1.02, perLevel: 0.03 } },
-        alien41: { name: 'Green Abstract', price: 195, tex: 'alien41.jpg', type: 'texture', ability: { key: 'jump', base: 1.02, perLevel: 0.03 } },
-        colored_stone1: { name: 'Blue Stone', price: 170, tex: 'colored_stone1.jpg', type: 'texture', ability: { key: 'coins', base: 1.02, perLevel: 0.03 } },
-        alien_7: { name: 'Neon Ripples', price: 240, tex: 'alien_7.jpg', type: 'texture', ability: { key: 'speed', base: 1.04, perLevel: 0.05 } },
-        alien_3: { name: 'Alien Face', price: 260, tex: 'alien_3.jpg', type: 'texture', ability: { key: 'coins', base: 1.05, perLevel: 0.05 } },
-        alien_14: { name: 'Alien Wavy Ridged', price: 225, tex: 'alien_14.jpg', type: 'texture', ability: { key: 'jump', base: 1.03, perLevel: 0.04 } }
-    };
-
-    // Merge external BALL_DB into ballConfigs
-    mergeBallDB(game);
+    // --- Ball configs (single source of truth: ball_db.js) ---
+    game.ballConfigs = (BALL_DB && typeof BALL_DB === 'object') ? { ...BALL_DB } : {};
 
     // --- Powerup configs ---
     game.powerupConfigs = {
@@ -126,14 +67,14 @@ export function initPersistence(game) {
 
     // --- Sky configs ---
     game.skyConfigs = {
-        day:    { name: 'Blue Sky',    price: 0,   tex: 'sky_day.png',    color: 0x87ceeb },
-        sunset: { name: 'Sunset',      price: 100, tex: 'sky_sunset.png', color: 0xff7f50 },
-        night:  { name: 'Midnight',    price: 250, tex: 'sky_night.png',  color: 0x0a0a2a },
-        void:   { name: 'Cosmic',      price: 500, tex: 'sky_void.png',   color: 0x000000 },
-        clouds: { name: 'Cloudscape',  price: 80,  tex: '1eprhbtmvoo51.png', color: 0xddeeff },
-        mosaic: { name: 'Rainbow Mosaic', price: 300, tex: 'Gemini_Generated_Image_dsfkzqdsfkzqdsfk.png', color: 0x223344 },
-        aurora: { name: 'Aurora Glow', price: 800, tex: 'sky_void.png', color: 0x055e7f },
-        retro:  { name: 'Retro Sunset', price: 200, tex: 'sky_sunset.png', color: 0xffb07a }
+        day:    { name: 'Blue Sky',    price: 0,   tex: 'assets/image/sky_day.webp',    color: 0x87ceeb },
+        sunset: { name: 'Sunset',      price: 100, tex: 'assets/image/sky_sunset.webp', color: 0xff7f50 },
+        night:  { name: 'Midnight',    price: 250, tex: 'assets/image/sky_night.webp',  color: 0x0a0a2a },
+        void:   { name: 'Cosmic',      price: 500, tex: 'assets/image/sky_void.webp',   color: 0x000000 },
+        clouds: { name: 'Cloudscape',  price: 80,  tex: 'assets/image/1eprhbtmvoo51.webp', color: 0xddeeff },
+        mosaic: { name: 'Rainbow Mosaic', price: 300, tex: 'assets/image/dsfk.webp', color: 0x223344 },
+        aurora: { name: 'Aurora Glow', price: 800, tex: 'assets/image/sky_void.webp', color: 0x055e7f },
+        retro:  { name: 'Retro Sunset', price: 200, tex: 'assets/image/sky_sunset.webp', color: 0xffb07a }
     };
 
     // --- Weather AI ---
@@ -169,44 +110,6 @@ export function initPersistence(game) {
             saveGame(game);
         }
     };
-}
-
-export function mergeBallDB(game) {
-    try {
-        if (typeof BALL_DB !== 'undefined') {
-            const entries = Array.isArray(BALL_DB)
-                ? BALL_DB
-                : Object.entries(BALL_DB).map(([key, val]) => ({ key, ...val }));
-
-            for (const b of entries) {
-                try {
-                    const k = (b.key || '').toString();
-                    if (!k) continue;
-                    if (game.ballConfigs[k]) {
-                        const existing = game.ballConfigs[k];
-                        existing.price = (existing.price !== undefined) ? existing.price : (b.price !== undefined ? b.price : 0);
-                        existing.tex = existing.tex || b.tex || existing.tex;
-                        existing.type = existing.type || b.type || 'texture';
-                        existing.description = existing.description || b.description || '';
-                        existing.ability = existing.ability || b.ability || null;
-                    } else {
-                        game.ballConfigs[k] = {
-                            name: b.name || k,
-                            price: (b.price !== undefined) ? b.price : 0,
-                            tex: b.tex || '',
-                            type: b.type || 'texture',
-                            ability: b.ability || null,
-                            description: b.description || ''
-                        };
-                    }
-                } catch (err) {
-                    console.warn('Failed to merge BALL_DB entry', b && b.key, err);
-                }
-            }
-        }
-    } catch (e) {
-        console.warn('BALL_DB merge failed', e);
-    }
 }
 
 export function saveGame(game) {

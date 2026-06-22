@@ -9,7 +9,7 @@
 */
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { getBallMaterial } from './engine/scene.js';
+import { getBallMaterial } from '../engine/scene.js';
 import { getParticleCount } from './persistence.js';
 
 // Physics constants (module-scoped for game feel tuning)
@@ -64,6 +64,17 @@ export function initPhysics(game) {
     game.jumpCount = 0;
     game.checkpoints = [];
     game.lastCheckpointPos = new CANNON.Vec3(0, 5, 0);
+
+    // Pre-allocated pooled vectors (eliminates per-frame GC allocations)
+    game._vecA = new CANNON.Vec3();
+    game._vecB = new CANNON.Vec3();
+    game._rayResult = new CANNON.RaycastResult();
+    game._vecForce = new CANNON.Vec3();
+    game._vec3A = new THREE.Vector3();
+    // Camera follow (used by rendering.js)
+    game._vec3Cam = new THREE.Vector3();
+    game._vec3Dir = new THREE.Vector3();
+    game._vec3Desired = new THREE.Vector3();
 }
 
 export function updatePhysics(game, dt) {
@@ -72,11 +83,10 @@ export function updatePhysics(game, dt) {
 
         // Check grounded
         game.isGrounded = false;
-        const rayStart = game.ballBody.position.vadd(new CANNON.Vec3(0, -BALL_RADIUS - 0.1, 0));
-        const rayEnd = game.ballBody.position.vadd(new CANNON.Vec3(0, -BALL_RADIUS - 0.6, 0));
-        const rayResult = new CANNON.RaycastResult();
-        game.world.raycastClosest(rayStart, rayEnd, {}, rayResult);
-        if (rayResult.hasHit) {
+        game._vecA.set(0, -BALL_RADIUS - 0.1, 0);
+        game._vecB.set(0, -BALL_RADIUS - 0.6, 0);
+        game.world.raycastClosest(game._vecA, game._vecB, {}, game._rayResult);
+        if (game._rayResult.hasHit) {
             game.isGrounded = true;
         }
         if (game.isGrounded) game.jumpCount = 0;
@@ -112,16 +122,19 @@ export function updatePhysics(game, dt) {
         const forceZ = inputY * BALL_SPEED * dt;
 
         if (game.isGrounded) {
-            game.ballBody.applyForce(new CANNON.Vec3(forceX, 0, forceZ), game.ballBody.position);
+            game._vecForce.set(forceX, 0, forceZ);
+            game.ballBody.applyForce(game._vecForce, game.ballBody.position);
         } else {
             // Reduced air control
-            game.ballBody.applyForce(new CANNON.Vec3(forceX * 0.3, 0, forceZ * 0.3), game.ballBody.position);
+            game._vecForce.set(forceX * 0.3, 0, forceZ * 0.3);
+            game.ballBody.applyForce(game._vecForce, game.ballBody.position);
         }
 
         // Wind force
         if (game.windy && game.wind) {
             const windForce = game.wind.dirX * game.wind.strength * 80 * dt;
-            game.ballBody.applyForce(new CANNON.Vec3(windForce, 0, 0), game.ballBody.position);
+            game._vecForce.set(windForce, 0, 0);
+            game.ballBody.applyForce(game._vecForce, game.ballBody.position);
         }
 
         // Apply abilities-based speed/resistance adjustments
@@ -133,7 +146,8 @@ export function updatePhysics(game, dt) {
                 const boostForce = 800 * speedMult * dt;
                 const dirX = vel.x / (currentSpeed + 0.01);
                 const dirZ = vel.z / (currentSpeed + 0.01);
-                game.ballBody.applyForce(new CANNON.Vec3(dirX * boostForce, 0, dirZ * boostForce), game.ballBody.position);
+                game._vecForce.set(dirX * boostForce, 0, dirZ * boostForce);
+                game.ballBody.applyForce(game._vecForce, game.ballBody.position);
             }
         }
 
@@ -157,10 +171,8 @@ export function updatePhysics(game, dt) {
                 p.body.angularVelocity.set(0, 0, 2.5 * p.speedMult);
                 // Update rope line
                 if (p.line && p.line.geometry) {
-                    const points = [
-                        p.pivot,
-                        new THREE.Vector3(p.body.position.x, p.body.position.y, p.body.position.z)
-                    ];
+                    game._vec3A.set(p.body.position.x, p.body.position.y, p.body.position.z);
+                    const points = [p.pivot, game._vec3A];
                     p.line.geometry.setFromPoints(points);
                 }
                 // Sync mesh

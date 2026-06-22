@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Going Balls - Web Edition</title>
     <style>
+        @font-face {
+            font-family: '5x5dots';
+            src: url('assets/font/5x5dots.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
         body {
             margin: 0;
             overflow: hidden;
@@ -31,8 +39,10 @@
         .stats {
             display: flex;
             justify-content: space-between;
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
+            font-family: '5x5dots', monospace;
+            letter-spacing: -1px;
         }
         #overlay {
             position: absolute;
@@ -48,12 +58,14 @@
             pointer-events: auto;
         }
         #overlay h1 {
-            font-size: 48px;
+            font-size: 28px;
             margin-bottom: 20px;
+            font-family: '5x5dots', monospace;
+            line-height: 1.6;
         }
         #overlay button {
             padding: 15px 40px;
-            font-size: 24px;
+            font-size: 14px;
             background: #ffcc00;
             border: none;
             border-radius: 30px;
@@ -62,6 +74,7 @@
             color: #333;
             box-shadow: 0 4px 0 #ccaa00;
             transition: transform 0.1s;
+            font-family: '5x5dots', monospace;
         }
         #overlay button:active {
             transform: translateY(4px);
@@ -91,7 +104,8 @@
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 10px;
+            font-family: '5x5dots', monospace;
         }
         .modal {
             position: absolute;
@@ -111,7 +125,20 @@
             max-height: 80vh;
             overflow-y: auto;
         }
-        .modal h2 { margin-top: 0; color: #ffcc00; text-align: center; }
+        .modal h2 { margin-top: 0; color: #ffcc00; text-align: center; font-family: '5x5dots', monospace; font-size: 16px; }
+        /* Reset modal body text to system font for readability */
+        .modal p,
+        .modal div,
+        .item-card-front,
+        .item-card-back,
+        .item-card-inner {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        /* Keep pixel font on price badges and card title text */
+        .item-card .price,
+        .item-card-front > div:first-of-type {
+            font-family: '5x5dots', monospace;
+        }
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -177,7 +204,7 @@
             border: 2px solid #ffcc00;
         }
         .item-card.locked { opacity: 0.92; }
-        .item-card .price { font-size: 12px; color: #ffcc00; font-weight: bold; }
+        .item-card .price { font-size: 10px; color: #ffcc00; font-weight: bold; font-family: '5x5dots', monospace; }
         .item-preview {
             width: 128px; /* enlarged preview to show full ball */
             height: 128px;
@@ -192,34 +219,14 @@
         }
         .ball-preview { border-radius: 50%; width:128px; height:128px; }
         .sky-preview { border-radius: 8px; width: 140px; height: 88px; }
-        .close-modal {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            font-size: 30px;
-            width: 44px;
-            height: 44px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            border-radius: 50%;
-            cursor: pointer;
-            z-index: 1100;
-            line-height: 1;
-        }
-        .close-modal:active {
-            background: rgba(255, 255, 255, 0.4);
-        }
-        #total-coins {
+#total-coins {
             position: absolute;
             top: 60px;
             left: 20px;
-            font-size: 18px;
+            font-size: 12px;
             font-weight: bold;
             color: #ffd700;
+            font-family: '5x5dots', monospace;
         }
         #joystick-container {
             position: absolute;
@@ -253,58 +260,19 @@
             justify-content: center;
             align-items: center;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 11px;
             pointer-events: auto;
             touch-action: none;
             color: white;
             text-shadow: 1px 1px 2px black;
+            font-family: '5x5dots', monospace;
         }
         #jump-btn:active {
             background: rgba(255, 255, 255, 0.6);
             transform: scale(0.9);
         }
-
-        /* Fullscreen leaderboard modal override */
-        #leaderboard-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            transform: none;
-            width: 100%;
-            height: 100%;
-            max-width: none;
-            border-radius: 0;
-            padding: 28px;
-            box-sizing: border-box;
-            display: none; /* toggled by JS as before */
-            flex-direction: column;
-            justify-content: flex-start;
-            align-items: stretch;
-            z-index: 1500;
-            overflow: auto;
-            background: rgba(8,8,10,0.96);
-            border: none;
-        }
-
-        /* Slight layout tweaks inside the fullscreen leaderboard */
-        #leaderboard-modal h2 {
-            margin-top: 4px;
-            margin-bottom: 12px;
-            font-size: 22px;
-            text-align: left;
-            color: #ffcc00;
-            width: 100%;
-        }
-        #leaderboard-list {
-            flex: 1 1 auto;
-            overflow: auto;
-            padding-bottom: 20px;
-        }
-        #leaderboard-modal .close-modal {
-            top: 18px;
-            right: 18px;
-            width: 44px;
-            height: 44px;
+        #loading-overlay {
+            font-family: '5x5dots', monospace;
         }
 
     </style>
@@ -329,98 +297,11 @@
     <div id="total-coins">Wallet: 0</div>
 
     <div id="top-menu">
-        <button class="menu-btn" id="help-btn-open">?</button>
-        <button class="menu-btn" id="balls-btn-open">BALLS</button>
-        <button class="menu-btn" id="skins-btn-open">SKINS</button>
-        <button class="menu-btn" id="skies-btn-open">SKIES</button>
-        <button class="menu-btn" id="leaderboard-btn-open">LEADERBOARD</button>
+        <button class="menu-btn" id="help-btn">?</button>
+        <button class="menu-btn" id="shop-btn">SHOP</button>
+        <button class="menu-btn" id="leaderboard-btn">LEADERBOARD</button>
         <button class="menu-btn" id="music-toggle">MUSIC</button>
-        <button class="menu-btn" id="settings-btn-open" title="Settings" aria-label="Settings">⚙️</button>
-    </div>
-
-    <!-- Leaderboard Modal -->
-    <div id="leaderboard-modal" class="modal">
-        <button class="close-modal">&times;</button>
-        <h2>LEADERBOARD</h2>
-        <div style="text-align:center; margin-bottom:8px; color:#fff;">
-            Best times / high scores (local)
-        </div>
-        <div id="leaderboard-list" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
-        <div style="display:flex; gap:8px; margin-top:12px; justify-content:center;">
-            <button id="clear-leaderboard" class="menu-btn" style="pointer-events:auto;">CLEAR</button>
-        </div>
-    </div>
-
-    <!-- Help Modal -->
-    <div id="help-modal" class="modal">
-        <button class="close-modal">&times;</button>
-        <h2>HOW TO PLAY</h2>
-        <p>• <b>Desktop:</b> Use WASD or Arrows to roll. Press T to toggle mouse lock.</p>
-        <p>• <b>Mobile:</b> Use the joystick to roll, Jump button to hop.</p>
-        <p>• <b>Goal:</b> Reach the finish line without falling off!</p>
-        <p>• <b>Shop:</b> Collect coins to unlock new ball styles and sky themes.</p>
-    </div>
-
-    <!-- Skins Modal -->
-    <div id="skins-modal" class="modal">
-        <button class="close-modal">&times;</button>
-        <h2>BALL SHOP</h2>
-        <div class="grid" id="skins-grid"></div>
-    </div>
-
-    <!-- Ball Index Modal -->
-    <div id="balls-modal" class="modal" style="max-width:600px;">
-        <button class="close-modal">&times;</button>
-        <h2>BALL INDEX</h2>
-        <div style="text-align:center; margin-bottom:8px; color:#fff;">
-            Detailed descriptions and community stats for each ball skin
-        </div>
-        <div id="balls-list" style="display:flex; flex-direction:column; gap:10px; margin-top:8px;"></div>
-    </div>
-
-    <!-- Skies Modal -->
-    <div id="skies-modal" class="modal">
-        <button class="close-modal">&times;</button>
-        <h2>SKY SHOP</h2>
-        <div class="grid" id="skies-grid"></div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal">
-        <button class="close-modal">&times;</button>
-        <h2>SETTINGS</h2>
-        <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-weight:bold; color:#fff;">Music</div>
-                <button id="settings-music-toggle" class="menu-btn" style="pointer-events:auto;">Toggle</button>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-weight:bold; color:#fff;">Sound FX</div>
-                <button id="settings-sfx-toggle" class="menu-btn" style="pointer-events:auto;">Toggle</button>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-weight:bold; color:#fff;">Pointer Lock Hint</div>
-                <button id="settings-pointerlock-toggle" class="menu-btn" style="pointer-events:auto;">Toggle</button>
-            </div>
-
-            <!-- Joystick power controls -->
-            <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.06);">
-                <div style="color:#fff; font-weight:bold;">Joystick Power</div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <input id="joystick-power" type="range" min="0.2" max="2.5" step="0.05" value="1.0" style="width:100%; pointer-events:auto;">
-                    <div id="joystick-power-val" style="min-width:48px; text-align:center; color:#ffd700;">1.00x</div>
-                </div>
-
-                <div style="color:#fff; font-weight:bold;">Joystick Deadzone</div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <input id="joystick-deadzone" type="range" min="0.01" max="0.4" step="0.01" value="0.10" style="width:100%; pointer-events:auto;">
-                    <div id="joystick-deadzone-val" style="min-width:48px; text-align:center; color:#ffd700;">0.10</div>
-                </div>
-                <div style="font-size:12px; color:#ccc;">Adjust how strongly the joystick responds and how large the deadzone is.</div>
-            </div>
-
-            <div style="text-align:center; color:#ddd; font-size:13px;">Settings persist per session where applicable.</div>
-        </div>
+        <button class="menu-btn" id="settings-btn" title="Settings" aria-label="Settings">⚙️</button>
     </div>
 
     <div id="overlay">
@@ -432,7 +313,7 @@
     <div id="jump-btn">JUMP</div>
 
     <!-- Mini gear quick-access (bottom-right) -->
-    <button id="mini-gear" aria-label="Quick Settings" title="Settings" style="position:fixed; right:12px; bottom:12px; width:44px; height:44px; border-radius:50%; background:rgba(0,0,0,0.45); border:2px solid rgba(255,255,255,0.12); color:#fff; display:flex; align-items:center; justify-content:center; z-index:1200; pointer-events:auto; font-size:18px;">⚙️</button>
+    <button id="gear-btn" aria-label="Menu" title="Menu" style="position:fixed; right:12px; bottom:12px; width:44px; height:44px; border-radius:50%; background:rgba(0,0,0,0.45); border:2px solid rgba(255,255,255,0.12); color:#fff; display:flex; align-items:center; justify-content:center; z-index:1200; pointer-events:auto; font-size:18px;">⚙️</button>
 
     <script type="importmap">
     {

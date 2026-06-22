@@ -7,7 +7,7 @@
 */
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { updateGroovyCanvas } from './engine/scene.js';
+import { updateGroovyCanvas } from '../engine/scene.js';
 import { saveGame } from './persistence.js';
 
 export function onWindowResize(game) {
@@ -65,19 +65,19 @@ export function animate(game) {
 function updateCamera(game, dt) {
     try {
         if (!game.ballMesh) return;
-        const target = game.ballMesh.position.clone();
-        const dir = new THREE.Vector3(
+        game._vec3Cam.copy(game.ballMesh.position);
+        game._vec3Dir.set(
             Math.sin(game.cameraYaw) * Math.cos(game.cameraPitch),
             Math.sin(game.cameraPitch),
             Math.cos(game.cameraYaw) * Math.cos(game.cameraPitch)
-        );
-        dir.normalize();
-        const desiredPos = target.clone().add(dir.clone().multiplyScalar(game.cameraDistance));
+        ).normalize();
+        game._vec3Desired.copy(game._vec3Cam)
+            .addScaledVector(game._vec3Dir, game.cameraDistance);
 
         // Lerp camera for smooth follow
         const lerp = 6.0 * (dt || 0.016);
-        game.camera.position.lerp(desiredPos, lerp);
-        game.camera.lookAt(target);
+        game.camera.position.lerp(game._vec3Desired, lerp);
+        game.camera.lookAt(game._vec3Cam);
     } catch (e) {}
 }
 
