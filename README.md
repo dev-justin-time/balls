@@ -1,5 +1,7 @@
 # Going Balls - Web Edition
 
+[![Version](https://img.shields.io/badge/version-1.2.0-blue?link=CHANGELOG.md)](./CHANGELOG.md)
+
 A 3D physics-based rolling platformer inspired by "Going Balls".
 
 ## Features
