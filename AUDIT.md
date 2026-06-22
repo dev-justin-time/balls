@@ -11,8 +11,8 @@ Status key: ✅ Done  🔶 Partial  ⬜ Not started
 
 Executive summary
 -----------------
-Major progress: the monolithic main.js has been split into 12 modules, assets optimized (~40% size reduction), ball configs consolidated to a single source of truth, and a .codebuffrules safety file established. All audit P0/P1 bugs fixed (operator precedence, nebula skin type, coin geometry reuse, glass disposal, double level-scaling). Naming conventions standardized (camelCase for internal keys, snake_case adapter support for remote data).
-Remaining: PMREM cache hot-swap disposal verification.
+Major progress: the monolithic main.js has been split into 12 modules, assets optimized (~40% size reduction), ball configs consolidated to a single source of truth, and a .codebuffrules safety file established. All audit P0/P1 bugs fixed (operator precedence, nebula skin type, coin geometry reuse, glass disposal, double level-scaling). Naming conventions standardized (camelCase for internal keys, snake_case adapter support for remote data). ESLint + CI pipeline + Lighthouse CI + service worker cache busting + ball skin unit tests all complete. Geometry disposal leak fixed in clearLevel.
+All audit items complete — no remaining work.
 
 ---
 
@@ -37,9 +37,8 @@ Remaining: PMREM cache hot-swap disposal verification.
 
 ## Priority 2 — Performance & Resource Management
 
-### 1. 🔶 Textures and PMREM leaks
-- Status: PARTIAL. _lastEnvMap.dispose() tracked when replacing env maps. textureCache with Map. disposeMesh() helper handles sky transitions. clearTextureCache() available for hot-swap.
-- Remaining: Verify clearTextureCache is called during level reset hot-swap paths.
+### 1. ✅ Textures and PMREM leaks
+- Status: DONE. _lastEnvMap.dispose() tracked when replacing env maps. textureCache with Map. disposeMesh() helper handles sky transitions. clearTextureCache() intentionally NOT called during level reset (shared materials reference cached textures). Geometry disposal added to clearLevel (levelObjects, coins, pendulums, spinners, movers, glass platforms). Trail instances removed from scene on level reset.
 
 ### 2. ✅ Particle counts on mobile
 - Status: DONE. getParticleCount() scales by hardwareConcurrency, device type, screen area.
@@ -84,7 +83,7 @@ Remaining: PMREM cache hot-swap disposal verification.
 | N1 | eye_ball GLTF skin rendering | ✅ DONE |
 | N2 | .glb finish model rename | ✅ DONE |
 | N3 | window.__goingBalls* globals | ✅ DONE |
-| N4 | Automated tests (115 passing) | ✅ DONE |
+| N4 | Automated tests (141 passing) | ✅ DONE |
 | N5 | Assets optimized (~40% reduction) | ✅ DONE |
 | N6 | Asset paths standardized | ✅ DONE |
 | N7 | .codebuffrules safety file | ✅ DONE |
@@ -102,7 +101,11 @@ Remaining: PMREM cache hot-swap disposal verification.
 
 - ✅ Week 0–6: All major features, refactors, and bug fixes complete
 - ✅ Audit pass: P0/P1 bugs fixed, naming standardized, coin geometry reused, glass disposal added
-- ⬜ Future: PMREM cache hot-swap verification, ESLint setup, CI pipeline
+- ✅ PMREM cache hot-swap verification (disposal paths verified, geometry leak fixed in clearLevel)
+- ✅ ESLint setup (eslint.config.js with flat config, lint/lint:fix scripts, 4 errors fixed)
+- ✅ CI pipeline (.github/workflows/ci.yml: ESLint + vitest + Lighthouse CI + GitHub Pages deploy)
+- ✅ Service worker with SHA-stamped cache busting (sw.js)
+- ✅ Ball skin system unit tests (26 tests in tests/ball_skin.test.js)
 
 ---
 
