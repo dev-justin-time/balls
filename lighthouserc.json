@@ -1,7 +1,6 @@
 {
   "ci": {
     "collect": {
-      "staticDistDir": "./",
       "startServerCommand": "npx serve -s . -p 9001 --no-clipboard",
       "startServerReadyPattern": "Accepting connections",
       "url": ["http://localhost:9001"],

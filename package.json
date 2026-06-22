@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "serve -o",
-    "start": "serve -o",
+    "dev": "serve --open",
+    "start": "serve --open",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -14,6 +14,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@lhci/cli": "^0.15.1",
     "cannon-es": "^0.20.0",
     "eslint": "^10.5.0",
     "globals": "^17.6.0",

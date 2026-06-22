@@ -23,21 +23,36 @@ let _rand = Math.random.bind(Math);
 export function clearLevel(game) {
     game.levelObjects.forEach(obj => {
         if (obj.body) game.world.removeBody(obj.body);
-        if (obj.mesh) game.scene.remove(obj.mesh);
+        if (obj.mesh) {
+            game.scene.remove(obj.mesh);
+            if (obj.mesh.geometry) obj.mesh.geometry.dispose();
+        }
     });
-    game.coins.forEach(coin => game.scene.remove(coin));
+    game.coins.forEach(coin => {
+        game.scene.remove(coin);
+        if (coin.geometry) coin.geometry.dispose();
+    });
     game.pendulums.forEach(p => {
         if (p.body) game.world.removeBody(p.body);
         game.scene.remove(p.mesh);
-        if (p.line) game.scene.remove(p.line);
+        if (p.mesh && p.mesh.geometry) p.mesh.geometry.dispose();
+        if (p.line) {
+            game.scene.remove(p.line);
+            if (p.line.geometry) p.line.geometry.dispose();
+        }
+        if (p.trail) { game.scene.remove(p.trail); }
     });
     game.spinners.forEach(s => {
         if (s.body) game.world.removeBody(s.body);
         game.scene.remove(s.mesh);
+        if (s.mesh && s.mesh.geometry) s.mesh.geometry.dispose();
+        if (s.trail) { game.scene.remove(s.trail); }
     });
     game.movers.forEach(m => {
         if (m.body) game.world.removeBody(m.body);
         game.scene.remove(m.mesh);
+        if (m.mesh && m.mesh.geometry) m.mesh.geometry.dispose();
+        if (m.trail) { game.scene.remove(m.trail); }
     });
     if (game.raining) clearRain(game);
     if (game.windy) clearWind(game);
