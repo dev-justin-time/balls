@@ -124,15 +124,17 @@ Adding new skins / skies
 ------------------------
 To add a new ball skin:
 1. Add the texture file to the project root (e.g., myball.png).
-2. Add an entry in main.js this.ballConfigs with:
-   key: { name: 'My Ball', price: 150, tex: 'myball.png', type: 'texture' }
+2. Add an entry in src/ball_db.js BALL_DB with:
+   key: { name: 'My Ball', price: 150, tex: 'assets/image/myball.webp', type: 'texture', ability: { key: 'speed', base: 1.0, perLevel: 0.05 }, description: '...' }
 3. Optionally include unlockedBalls default in saveData to make it immediately available for testing.
 
 To add a sky:
 1. Add an equirectangular PNG (recommended) named sky_new.png.
-2. Add to this.skyConfigs:
-   key: { name: 'My Sky', price: 200, tex: 'sky_new.png', color: 0x112233 }
+2. Add to src/persistence.js skyConfigs:
+   key: { name: 'My Sky', price: 200, tex: 'assets/image/sky_new.webp', color: 0x112233 }
+   Optionally add conditions: { coinBonus: 1.2, speedBoost: 1.1 }
 3. The applySkyConfig routine will attempt PMREM generation and will create the rotating sky sphere.
+4. Condition skies apply coin multipliers (via checkGameState) and speed modifiers (via updatePhysics).
 
 Extending levels and obstacles
 ------------------------------
@@ -196,5 +198,12 @@ Appendix: Quick dev tips
 - To reproduce a specific level deterministically, set currentLevel and call createLevel() after setting Math.random seed (use a seeded RNG lib).
 - To test weather transitions, temporarily call weatherAI.recordWeather('rain') from console and recreate level.
 - To debug physics state, log this.world.bodies and inspect positions; avoid logging per-frame in production.
+
+Hazards & coin-drop system
+--------------------------
+- Pendulums, spinners, and movers now drop coins on contact with the player ball.
+- Coin loss scales with level: higher levels = more coins dropped per hit.
+- Dropped coins are spawned as collectible pickups — the player can reclaim them.
+- 10 trail sprite/model types attach to hazards for visual flair (skeleton, zombie, eye, soldier2, venus, dragon, bowling_strike, easter, life, love).
 
 End of DEEP_WIKI.md

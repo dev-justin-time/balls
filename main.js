@@ -15,7 +15,7 @@ import { initAudio, registerSfx, playSound } from './src/audio.js';
 import { initNetworking, setupLoadingManager, setupGlobalErrorHandlers } from './src/networking.js';
 import { initScene, getBallMaterial, clearTextureCache } from './engine/scene.js';
 import { onWindowResize, animate } from './src/rendering.js';
-import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind } from './src/physics.js';
+import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, updateFireSparks, createMeteors, clearMeteors, updateMeteors, checkMeteorCollisions } from './src/physics.js';
 import { createLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins } from './src/levelgen.js';
 import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset } from './src/ui.js';
 
@@ -147,12 +147,12 @@ class Game {
                 const mx = Math.abs(e.movementX) > 150 ? 0 : e.movementX;
                 const my = Math.abs(e.movementY) > 150 ? 0 : e.movementY;
                 this.cameraYaw -= mx * 0.002;
-                this.cameraPitch = Math.max(0.1, Math.min(1.4, this.cameraPitch + my * 0.002));
+                this.cameraPitch = Math.max(0.15, Math.min(1.2, this.cameraPitch + my * 0.002));
             } else if (document.pointerLockElement === document.body) {
                 const mx = Math.abs(e.movementX) > 150 ? 0 : e.movementX;
                 const my = Math.abs(e.movementY) > 150 ? 0 : e.movementY;
                 this.cameraYaw -= mx * 0.0025;
-                this.cameraPitch = Math.max(0.1, Math.min(1.4, this.cameraPitch + my * 0.0025));
+                this.cameraPitch = Math.max(0.15, Math.min(1.2, this.cameraPitch + my * 0.0025));
                 this.mouseInput.x = THREE.MathUtils.clamp(mx * 0.1, -1, 1);
                 this.mouseInput.y = THREE.MathUtils.clamp(-my * 0.1, -1, 1);
             }
@@ -185,8 +185,86 @@ class Game {
         }, { passive: true });
 
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'KeyT') document.exitPointerLock();
+            if (e.code === 'Escape' && document.pointerLockElement === document.body) {
+                document.exitPointerLock();
+            }
+
+            // Focus-trap for open modals inside #overlay
+            if (e.code === 'Tab') {
+                const overlay = document.getElementById('overlay');
+                if (!overlay || overlay.style.display !== 'flex') return;
+                const focusable = overlay.querySelectorAll(
+                    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                );
+                if (focusable.length === 0) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (e.shiftKey) {
+                    if (document.activeElement === first || !overlay.contains(document.activeElement)) {
+                        e.preventDefault();
+                        last.focus();
+                    }
+                } else {
+                    if (document.activeElement === last || !overlay.contains(document.activeElement)) {
+                        e.preventDefault();
+                        first.focus();
+                    }
+                }
+            }
         });
+
+        // --- Pointer lock button ---
+        const plBtn = document.getElementById('pointerlock-btn');
+        const hint = document.getElementById('pointerlock-hint');
+        const hintDismiss = document.getElementById('pointerlock-hint-dismiss');
+
+        const updatePlIcon = () => {
+            if (!plBtn) return;
+            plBtn.textContent = document.pointerLockElement === document.body ? '🔒' : '🖱️';
+        };
+
+        if (plBtn) {
+            plBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (document.pointerLockElement === document.body) {
+                    document.exitPointerLock();
+                } else {
+                    document.body.requestPointerLock();
+                }
+            });
+        }
+
+        document.addEventListener('pointerlockchange', () => {
+            updatePlIcon();
+            // Dismiss hint once user engages with pointer lock
+            if (hint && document.pointerLockElement === document.body) {
+                hint.classList.remove('visible');
+                try { localStorage.setItem('goingBalls_plHintDismissed', '1'); } catch(e) {}
+            }
+        });
+
+        // Show hint after loading completes (overlay removed)
+        if (hint && !localStorage.getItem('goingBalls_plHintDismissed')) {
+            let pollAttempts = 0;
+            const showHint = () => {
+                pollAttempts++;
+                if (pollAttempts > 50) return; // bail-out after ~30s
+                if (!document.getElementById('loading-overlay') || document.getElementById('loading-overlay').style.opacity === '0') {
+                    hint.classList.add('visible');
+                } else {
+                    setTimeout(showHint, 600);
+                }
+            };
+            setTimeout(showHint, 2500);
+        }
+
+        if (hintDismiss && hint) {
+            hintDismiss.addEventListener('click', (e) => {
+                e.stopPropagation();
+                hint.classList.remove('visible');
+                try { localStorage.setItem('goingBalls_plHintDismissed', '1'); } catch(e) {}
+            });
+        }
     }
 
     // ---- Module method delegation (thin wrappers) ----
@@ -199,6 +277,13 @@ class Game {
     clearRain() { clearRain(this); }
     createWind() { createWind(this); }
     clearWind() { clearWind(this); }
+    createFireSparks() { createFireSparks(this); }
+    clearFireSparks() { clearFireSparks(this); }
+    updateFireSparks(dt) { updateFireSparks(this, dt); }
+    createMeteors() { createMeteors(this); }
+    clearMeteors() { clearMeteors(this); }
+    updateMeteors(dt) { updateMeteors(this, dt); }
+    checkMeteorCollisions() { checkMeteorCollisions(this); }
 
     createLevel(seed) { createLevel(this, seed); }
     clearLevel() { clearLevel(this); }

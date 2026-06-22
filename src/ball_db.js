@@ -147,5 +147,119 @@ export const BALL_DB = {
     type: 'texture',
     ability: { key: 'coins', base: 1.30, perLevel: 0.12 },
     description: 'A glass-like orb containing a fiery spirit; strong coin multiplier with translucent glass visuals.'
+  },
+
+  // --- New skins from unused assets (#2) ---
+  eightball: {
+    name: '8-Ball',
+    price: 250,
+    tex: 'assets/image/8-ball-8-ball-pool.gif',
+    type: 'texture',
+    ability: { key: 'speed', base: 1.04, perLevel: 0.05 },
+    description: 'Classic pool 8-ball with a steady roll and minor speed edge.'
+  },
+  dragon_orb: {
+    name: 'Dragon Orb',
+    price: 1800,
+    tex: 'assets/image/dragon-ball.webp',
+    type: 'texture',
+    ability: { key: 'coins', base: 1.18, perLevel: 0.10 },
+    description: 'Mystical dragon sphere radiating coin fortune; premium looks and rewards.'
+  },
+  poke_sphere: {
+    name: 'Poke Sphere',
+    price: 600,
+    tex: 'assets/image/poke-balls-all-poke-balls.webp',
+    type: 'texture',
+    ability: { key: 'jump', base: 1.08, perLevel: 0.07 },
+    description: 'Collector sphere with a bounce bonus — catch air, not monsters.'
+  },
+  tennis_chick: {
+    name: 'Tennis Chick',
+    price: 280,
+    tex: 'assets/image/tennis-ball-chick.webp',
+    type: 'texture',
+    ability: { key: 'jump', base: 1.04, perLevel: 0.05 },
+    description: 'Fuzzy tennis fuzz meets playful chick energy; light, bouncy, fun.'
+  },
+  softball: {
+    name: 'Softball',
+    price: 220,
+    tex: 'assets/image/softball-ball.gif',
+    type: 'texture',
+    ability: { key: 'speed', base: 1.03, perLevel: 0.04 },
+    description: 'Classic yellow softball — bigger than a baseball, rolls with authority.'
+  },
+  heavy_roller: {
+    name: 'Heavy Roller',
+    price: 450,
+    tex: 'assets/image/fat-bowling-ball.gif',
+    type: 'texture',
+    ability: { key: 'speed', base: 1.06, perLevel: 0.06 },
+    description: 'A chunky bowling brute that bulldozes through levels with weighty rolls.'
+  },
+  bear_ball: {
+    name: 'Bear Ball',
+    price: 520,
+    tex: 'assets/image/bear-ball.gif',
+    type: 'texture',
+    ability: { key: 'jump', base: 1.07, perLevel: 0.06 },
+    description: 'Grizzly-powered bounce — feels like a bear hug on every jump.'
+  },
+  rindo_emoji: {
+    name: 'Rindo Emoji',
+    price: 380,
+    tex: 'assets/image/emoji-rindo.webp',
+    type: 'texture',
+    ability: { key: 'coins', base: 1.06, perLevel: 0.06 },
+    description: 'Expressive emoji ball that charms coins out of every corner.'
+  },
+  flushed_orb: {
+    name: 'Flushed Orb',
+    price: 340,
+    tex: 'assets/image/flushed-ball.webp',
+    type: 'texture',
+    ability: { key: 'speed', base: 1.04, perLevel: 0.05 },
+    description: 'Embarrassed but fast — this anxious orb rolls quicker than it wants to.'
+  },
+  nba_pinch: {
+    name: 'NBA Pinch',
+    price: 440,
+    tex: 'assets/image/pinch-nba-ball.webp',
+    type: 'texture',
+    ability: { key: 'jump', base: 1.06, perLevel: 0.06 },
+    description: 'Slam-dunk energy wrapped in a pinch of NBA swagger.'
+  },
+  ai_sphere: {
+    name: 'AI Sphere',
+    price: 3200,
+    tex: 'assets/image/balls-ai.webp',
+    type: 'texture',
+    ability: { key: 'speed', base: 1.25, perLevel: 0.14 },
+    description: 'Neural-network-inspired skin with aggressive speed scaling; high-tech high-tier.'
+  },
+  cursed_cat: {
+    name: 'Cursed Cat',
+    price: 880,
+    tex: 'assets/image/cursed-cat-cat.webp',
+    type: 'texture',
+    ability: { key: 'coins', base: 1.14, perLevel: 0.09 },
+    description: 'A mischievous feline aura that jinxes coins into your wallet. Bad luck for levels, good luck for you.'
+  },
+  cece_vibe: {
+    name: 'Cece Vibe',
+    price: 700,
+    tex: 'assets/image/cecesgif-cecesgifs.webp',
+    type: 'texture',
+    ability: { key: 'jump', base: 1.10, perLevel: 0.08 },
+    description: 'Vibrant animated energy — bounces with infectious rhythm and style.'
+  },
+  ganyu_lick: {
+    name: 'Ganyu Lick',
+    price: 1100,
+    tex: 'assets/image/ganyu-lick.webp',
+    type: 'texture',
+    ability: { key: 'coins', base: 1.16, perLevel: 0.09 },
+    description: 'Cryo-chilled charm that freezes extra coins into your path. Cool under pressure.'
   }
 };

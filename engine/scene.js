@@ -70,7 +70,7 @@ export function initScene(game) {
     preloadTrailModels(game);
 
     // Load finish GLB
-    game.gltfLoader.load('assets/model/.glb',
+    game.gltfLoader.load('assets/model/finish_gate.glb',
         (gltf) => {
             game.finishModel = gltf.scene;
             if (game.placeFinishModel) game.placeFinishModel();
@@ -430,7 +430,13 @@ function preloadTrailModels(game) {
         { key: 'zombie', url: 'assets/model/_halloween_Um_zumbi__0523105301_.glb' },
         { key: 'eye', url: 'assets/model/eye_low_poly_free_cute_eyeballs.glb' },
         { key: 'soldier2', url: 'assets/image/Soldier (3).webp' },
-        { key: 'venus', url: 'assets/image/Venus Fly Trap.webp' }
+        { key: 'venus', url: 'assets/image/Venus Fly Trap.webp' },
+        // --- New trail types (#8) ---
+        { key: 'dragon', url: 'assets/image/dragon-ball.webp' },
+        { key: 'bowling_strike', url: 'assets/image/bowling-strike.gif' },
+        { key: 'easter', url: 'assets/image/easter.gif' },
+        { key: 'life', url: 'assets/image/life.gif' },
+        { key: 'love', url: 'assets/image/love.gif' }
     ];
 
     const createSpriteFromImage = (src, size = 0.8) => {
@@ -527,7 +533,75 @@ export function getBallMaterial(game) {
     } catch (e) {
         console.warn('getBallMaterial fallback', e);
     }
+    // Default fallback (also used temporarily for gltf while loading)
     return new THREE.MeshPhongMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+}
+
+// Ball skin application — handles both material swap (texture/color/emissive)
+// and full mesh replacement (gltf type). For gltf: loads the GLB model,
+// caches it, and swaps game.ballMesh with a clone. Stores the original
+// sphere mesh as game._defaultBallMesh for restoration when switching back.
+export function applyBallSkin(game, conf) {
+    if (!game || !conf) return;
+
+    // For non-gltf types: restore default sphere mesh if currently using gltf
+    if (conf.type !== 'gltf') {
+        if (game._gltfBallActive && game._defaultBallMesh) {
+            game.scene.remove(game.ballMesh);
+            disposeMesh(game.ballMesh);
+            game.ballMesh = game._defaultBallMesh;
+            game.scene.add(game.ballMesh);
+            game._gltfBallActive = false;
+            game._defaultBallMesh = null;
+        }
+        game.ballMesh.material = getBallMaterial(game);
+        return;
+    }
+
+    // gltf type: save default mesh reference before first swap
+    if (!game._defaultBallMesh && !game._gltfBallActive) {
+        game._defaultBallMesh = game.ballMesh;
+    }
+
+    const doSwap = (model) => {
+        // Always remove current mesh from scene first
+        game.scene.remove(game.ballMesh);
+        // Only dispose if replacing a previous GLTF clone (not the default sphere)
+        if (game._gltfBallActive) {
+            disposeMesh(game.ballMesh);
+        }
+        const clone = model.clone(true);
+        // Scale to match ball radius (0.5)
+        clone.scale.set(0.5, 0.5, 0.5);
+        clone.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        game.ballMesh = clone;
+        game.scene.add(game.ballMesh);
+        game._gltfBallActive = true;
+    };
+
+    // Use cached model if available
+    game._gltfBallCache = game._gltfBallCache || {};
+    if (game._gltfBallCache[conf.tex]) {
+        doSwap(game._gltfBallCache[conf.tex]);
+        return;
+    }
+
+    // Load async — show default white ball during load
+    game.ballMesh.material = getBallMaterial(game);
+    game.gltfLoader.load(conf.tex,
+        (gltf) => {
+            const model = gltf.scene;
+            game._gltfBallCache[conf.tex] = model;
+            // Only swap if this skin is still selected (user may have switched)
+            if (game.saveData.selectedBall && game.ballConfigs[game.saveData.selectedBall] === conf) {
+                doSwap(model);
+            }
+        },
+        undefined,
+        (err) => {
+            console.warn('Failed to load gltf ball skin:', conf.tex, err);
+        }
+    );
 }
 
 // Groovy canvas

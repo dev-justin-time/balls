@@ -14,6 +14,12 @@ let __networkErrorCount = 0;
 let __networkErrorLogged = false;
 let __roomReadyFn = () => false;
 
+// Retry constants for room initialization
+const ROOM_INIT_MAX_RETRIES = 3;
+const ROOM_INIT_BASE_DELAY = 1000; // ms
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 const loadingManager = {
     active: false
 };
@@ -75,6 +81,7 @@ export function setupLoadingManager() {
                         t.style.boxShadow = '0 6px 18px rgba(0,0,0,0.5)';
                         t.innerText = 'Some network assets failed to load — using safe fallbacks.';
                         const dismiss = document.createElement('button');
+                        dismiss.setAttribute('aria-label', 'Dismiss fallback notice');
                         dismiss.innerText = 'Dismiss';
                         dismiss.style.marginLeft = '10px';
                         dismiss.style.background = '#222';
@@ -164,46 +171,62 @@ export function setupGlobalErrorHandlers(notifier) {
 
 export async function initNetworking() {
     const room = new WebsimSocket();
-    try {
-        await room.initialize();
-        room.isReady = true;
 
-        __roomReadyFn = () => (room && room.isReady && typeof room.collection === 'function');
+    // Retry loop with exponential backoff
+    for (let attempt = 0; attempt <= ROOM_INIT_MAX_RETRIES; attempt++) {
+        try {
+            await room.initialize();
+            room.isReady = true;
 
-        // Seed ball_stats collection
-        (async () => {
-            try {
-                if (!__roomReadyFn()) return;
-                const coll = room.collection('ball_stats');
-                const existing = coll.getList() || [];
-                if (!existing || existing.length === 0) {
-                    const seeded = [
-                        { ball_key: 'rainbow', played: 120, wins: 48, avg_time: 34.2, best_time: 18.6 },
-                        { ball_key: 'wood', played: 42, wins: 10, avg_time: 47.1, best_time: 29.3 },
-                        { ball_key: 'metal', played: 88, wins: 32, avg_time: 30.8, best_time: 16.9 },
-                        { ball_key: 'lava', played: 15, wins: 3, avg_time: 52.4, best_time: 41.2 },
-                        { ball_key: 'groovy', played: 5, wins: 1, avg_time: 28.7, best_time: 28.7 }
-                    ];
-                    for (const r of seeded) {
-                        try {
-                            await coll.create(r);
-                        } catch (err) {
-                            console.warn('Failed to create ball_stats record (continuing):', err && err.message ? err.message : err);
-                        }
-                    }
-                    console.info('Seeded ball_stats collection with sample records.');
-                } else {
-                    console.info('ball_stats collection already populated, skipping seed.');
-                }
-            } catch (err) {
-                console.warn('ball_stats seeding failed (continuing):', err && err.message ? err.message : err);
+            __roomReadyFn = () => (room && room.isReady && typeof room.collection === 'function');
+
+            if (attempt > 0) {
+                console.info(`WebsimSocket.initialize() succeeded on retry attempt ${attempt}.`);
             }
-        })();
 
-        return room;
-    } catch (e) {
-        console.warn('WebsimSocket.initialize() failed — continuing in offline/fallback mode.', e && (e.message || e));
-        __roomReadyFn = () => false;
-        return room;
+            // Seed ball_stats collection
+            (async () => {
+                try {
+                    if (!__roomReadyFn()) return;
+                    const coll = room.collection('ball_stats');
+                    const existing = coll.getList() || [];
+                    if (!existing || existing.length === 0) {
+                        const seeded = [
+                            { ball_key: 'rainbow', played: 120, wins: 48, avg_time: 34.2, best_time: 18.6 },
+                            { ball_key: 'wood', played: 42, wins: 10, avg_time: 47.1, best_time: 29.3 },
+                            { ball_key: 'metal', played: 88, wins: 32, avg_time: 30.8, best_time: 16.9 },
+                            { ball_key: 'lava', played: 15, wins: 3, avg_time: 52.4, best_time: 41.2 },
+                            { ball_key: 'groovy', played: 5, wins: 1, avg_time: 28.7, best_time: 28.7 }
+                        ];
+                        for (const r of seeded) {
+                            try {
+                                await coll.create(r);
+                            } catch (err) {
+                                console.warn('Failed to create ball_stats record (continuing):', err && err.message ? err.message : err);
+                            }
+                        }
+                        console.info('Seeded ball_stats collection with sample records.');
+                    } else {
+                        console.info('ball_stats collection already populated, skipping seed.');
+                    }
+                } catch (err) {
+                    console.warn('ball_stats seeding failed (continuing):', err && err.message ? err.message : err);
+                }
+            })();
+
+            return room;
+        } catch (e) {
+            if (attempt < ROOM_INIT_MAX_RETRIES) {
+                const delay = ROOM_INIT_BASE_DELAY * (2 ** attempt);
+                console.info(`WebsimSocket.initialize() attempt ${attempt + 1}/${ROOM_INIT_MAX_RETRIES + 1} failed, retrying in ${delay}ms...`);
+                await sleep(delay);
+            }
+        }
     }
+
+    // All retries exhausted — fall back to offline mode
+    console.warn(`WebsimSocket.initialize() failed after ${ROOM_INIT_MAX_RETRIES + 1} attempts — continuing in offline/fallback mode.`);
+    __roomReadyFn = () => false;
+    return room;
+}
 }

@@ -1,0 +1,17 @@
+{
+  "name": "going-balls",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "cannon-es": "^0.20.0",
+    "jsdom": "^29.1.1",
+    "three": "^0.184.0",
+    "vitest": "^3.2.6"
+  }
+}

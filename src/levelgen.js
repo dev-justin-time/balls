@@ -15,7 +15,10 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { mulberry32, getParticleCount, saveGame } from './persistence.js';
 import { applySkyConfig } from '../engine/scene.js';
-import { createRain, clearRain, createWind, clearWind } from './physics.js';
+import { createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, createMeteors, clearMeteors } from './physics.js';
+
+/** Module-level RNG used by all helper functions. Overridden by createLevel() with a seeded RNG, restored afterward. */
+let _rand = Math.random.bind(Math);
 
 export function clearLevel(game) {
     game.levelObjects.forEach(obj => {
@@ -42,6 +45,8 @@ export function clearLevel(game) {
         if (game.snowPoints) { game.scene.remove(game.snowPoints); game.snowPoints.geometry && game.snowPoints.geometry.dispose(); game.snowPoints.material && game.snowPoints.material.dispose(); game.snowPoints = null; }
         game.snowing = false;
     }
+    if (game.hasFireSparks) { clearFireSparks(game); game.hasFireSparks = false; }
+    if (game.hasMeteors) { clearMeteors(game); game.hasMeteors = false; }
 
     game.checkpoints = [];
     game.levelObjects = [];
@@ -66,8 +71,12 @@ export function createLevel(game, seed) {
     } catch (e) {
         console.warn('Seeded RNG setup failed (continuing with default RNG)', e);
     }
-    const rand = () => (game.rnd ? game.rnd() : Math.random());
+    const _fallbackRandom = Math.random.bind(Math);
+    const rand = () => (game.rnd ? game.rnd() : _fallbackRandom());
+    const _prevRand = _rand;
+    _rand = rand;
 
+    try {
     clearLevel(game);
     game.lastCheckpointPos.set(0, 5, 0);
 
@@ -98,17 +107,57 @@ export function createLevel(game, seed) {
         { level: 13, color: 0xffa500, label: "TOUGH", types: ['pendulum', 'hammer_gauntlet', 'moving_rects', 'checkerboard', 'triple_jump_gap'] },
         { level: 16, color: 0xff4500, label: "EXPERT", types: ['hammer_gauntlet', 'side_crusher', 'narrow', 'moving_rects', 'triple_jump_gap'] },
         { level: 19, color: 0x8b0000, label: "EXTREME", types: ['narrow', 'side_crusher', 'checkerboard', 'archipelago', 'triple_jump_gap'] },
-        { level: 22, color: 0x4b0082, label: "INSANE", types: ['narrow', 'side_crusher', 'hammer_gauntlet', 'checkerboard', 'triple_jump_gap'] },
-        { level: 25, color: 0x000000, label: "IMPOSSIBLE", types: ['narrow', 'side_crusher', 'hammer_gauntlet', 'checkerboard', 'triple_jump_gap'] }
+        { level: 22, color: 0x4b0082, label: "INSANE", types: ['narrow', 'side_crusher', 'hammer_gauntlet', 'checkerboard', 'triple_jump_gap', 'loop_d_loop'] },
+        { level: 25, color: 0x000000, label: "IMPOSSIBLE", types: ['narrow', 'side_crusher', 'hammer_gauntlet', 'checkerboard', 'triple_jump_gap', 'loop_d_loop', 'spiral_tube'] }
     ];
 
     let tier = difficultyTiers[0];
     for (let t of difficultyTiers) {
         if (game.currentLevel >= t.level) tier = t;
     }
+    game.currentTier = tier;
 
-    // Weather AI
-    game.currentWeather = game.weatherAI ? game.weatherAI.chooseWeather(game.currentLevel) : 'clear';
+    // --- Sky condition overrides (#8) — run before weather application ---
+    const skyCond = game.skyConfigs[game.saveData.selectedSky]?.conditions;
+    if (skyCond) {
+        // Inferno: fire sparks + heat haze
+        if (skyCond.fireSparks) {
+            createFireSparks(game);
+            game.hasFireSparks = true;
+        }
+        if (skyCond.heatHaze) {
+            // Heat haze visual: warm reddish fog tint
+            if (game.scene.fog) game.scene.fog.color.setHex(0x3a0a00);
+        }
+        // Void Storm: meteors + forced wind
+        if (skyCond.meteorHazards) {
+            createMeteors(game);
+            game.hasMeteors = true;
+        }
+        // Frost: always snow + ice (extra friction reduction)
+        if (skyCond.snowAlways) {
+            game.currentWeather = 'snow';
+        }
+        // Storm / Void Storm: high wind chance
+        if (skyCond.windChance && Math.random() < skyCond.windChance) {
+            if (game.currentWeather !== 'snow') {
+                game.currentWeather = 'wind';
+            } else {
+                // Snow + wind combo
+                game.windy = true;
+                game.wind = { dirX: (rand() > 0.5 ? 1 : -1) * (0.6 + rand() * 1.0), strength: 0.7 + rand() * 0.9 };
+                createWind(game);
+            }
+        }
+        if (skyCond.rainChance && Math.random() < skyCond.rainChance) {
+            if (game.currentWeather !== 'snow') game.currentWeather = 'rain';
+        }
+    }
+
+    // Weather AI (used when no sky condition forces weather)
+    if (!skyCond || (!skyCond.snowAlways && !skyCond.fireSparks && !skyCond.meteorHazards)) {
+        game.currentWeather = game.weatherAI ? game.weatherAI.chooseWeather(game.currentLevel) : 'clear';
+    }
     try { game.weatherAI && game.weatherAI.recordWeather(game.currentWeather); } catch(e){}
 
     if (game.currentWeather === 'rain') {
@@ -117,7 +166,7 @@ export function createLevel(game, seed) {
         game.world.contactmaterials.forEach(cm => { try { cm.frictionBackup = cm.friction; cm.friction = Math.max(0.08, (cm.frictionBackup || 0.6) * 0.3); } catch(e){} });
     } else if (game.currentWeather === 'wind') {
         game.windy = true;
-        game.wind = { dirX: (Math.random() > 0.5 ? 1 : -1) * (0.6 + Math.random() * 1.0), strength: 0.7 + Math.random() * 0.9 };
+        game.wind = { dirX: (rand() > 0.5 ? 1 : -1) * (0.6 + rand() * 1.0), strength: 0.7 + rand() * 0.9 };
         createWind(game);
     } else if (game.currentWeather === 'snow') {
         game.snowing = true;
@@ -127,9 +176,9 @@ export function createLevel(game, seed) {
             const area = Math.max(30, Math.min(120, Math.floor((window.innerWidth + window.innerHeight) / 40)));
             for (let i = 0; i < count; i++) {
                 const ix = i * 3;
-                positions[ix] = (Math.random() - 0.5) * area + (game.ballMesh.position.x || 0);
-                positions[ix + 1] = Math.random() * 40 + 5;
-                positions[ix + 2] = (Math.random() - 0.5) * area + (game.ballMesh.position.z || 0);
+                positions[ix] = (rand() - 0.5) * area + (game.ballMesh.position.x || 0);
+                positions[ix + 1] = rand() * 40 + 5;
+                positions[ix + 2] = (rand() - 0.5) * area + (game.ballMesh.position.z || 0);
             }
             const geom = new THREE.BufferGeometry();
             geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -160,17 +209,22 @@ export function createLevel(game, seed) {
     }
     document.body.style.backgroundColor = `#${tier.color.toString(16).padStart(6, '0')}`;
 
-    // Rain/wind based on level number
-    if (game.currentLevel % 5 === 0) {
+    // Rain/wind based on level number (only when no condition sky active)
+    if (!skyCond && game.currentLevel % 5 === 0) {
         game.raining = true;
         createRain(game);
         game.world.contactmaterials.forEach(cm => { try { cm.frictionBackup = cm.friction; cm.friction = Math.max(0.1, (cm.frictionBackup || 0.6) * 0.35); } catch(e){} });
         if (game.rollSound) game.rollSound.volume *= 0.9;
     }
-    if (game.currentLevel % 7 === 0) {
+    if (!skyCond && game.currentLevel % 7 === 0) {
         game.windy = true;
-        game.wind = { dirX: (Math.random() > 0.5 ? 1 : -1) * (0.4 + Math.random() * 0.9), strength: 0.5 + Math.random() * 1.0 };
+        game.wind = { dirX: (rand() > 0.5 ? 1 : -1) * (0.4 + rand() * 0.9), strength: 0.5 + rand() * 1.0 };
         createWind(game);
+    }
+
+    // Frost ice patches: extra friction reduction after snow is already applied
+    if (skyCond && skyCond.icePatches && game.currentWeather === 'snow') {
+        game.world.contactmaterials.forEach(cm => { try { cm.friction = Math.max(0.04, cm.friction * 0.55); } catch(e){} });
     }
 
     // Level scaling
@@ -185,20 +239,20 @@ export function createLevel(game, seed) {
             currentZ -= 4;
         }
 
-        const type = tier.types[Math.floor(Math.random() * tier.types.length)];
+        const type = tier.types[Math.floor(rand() * tier.types.length)];
 
         switch(type) {
             case 'straight': {
-                const len = 15 + Math.random() * 20;
+                const len = 15 + rand() * 20;
                 addPlatform(game, MX(currentX), currentY, currentZ - len/2, baseWidth, len);
                 addCoins(game, MX(currentX), currentY + 1, currentZ, len, 3);
                 currentZ -= len;
                 break;
             }
             case 'ramp': {
-                const rampL = 15 + Math.random() * 10;
-                let rampH = 4 + Math.random() * 4;
-                if (Math.random() < 0.20) { rampH = rampL; }
+                const rampL = 15 + rand() * 10;
+                let rampH = 4 + rand() * 4;
+                if (rand() < 0.20) { rampH = rampL; }
                 const maxAngle = Math.PI / 4;
                 const angle = Math.atan2(rampH, rampL);
                 if (angle > maxAngle) { rampH = Math.tan(maxAngle) * rampL; }
@@ -223,7 +277,7 @@ export function createLevel(game, seed) {
             case 'zigzag': {
                 const zzLen = 12;
                 const offset = 4;
-                const dir = Math.random() > 0.5 ? 1 : -1;
+                const dir = rand() > 0.5 ? 1 : -1;
                 addPlatform(game, MX(currentX), currentY, currentZ - zzLen/2, baseWidth, zzLen);
                 currentZ -= zzLen;
                 currentX += offset * dir;
@@ -232,7 +286,7 @@ export function createLevel(game, seed) {
                 break;
             }
             case 'gap': {
-                const gapSize = 5 + Math.random() * 3;
+                const gapSize = 5 + rand() * 3;
                 addPlatform(game, MX(currentX), currentY, currentZ - 5, baseWidth + 2, 10);
                 currentZ -= (10 + gapSize);
                 addPlatform(game, MX(currentX), currentY, currentZ - 5, baseWidth + 2, 10);
@@ -241,7 +295,7 @@ export function createLevel(game, seed) {
             }
             case 'bumpy': {
                 for(let b=0; b<6; b++) {
-                    const bH = Math.random() * 0.7;
+                    const bH = rand() * 0.7;
                     addPlatform(game, MX(currentX), currentY + bH, currentZ - 3, baseWidth + 1.5, 6);
                     currentZ -= 6;
                 }
@@ -275,7 +329,7 @@ export function createLevel(game, seed) {
                 const count = 5;
                 const dist = 8;
                 for(let a=0; a<count; a++) {
-                    const offX = (Math.random() - 0.5) * 6;
+                    const offX = (rand() - 0.5) * 6;
                     addPlatform(game, MX(currentX + offX), currentY, currentZ - dist/2, 3, 3);
                     addCoins(game, MX(currentX + offX), currentY + 1, currentZ - dist/2, 1, 1);
                     currentZ -= dist;
@@ -383,13 +437,13 @@ export function createLevel(game, seed) {
                 break;
             }
             case 'curve': {
-                const segments = 6 + Math.floor(Math.random() * 4);
+                const segments = 6 + Math.floor(rand() * 4);
                 const curveWidth = baseWidth;
-                const curveRadius = 6 + Math.random() * 12;
-                const dir = Math.random() > 0.5 ? 1 : -1;
+                const curveRadius = 6 + rand() * 12;
+                const dir = rand() > 0.5 ? 1 : -1;
                 const segLen = 6;
                 for (let s = 0; s < segments; s++) {
-                    const angle = (s / segments) * (Math.PI / 2) * (0.6 + Math.random() * 0.6) * dir;
+                    const angle = (s / segments) * (Math.PI / 2) * (0.6 + rand() * 0.6) * dir;
                     const offX = Math.sin(angle) * curveRadius;
                     const zStep = segLen;
                     addPlatform(game, MX(currentX + offX), currentY, currentZ - zStep/2, curveWidth, zStep);
@@ -399,8 +453,8 @@ export function createLevel(game, seed) {
                 break;
             }
             case 'loop_d_loop': {
-                const loopRadius = 6 + Math.random() * 6;
-                const loopSegments = 10;
+                const loopRadius = 6 + rand() * 8;
+                const loopSegments = 12 + Math.floor(rand() * 6);
                 addRamp(game, MX(currentX), currentY, currentZ, baseWidth + 1, 8, Math.min(6, loopRadius * 0.6));
                 currentZ -= 8;
                 for (let i = 0; i < loopSegments; i++) {
@@ -408,15 +462,16 @@ export function createLevel(game, seed) {
                     const px = Math.cos(a) * loopRadius;
                     const pz = Math.sin(a) * loopRadius;
                     addPlatform(game, MX(currentX + px), currentY + Math.sin(a) * 2, currentZ - pz, baseWidth * 0.9, 4);
+                    if (i % 3 === 0) addCoins(game, MX(currentX + px), currentY + Math.sin(a) * 2 + 1, currentZ - pz, 2, 1);
                 }
-                addRamp(game, MX(currentX), currentY, currentZ - loopRadius * 1.2, baseWidth + 1, 10, Math.min(4, loopRadius * 0.4));
-                currentZ -= loopRadius * 1.6;
+                addRamp(game, MX(currentX), currentY, currentZ - loopRadius * 1.2, baseWidth + 1, 12, Math.min(5, loopRadius * 0.4));
+                currentZ -= loopRadius * 1.8;
                 break;
             }
             case 'spiral_tube': {
-                const turns = 1 + Math.floor(Math.random() * 2);
-                const spiralRadius = 8 + Math.random() * 8;
-                const segments = 14 + Math.floor(Math.random() * 6);
+                const turns = 1 + Math.floor(rand() * 2);
+                const spiralRadius = 8 + rand() * 8;
+                const segments = 14 + Math.floor(rand() * 6);
                 for (let i = 0; i < segments; i++) {
                     const t = (i / segments) * (Math.PI * 2 * turns);
                     const r = spiralRadius * (1 - i / segments * 0.6);
@@ -449,6 +504,9 @@ export function createLevel(game, seed) {
     game.levelLength = Math.abs(currentZ);
     game.startTime = Date.now();
     game.timeBonusShown = false;
+    } finally {
+        _rand = _prevRand;
+    }
 }
 
 // --- Level element builders ---
@@ -588,11 +646,11 @@ export function addPendulum(game, x, y, z, speedMult = 1) {
     const line = new THREE.Line(lineGeo, game.sharedMaterials.rope);
     game.scene.add(line);
 
-    const pend = { body, mesh, line, pivot: new THREE.Vector3(x, pivotHeight, z), startTime: Math.random() * Math.PI * 2, speedMult };
+    const pend = { body, mesh, line, pivot: new THREE.Vector3(x, pivotHeight, z), startTime: _rand() * Math.PI * 2, speedMult };
 
     // Trail attachment
     try {
-        const trailKeys = ['skeleton', 'zombie', 'eye', 'soldier2', 'venus'];
+        const trailKeys = ['skeleton', 'zombie', 'eye', 'soldier2', 'venus', 'dragon', 'bowling_strike', 'easter', 'life', 'love'];
         for (const k of trailKeys) {
             const tmpl = game._trailModelPool && game._trailModelPool[k];
             if (!tmpl) continue;
@@ -637,7 +695,7 @@ export function addSpinner(game, x, y, z, speedMult = 1) {
 
     // Trail attachment
     try {
-        const trailKeys = ['skeleton', 'zombie', 'eye', 'soldier2', 'venus'];
+        const trailKeys = ['skeleton', 'zombie', 'eye', 'soldier2', 'venus', 'dragon', 'bowling_strike', 'easter', 'life', 'love'];
         for (const k of trailKeys) {
             const tmpl = game._trailModelPool && game._trailModelPool[k];
             if (!tmpl) continue;
@@ -695,7 +753,7 @@ export function addMover(game, x, y, z, w, h, d, sideways, speedMult = 1) {
 
     // Trail
     try {
-        const trailKeys = ['skeleton', 'zombie', 'eye', 'soldier2', 'venus'];
+        const trailKeys = ['skeleton', 'zombie', 'eye', 'soldier2', 'venus', 'dragon', 'bowling_strike', 'easter', 'life', 'love'];
         for (const k of trailKeys) {
             const tmpl = game._trailModelPool && game._trailModelPool[k];
             if (!tmpl) continue;
@@ -741,7 +799,7 @@ export function addCoins(game, x, y, startZ, length, count) {
         const tier = weightedCoinTier();
         const geo = new THREE.CylinderGeometry(tier.size, tier.size, 0.1, 12);
         const coin = new THREE.Mesh(geo, game.sharedMaterials.coin);
-        coin.position.set(x + (Math.random() - 0.5) * 2, y + Math.random() * 1.5, z);
+        coin.position.set(x + (_rand() - 0.5) * 2, y + _rand() * 1.5, z);
         coin.rotation.x = Math.PI / 2;
         coin.userData = { value: tier.value, tier: tier.name, collected: false };
         game.scene.add(coin);
@@ -750,7 +808,7 @@ export function addCoins(game, x, y, startZ, length, count) {
 }
 
 function weightedCoinTier() {
-    const r = Math.random();
+    const r = _rand();
     if (r < 0.45) return { name: 'small', value: 2, size: 0.15 };
     if (r < 0.75) return { name: 'medium', value: 5, size: 0.22 };
     if (r < 0.92) return { name: 'large', value: 12, size: 0.3 };
@@ -793,9 +851,9 @@ export function spawnDroppedCoins(game, worldPos, totalValue) {
             const geo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8);
             const coin = new THREE.Mesh(geo, game.sharedMaterials.coin);
             coin.position.set(
-                pos.x + (Math.random() - 0.5) * 3,
-                pos.y + Math.random() * 2,
-                pos.z + (Math.random() - 0.5) * 3
+                pos.x + (_rand() - 0.5) * 3,
+                pos.y + _rand() * 2,
+                pos.z + (_rand() - 0.5) * 3
             );
             coin.rotation.x = Math.PI / 2;
             coin.userData = { value: Math.max(1, Math.floor(totalValue / coinCount)), tier: 'dropped', collected: false, dropped: true, life: 8 };

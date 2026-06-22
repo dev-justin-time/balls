@@ -1,11 +1,14 @@
 /*
  Physics module.
  Exports: initPhysics(game), updatePhysics(game, dt), jump(game),
- createRain(game), clearRain(game), createWind(game), clearWind(game).
+ createRain(game), clearRain(game), createWind(game), clearWind(game),
+ createFireSparks(game), clearFireSparks(game), updateFireSparks(game, dt),
+ createMeteors(game), clearMeteors(game), updateMeteors(game, dt),
+ checkMeteorCollisions(game).
 
  Handles: cannon-es world, ball body, contact materials, input processing
  (keyboard, joystick, mouse), force application, wind, grounded check,
- physics-to-renderer sync.
+ physics-to-renderer sync, fire sparks (Inferno sky), meteor hazards (Void Storm sky).
 */
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
@@ -85,6 +88,8 @@ export function updatePhysics(game, dt) {
         game.isGrounded = false;
         game._vecA.set(0, -BALL_RADIUS - 0.1, 0);
         game._vecB.set(0, -BALL_RADIUS - 0.6, 0);
+        game.ballBody.position.vadd(game._vecA, game._vecA);
+        game.ballBody.position.vadd(game._vecB, game._vecB);
         game.world.raycastClosest(game._vecA, game._vecB, {}, game._rayResult);
         if (game._rayResult.hasHit) {
             game.isGrounded = true;
@@ -138,7 +143,14 @@ export function updatePhysics(game, dt) {
         }
 
         // Apply abilities-based speed/resistance adjustments
-        const speedMult = game._abilitySpeed || 1.0;
+        let speedMult = game._abilitySpeed || 1.0;
+
+        // Apply sky condition speed modifier (#8)
+        const skyConf = game.skyConfigs && game.skyConfigs[game.saveData.selectedSky];
+        if (skyConf && skyConf.conditions) {
+            if (skyConf.conditions.speedBoost) speedMult *= skyConf.conditions.speedBoost;
+            if (skyConf.conditions.speedDebuff) speedMult *= skyConf.conditions.speedDebuff;
+        }
         if (game.isGrounded && inputX !== 0 || inputY !== 0) {
             const vel = game.ballBody.velocity;
             const currentSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
@@ -214,6 +226,64 @@ export function updatePhysics(game, dt) {
                 }
             } catch (e) {}
         });
+
+        // Coin-drop on obstacle contact (#5)
+        // Pendulum collision → drop coins
+        for (const p of game.pendulums) {
+            try {
+                const dx = game.ballBody.position.x - p.body.position.x;
+                const dy = game.ballBody.position.y - p.body.position.y;
+                const dz = game.ballBody.position.z - p.body.position.z;
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                const contactDist = 2.2; // ball radius + pendulum ball radius
+                if (dist < contactDist && !p._lastContact) {
+                    p._lastContact = true;
+                    const levelMult = 1 + (game.currentLevel - 1) * 0.08;
+                    const baseLoss = 3;
+                    game.triggerDropFromObstacle(p, { baseLoss: baseLoss * levelMult });
+                } else if (dist >= contactDist) {
+                    p._lastContact = false;
+                }
+            } catch (e) {}
+        }
+
+        // Spinner contact → drop coins
+        for (const s of game.spinners) {
+            try {
+                const dx = game.ballBody.position.x - s.body.position.x;
+                const dy = game.ballBody.position.y - s.body.position.y;
+                const dz = game.ballBody.position.z - s.body.position.z;
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                const contactDist = 4.5; // spinner bar half-length
+                if (dist < contactDist && !s._lastContact) {
+                    s._lastContact = true;
+                    const levelMult = 1 + (game.currentLevel - 1) * 0.10;
+                    const baseLoss = 4;
+                    game.triggerDropFromObstacle(s, { baseLoss: baseLoss * levelMult });
+                } else if (dist >= contactDist) {
+                    s._lastContact = false;
+                }
+            } catch (e) {}
+        }
+
+        // Mover contact → drop coins
+        for (const m of game.movers) {
+            try {
+                const dx = game.ballBody.position.x - m.body.position.x;
+                const dy = game.ballBody.position.y - m.body.position.y;
+                const dz = game.ballBody.position.z - m.body.position.z;
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                const contactDist = 2.8;
+                if (dist < contactDist && !m._lastContact) {
+                    m._lastContact = true;
+                    const levelMult = 1 + (game.currentLevel - 1) * 0.12;
+                    const baseLoss = 5;
+                    game.triggerDropFromObstacle(m, { baseLoss: baseLoss * levelMult });
+                } else if (dist >= contactDist) {
+                    m._lastContact = false;
+                }
+            } catch (e) {}
+        }
 
         // Rolling SFX volume based on speed
         if (game.rollSound) {
@@ -300,4 +370,191 @@ export function clearWind(game) {
             game.windPoints = null;
         }
     } catch (e) {}
+}
+
+// --- Fire sparks particle system (Inferno sky condition) ---
+
+export function createFireSparks(game) {
+    try {
+        const count = getParticleCount(game, 'fire', 300);
+        const positions = new Float32Array(count * 3);
+        const area = Math.max(25, Math.min(70, Math.floor((window.innerWidth + window.innerHeight) / 30)));
+        const cx = game.ballMesh ? game.ballMesh.position.x : 0;
+        const cz = game.ballMesh ? game.ballMesh.position.z : 0;
+        for (let i = 0; i < count; i++) {
+            const ix = i * 3;
+            positions[ix] = cx + (Math.random() - 0.5) * area;
+            positions[ix + 1] = Math.random() * 20;
+            positions[ix + 2] = cz + (Math.random() - 0.5) * area;
+        }
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const mat = new THREE.PointsMaterial({
+            color: 0xff5500, size: 0.16, transparent: true, opacity: 0.7,
+            depthWrite: false, blending: THREE.AdditiveBlending
+        });
+        game.firePoints = new THREE.Points(geom, mat);
+        game.firePoints.frustumCulled = false;
+        game.scene.add(game.firePoints);
+    } catch (e) {
+        console.warn('createFireSparks failed', e);
+    }
+}
+
+export function clearFireSparks(game) {
+    try {
+        if (game.firePoints) {
+            game.scene.remove(game.firePoints);
+            if (game.firePoints.geometry) game.firePoints.geometry.dispose();
+            if (game.firePoints.material) game.firePoints.material.dispose();
+            game.firePoints = null;
+        }
+    } catch (e) {}
+}
+
+export function updateFireSparks(game, dt) {
+    try {
+        if (!game.firePoints) return;
+        const positions = game.firePoints.geometry.attributes.position.array;
+        const count = positions.length / 3;
+        const speed = 7;
+        const areaX = 50, areaY = 24, areaZ = 40;
+        const cx = game.ballMesh ? game.ballMesh.position.x : 0;
+        const cz = game.ballMesh ? game.ballMesh.position.z : 0;
+        const now = Date.now() * 0.001;
+        for (let i = 0; i < count; i++) {
+            const ix = i * 3;
+            // Rise upward with gentle drift
+            positions[ix + 1] += speed * dt;
+            positions[ix] += Math.sin(now * 2.5 + i * 0.7) * 0.8 * dt;
+            positions[ix + 2] += Math.cos(now * 1.8 + i * 0.9) * 0.5 * dt;
+            // Respawn at bottom when rising above ceiling
+            if (positions[ix + 1] > 22) {
+                positions[ix] = cx + (Math.random() - 0.5) * areaX;
+                positions[ix + 1] = Math.random() * 3;
+                positions[ix + 2] = cz + (Math.random() - 0.5) * areaZ;
+            }
+        }
+        game.firePoints.geometry.attributes.position.needsUpdate = true;
+    } catch (e) {}
+}
+
+// --- Meteor hazard system (Void Storm sky condition) ---
+
+function spawnMeteor(game) {
+    try {
+        const radius = 0.25 + Math.random() * 0.45;
+        const shape = new CANNON.Sphere(radius);
+        const body = new CANNON.Body({ mass: 5, shape: shape });
+        const cx = game.ballMesh ? game.ballMesh.position.x : 0;
+        const cz = game.ballMesh ? game.ballMesh.position.z : 0;
+        const area = 28;
+        body.position.set(
+            cx + (Math.random() - 0.5) * area,
+            22 + Math.random() * 18,
+            cz + (Math.random() - 0.5) * area
+        );
+        body.velocity.set(
+            (Math.random() - 0.5) * 4,
+            -6 - Math.random() * 14,
+            (Math.random() - 0.5) * 4
+        );
+        game.world.addBody(body);
+
+        const geo = new THREE.SphereGeometry(radius, 8, 8);
+        const mat = new THREE.MeshPhongMaterial({
+            color: 0x8844ff, emissive: 0x330066, emissiveIntensity: 0.9
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(body.position);
+        mesh.castShadow = true;
+        game.scene.add(mesh);
+
+        return { body, mesh, radius };
+    } catch (e) {
+        console.warn('spawnMeteor failed', e);
+        return null;
+    }
+}
+
+export function createMeteors(game) {
+    game.meteors = game.meteors || [];
+    for (let i = 0; i < 6; i++) {
+        const m = spawnMeteor(game);
+        if (m) game.meteors.push(m);
+    }
+    game._meteorSpawnTimer = 0;
+}
+
+export function clearMeteors(game) {
+    if (!game.meteors) return;
+    for (const m of game.meteors) {
+        if (m.body) game.world.removeBody(m.body);
+        if (m.mesh) { game.scene.remove(m.mesh); if (m.mesh.geometry) m.mesh.geometry.dispose(); if (m.mesh.material) m.mesh.material.dispose(); }
+    }
+    game.meteors = [];
+    game._meteorSpawnTimer = 0;
+}
+
+export function updateMeteors(game, dt) {
+    if (!game.meteors) return;
+
+    // Spawn new meteors periodically
+    game._meteorSpawnTimer = (game._meteorSpawnTimer || 0) + dt;
+    const interval = 0.7 + Math.random() * 0.9;
+    const maxMeteors = 12;
+    if (game._meteorSpawnTimer > interval && game.meteors.length < maxMeteors) {
+        game._meteorSpawnTimer = 0;
+        const m = spawnMeteor(game);
+        if (m) game.meteors.push(m);
+    }
+
+    // Update existing meteors — sync mesh, remove if below level
+    for (let i = game.meteors.length - 1; i >= 0; i--) {
+        const m = game.meteors[i];
+        try {
+            m.mesh.position.copy(m.body.position);
+            m.mesh.quaternion.copy(m.body.quaternion);
+        } catch (e) {}
+        if (m.body.position.y < -22) {
+            game.world.removeBody(m.body);
+            game.scene.remove(m.mesh);
+            if (m.mesh.geometry) m.mesh.geometry.dispose();
+            if (m.mesh.material) m.mesh.material.dispose();
+            game.meteors.splice(i, 1);
+        }
+    }
+}
+
+export function checkMeteorCollisions(game) {
+    if (!game.meteors || !game.ballBody) return;
+    for (let i = game.meteors.length - 1; i >= 0; i--) {
+        const m = game.meteors[i];
+        if (m._hitPlayer) continue;
+        try {
+            const dx = game.ballBody.position.x - m.body.position.x;
+            const dy = game.ballBody.position.y - m.body.position.y;
+            const dz = game.ballBody.position.z - m.body.position.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            const contactDist = 0.6 + (m.radius || 0.4);
+            if (dist < contactDist) {
+                m._hitPlayer = true;
+                const levelMult = 1 + (game.currentLevel - 1) * 0.15;
+                const baseLoss = 8;
+                if (game.triggerDropFromObstacle) {
+                    game.triggerDropFromObstacle(m, { baseLoss: baseLoss * levelMult });
+                }
+                // Knockback
+                game.ballBody.velocity.x += (Math.random() - 0.5) * 12;
+                game.ballBody.velocity.y += 6;
+                game.ballBody.velocity.z += (Math.random() - 0.5) * 12;
+                // Remove meteor after hit
+                game.world.removeBody(m.body);
+                game.scene.remove(m.mesh);
+                if (m.mesh.geometry) m.mesh.geometry.dispose();
+                if (m.mesh.material) m.mesh.material.dispose();
+                game.meteors.splice(i, 1);
+            }
+        } catch (e) {}
+    }
 }

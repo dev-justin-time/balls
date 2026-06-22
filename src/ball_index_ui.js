@@ -19,8 +19,8 @@ export function renderBallIndexUI(containerId, game, room) {
                 safe.played = Number.isFinite(Number(r.played)) ? Math.max(0, Math.min(1e7, Math.floor(Number(r.played)))) : 0;
                 safe.wins = Number.isFinite(Number(r.wins)) ? Math.max(0, Math.min(1e7, Math.floor(Number(r.wins)))) : 0;
 
-                safe.avg_time = Number.isFinite(Number(r.avg_time)) ? Math.max(0, Math.min(1e5, Number(r.avg_time))) : null;
-                safe.best_time = Number.isFinite(Number(r.best_time)) ? Math.max(0, Math.min(1e5, Number(r.best_time))) : null;
+                safe.avgTime = Number.isFinite(Number(r.avg_time)) ? Math.max(0, Math.min(1e5, Number(r.avg_time))) : null;
+                safe.bestTime = Number.isFinite(Number(r.best_time)) ? Math.max(0, Math.min(1e5, Number(r.best_time))) : null;
             } catch (e) {
                 return null;
             }
@@ -48,11 +48,11 @@ export function renderBallIndexUI(containerId, game, room) {
                 const r = remoteStats[i];
                 const s = sanitizeStatRecord(r);
                 if (!s || !s.key) continue;
-                const existing = statsMap[s.key] || { played: 0, wins: 0, avg_time_sum: 0, avg_count: 0, best_time: null };
+                const existing = statsMap[s.key] || { played: 0, wins: 0, avgTimeSum: 0, avgCount: 0, bestTime: null };
                 existing.played = Math.min(1e9, existing.played + s.played);
                 existing.wins = Math.min(1e9, existing.wins + s.wins);
-                if (s.avg_time !== null) { existing.avg_time_sum = (existing.avg_time_sum || 0) + s.avg_time; existing.avg_count = (existing.avg_count || 0) + 1; }
-                if (s.best_time !== null) existing.best_time = existing.best_time === null ? s.best_time : Math.min(existing.best_time, s.best_time);
+                if (s.avgTime !== null) { existing.avgTimeSum = (existing.avgTimeSum || 0) + s.avgTime; existing.avgCount = (existing.avgCount || 0) + 1; }
+                if (s.bestTime !== null) existing.bestTime = existing.bestTime === null ? s.bestTime : Math.min(existing.bestTime, s.bestTime);
                 statsMap[s.key] = existing;
             } catch (e) {
                 // ignore malformed entries
@@ -127,8 +127,8 @@ export function renderBallIndexUI(containerId, game, room) {
                             <div style="font-size:12px; color:#aaf; margin-bottom:6px;">${conf && conf.ability && conf.ability.key ? conf.ability.key.toUpperCase() + ' L' + level : ''}</div>
                             <div class="price">${isUnlocked ? (isSelected ? 'EQUIPPED' : 'OWNED') : (Number(conf && conf.price ? conf.price : 0) + ' 🪙')}</div>
                             <div style="display:flex; gap:6px; margin-top:8px; width:100%; justify-content:center;">
-                                ${isUnlocked ? `<button class="menu-btn" data-action="equip" data-key="${key}" style="pointer-events:auto;">${isSelected ? 'EQUIPPED' : 'EQUIP'}</button>` : `<button class="menu-btn" data-action="buy" data-key="${key}" style="pointer-events:auto;">BUY ${Number(conf && conf.price ? conf.price : 0)} 🪙</button>`}
-                                <button class="menu-btn" data-action="level" data-key="${key}" style="pointer-events:auto;">Level ${level}</button>
+                                ${isUnlocked ? `<button class="menu-btn" data-action="equip" data-key="${key}" style="pointer-events:auto;" aria-label="${isSelected ? 'Equipped' : 'Equip'} ${conf && conf.name ? conf.name : key}">${isSelected ? 'EQUIPPED' : 'EQUIP'}</button>` : `<button class="menu-btn" data-action="buy" data-key="${key}" style="pointer-events:auto;" aria-label="Buy ${conf && conf.name ? conf.name : key} for ${Number(conf && conf.price ? conf.price : 0)} coins">BUY ${Number(conf && conf.price ? conf.price : 0)} 🪙</button>`}
+                                <button class="menu-btn" data-action="level" data-key="${key}" style="pointer-events:auto;" aria-label="Level up ${conf && conf.name ? conf.name : key}">Level ${level}</button>
                             </div>
                         </div>
                         <div class="item-card-back">

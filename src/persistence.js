@@ -52,7 +52,14 @@ export function initPersistence(game) {
             bias: {}
         }
     };
-    game.saveData = JSON.parse(localStorage.getItem('goingBallsData_v1')) || defaultData;
+    try {
+        const raw = localStorage.getItem('goingBallsData_v1');
+        game.saveData = raw ? JSON.parse(raw) : null;
+    } catch (e) {
+        console.warn('Failed to parse saved data, using defaults', e);
+        game.saveData = null;
+    }
+    if (!game.saveData || typeof game.saveData !== 'object') game.saveData = defaultData;
 
     // --- Ball configs (single source of truth: ball_db.js) ---
     game.ballConfigs = (BALL_DB && typeof BALL_DB === 'object') ? { ...BALL_DB } : {};
@@ -74,7 +81,12 @@ export function initPersistence(game) {
         clouds: { name: 'Cloudscape',  price: 80,  tex: 'assets/image/1eprhbtmvoo51.webp', color: 0xddeeff },
         mosaic: { name: 'Rainbow Mosaic', price: 300, tex: 'assets/image/dsfk.webp', color: 0x223344 },
         aurora: { name: 'Aurora Glow', price: 800, tex: 'assets/image/sky_void.webp', color: 0x055e7f },
-        retro:  { name: 'Retro Sunset', price: 200, tex: 'assets/image/sky_sunset.webp', color: 0xffb07a }
+        retro:  { name: 'Retro Sunset', price: 200, tex: 'assets/image/sky_sunset.webp', color: 0xffb07a },
+        // --- New sky types with conditions & bonuses (#8) ---
+        storm:  { name: 'Storm Front', price: 600, tex: 'assets/image/sky_night.webp', color: 0x1a1a3a, conditions: { coinBonus: 1.3, rainChance: 0.9, windChance: 0.5 } },
+        inferno:{ name: 'Inferno',      price: 1200, tex: 'assets/image/sky_sunset.webp', color: 0x2a0a00, conditions: { coinBonus: 1.5, speedBoost: 1.15, heatHaze: true, fireSparks: true } },
+        frost:  { name: 'Frostbite',   price: 700, tex: 'assets/image/sky_void.webp', color: 0xddeeff, conditions: { coinBonus: 1.4, snowAlways: true, icePatches: true } },
+        voidstorm:{ name: 'Void Storm', price: 2500, tex: 'assets/image/sky_void.webp', color: 0x000020, conditions: { coinBonus: 2.0, speedDebuff: 0.85, windChance: 1.0, meteorHazards: true } }
     };
 
     // --- Weather AI ---
@@ -132,8 +144,9 @@ export function getParticleCount(game, type, defaultCount) {
         if (type === 'rain') typeBias = 1.0;
         else if (type === 'snow') typeBias = 0.6;
         else if (type === 'wind') typeBias = 0.35;
+        else if (type === 'fire') typeBias = 0.55;
         const scaled = Math.round(defaultCount * quality * typeBias);
-        const minByType = { rain: 120, snow: 80, wind: 20 };
+        const minByType = { rain: 120, snow: 80, wind: 20, fire: 40 };
         const min = minByType[type] || 30;
         return Math.max(min, Math.min(defaultCount, scaled));
     } catch (e) {

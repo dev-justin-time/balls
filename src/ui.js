@@ -15,8 +15,32 @@
 import { renderBallIndexUI } from './ball_index_ui.js';
 import { saveGame } from './persistence.js';
 import { playSound } from './audio.js';
-import { applySkyConfig, getBallMaterial } from '../engine/scene.js';
+import { applySkyConfig, getBallMaterial, applyBallSkin } from '../engine/scene.js';
 import { createLevel } from './levelgen.js';
+
+// --- Remote data sanitization ---
+const REMOTE_MAX_STRING = 128;
+const REMOTE_MAX_NUMBER = 1e9;
+
+function sanitizeRemoteEntry(entry) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    const safe = {};
+    for (const key of Object.keys(entry)) {
+        if (typeof key !== 'string' || key.length > 64) continue;
+        const val = entry[key];
+        if (typeof val === 'string') {
+            safe[key] = val.slice(0, REMOTE_MAX_STRING);
+        } else if (typeof val === 'number') {
+            safe[key] = Number.isFinite(val) ? Math.max(-REMOTE_MAX_NUMBER, Math.min(REMOTE_MAX_NUMBER, val)) : 0;
+        } else if (typeof val === 'boolean') {
+            safe[key] = val;
+        }
+        // Skip objects, arrays, functions, null, undefined
+    }
+    // Drop entries that produced no valid fields (all keys invalid)
+    if (Object.keys(safe).length === 0) return null;
+    return safe;
+}
 
 export function setupUI(game, room) {
     // --- Top menu gear button ---
@@ -32,6 +56,26 @@ export function setupUI(game, room) {
     // --- Help button ---
     const helpBtn = document.getElementById('help-btn');
     const overlay = document.getElementById('overlay');
+
+    // Focus management: trap focus in open modals, restore on close
+    let _preModalFocus = null;
+    if (overlay) {
+        const observer = new MutationObserver(() => {
+            if (overlay.style.display === 'flex' && overlay.innerHTML) {
+                if (!_preModalFocus) _preModalFocus = document.activeElement;
+                // Auto-focus first focusable element after render
+                requestAnimationFrame(() => {
+                    const first = overlay.querySelector('button:not([disabled]), [href], input:not([disabled])');
+                    if (first && !overlay.contains(document.activeElement)) first.focus();
+                });
+            } else if (overlay.style.display !== 'flex' && _preModalFocus) {
+                try { _preModalFocus.focus(); } catch(e) {}
+                _preModalFocus = null;
+            }
+        });
+        observer.observe(overlay, { attributes: true, attributeFilter: ['style'] });
+    }
+
     if (helpBtn && overlay) {
         helpBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -45,7 +89,7 @@ export function setupUI(game, room) {
                         <b>Goal:</b> Roll to the green finish line! Collect coins and avoid hazards.<br/>
                         <b>Shop:</b> Buy new ball skins, skies, and powerups with coins!
                     </p>
-                    <button class="menu-btn" id="overlay-close-btn" style="margin-top:12px;">OK</button>
+                    <button class="menu-btn" id="overlay-close-btn" aria-label="Close help" style="margin-top:12px;">OK</button>
                 </div>`;
             const closeBtn = document.getElementById('overlay-close-btn');
             if (closeBtn) {
@@ -108,7 +152,7 @@ export function setupUI(game, room) {
                             <span id="jp-val">${Math.round((game.joystickPower || 1.0) * 100)}%</span>
                         </label>
                     </div>
-                    <button class="menu-btn" id="settings-close-btn">Close</button>
+                    <button class="menu-btn" id="settings-close-btn" aria-label="Close settings">Close</button>
                 </div>`;
 
             const dzSlider = document.getElementById('joystick-deadzone');
@@ -128,12 +172,12 @@ export function setupUI(game, room) {
         });
     }
 
-    // --- Remote subscriptions (best-effort) ---
+    // --- Remote subscriptions (best-effort, sanitized) ---
     if (room && room.isReady && typeof room.collection === 'function') {
         try {
             room.collection('leaderboard').subscribe((list) => {
                 try {
-                    const parsed = Array.isArray(list) ? list : [];
+                    const parsed = Array.isArray(list) ? list.map(sanitizeRemoteEntry).filter(Boolean) : [];
                     game._remoteLeaderboard = parsed;
                 } catch (e) {}
             });
@@ -142,7 +186,7 @@ export function setupUI(game, room) {
         try {
             room.collection('player_clones').subscribe((list) => {
                 try {
-                    const parsed = Array.isArray(list) ? list : [];
+                    const parsed = Array.isArray(list) ? list.map(sanitizeRemoteEntry).filter(Boolean) : [];
                     game._remotePlayerClones = parsed;
                 } catch (e) {}
             });
@@ -151,7 +195,7 @@ export function setupUI(game, room) {
         try {
             room.collection('ball_stats').subscribe((list) => {
                 try {
-                    const parsed = Array.isArray(list) ? list : [];
+                    const parsed = Array.isArray(list) ? list.map(sanitizeRemoteEntry).filter(Boolean) : [];
                     game._remoteBallStats = parsed;
                 } catch (e) {}
             });
@@ -170,7 +214,13 @@ export function updateWalletUI(game) {
 export function checkGameState(game, dt, room) {
     try {
         // Coin collection
-        const coinMult = game._abilityCoins || 1.0;
+        let coinMult = game._abilityCoins || 1.0;
+
+        // Apply sky condition coin bonus (#8)
+        const skyConf = game.skyConfigs && game.skyConfigs[game.saveData.selectedSky];
+        if (skyConf && skyConf.conditions && skyConf.conditions.coinBonus) {
+            coinMult *= skyConf.conditions.coinBonus;
+        }
         for (let i = game.coins.length - 1; i >= 0; i--) {
             const coin = game.coins[i];
             if (!coin || coin.userData.collected) continue;
@@ -236,10 +286,50 @@ export function checkGameState(game, dt, room) {
             }
         }
 
-        // Distance tracking
+        // Distance tracking & HUD updates
         game._distanceTraveled = game._distanceTraveled || 0;
         const prog = Math.abs(game.ballBody.position.z) / Math.max(1, game.levelLength);
-        document.getElementById('level-progress') && (document.getElementById('level-progress').style.width = `${Math.min(100, prog * 100)}%`);
+
+        // --- Time remaining estimate ---
+        const timeEl = document.getElementById('time-display');
+        const distEl = document.getElementById('distance-display');
+        const diffEl = document.getElementById('difficulty-label');
+
+        // Distance
+        if (distEl) {
+            const pct = Math.min(99, Math.floor(prog * 100));
+            distEl.innerText = `Progress: ${pct}%`;
+        }
+
+        // Time remaining (estimated from current progress & elapsed)
+        if (timeEl && game.startTime && game.levelLength && !game.isGameOver) {
+            const elapsed = (Date.now() - game.startTime) / 1000;
+            const safeProg = Math.max(0.005, Math.min(0.995, prog));
+            // Suppress noisy early estimates until meaningful progress
+            if (prog < 0.03) {
+                timeEl.innerText = '⏱ --:--';
+                timeEl.style.color = '#ffdd66';
+            } else {
+                const remaining = Math.max(0, Math.round(elapsed / safeProg - elapsed));
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                timeEl.innerText = `⏱ ${mins}:${secs.toString().padStart(2, '0')}`;
+                // Flash red when time is running low (< 15s and not yet finished)
+                timeEl.style.color = remaining < 15 && prog < 0.85 ? '#ff5555' : '#ffdd66';
+            }
+        }
+
+        // Difficulty label
+        if (diffEl && game.currentTier) {
+            const t = game.currentTier;
+            const bg = '#' + t.color.toString(16).padStart(6, '0');
+            // Use white text on dark backgrounds, black on light
+            const brightness = ((t.color >> 16) & 0xff) * 0.299 + ((t.color >> 8) & 0xff) * 0.587 + (t.color & 0xff) * 0.114;
+            const fg = brightness > 140 ? '#000' : '#fff';
+            diffEl.innerText = t.label;
+            diffEl.style.background = bg;
+            diffEl.style.color = fg;
+        }
 
         // Win condition
         if (!game.isGameOver && game.finishZ !== undefined) {
@@ -285,7 +375,7 @@ export function gameOver(game, win, room) {
                 <h2>🏆 Level Complete!</h2>
                 <p style="font-size:14px;margin:8px 0;">Level ${game.currentLevel - 1} cleared in ${timeTaken.toFixed(1)}s</p>
                 <p style="font-size:14px;">Time Bonus: +${bonus} 🪙</p>
-                <button class="menu-btn" id="next-level-btn" style="margin-top:12px;">Next Level →</button>
+                <button class="menu-btn" id="next-level-btn" aria-label="Next level" style="margin-top:12px;">Next Level →</button>
             </div>`;
         const nextBtn = document.getElementById('next-level-btn');
         if (nextBtn) nextBtn.addEventListener('click', () => {
@@ -300,7 +390,7 @@ export function gameOver(game, win, room) {
             <div class="modal" style="max-width:360px;padding:20px;background:linear-gradient(145deg,#2e1a1a,#3e1621);border-radius:16px;color:#fff;text-align:center;">
                 <h2>💀 You Fell!</h2>
                 <p style="font-size:14px;margin:8px 0;">Try again!</p>
-                <button class="menu-btn" id="retry-btn" style="margin-top:12px;">Retry</button>
+                <button class="menu-btn" id="retry-btn" aria-label="Retry level" style="margin-top:12px;">Retry</button>
             </div>`;
         const retryBtn = document.getElementById('retry-btn');
         if (retryBtn) retryBtn.addEventListener('click', () => {
@@ -367,10 +457,10 @@ export function renderGrids(game) {
                 <span style="font-size:14px;">🪙 ${game.saveData.totalCoins}</span>
             </div>
             <div style="display:flex;gap:8px;margin-bottom:12px;">
-                <button class="menu-btn tab-btn active" data-tab="skins">Skins</button>
-                <button class="menu-btn tab-btn" data-tab="skies">Skies</button>
-                <button class="menu-btn tab-btn" data-tab="powerups">Powerups</button>
-                <button class="menu-btn" id="shop-close-btn" style="margin-left:auto;">✕</button>
+                <button class="menu-btn tab-btn active" data-tab="skins" aria-label="Show skins">Skins</button>
+                <button class="menu-btn tab-btn" data-tab="skies" aria-label="Show skies">Skies</button>
+                <button class="menu-btn tab-btn" data-tab="powerups" aria-label="Show powerups">Powerups</button>
+                <button class="menu-btn" id="shop-close-btn" aria-label="Close shop" style="margin-left:auto;">✕</button>
             </div>
             <div id="skins-grid" class="tab-content"></div>
             <div id="skies-grid" class="tab-content" style="display:none;"></div>
@@ -430,8 +520,8 @@ function renderSkinsGrid(game) {
                     <div style="font-size:14px;margin-top:6px;font-weight:700;">${conf && conf.name ? conf.name : key}</div>
                     <div class="price">${isUnlocked ? (isSelected ? 'EQUIPPED' : 'OWNED') : (price + ' 🪙')}</div>
                     <div style="display:flex;gap:4px;margin-top:8px;">
-                        ${isUnlocked ? `<button class="menu-btn equip-btn" data-key="${key}">${isSelected ? 'EQUIPPED' : 'EQUIP'}</button>` : `<button class="menu-btn buy-btn" data-key="${key}">BUY ${price}</button>`}
-                        <button class="menu-btn level-btn" data-key="${key}">Lv${level}</button>
+                        ${isUnlocked ? `<button class="menu-btn equip-btn" data-key="${key}" aria-label="${isSelected ? 'Equipped' : 'Equip'} ${conf && conf.name ? conf.name : key}">${isSelected ? 'EQUIPPED' : 'EQUIP'}</button>` : `<button class="menu-btn buy-btn" data-key="${key}" aria-label="Buy ${conf && conf.name ? conf.name : key} for ${price} coins">BUY ${price}</button>`}
+                        <button class="menu-btn level-btn" data-key="${key}" aria-label="Level up ${conf && conf.name ? conf.name : key}">Lv${level}</button>
                     </div>
                 </div>
             </div>`;
@@ -467,7 +557,7 @@ function renderSkiesGrid(game) {
             <div style="padding:12px;text-align:center;">
                 <div style="font-weight:700;">${conf.name}</div>
                 <div style="font-size:12px;margin:6px 0;">${isUnlocked ? (isSelected ? 'SELECTED' : 'OWNED') : (price + ' 🪙')}</div>
-                <button class="menu-btn sky-btn" data-key="${key}">${isUnlocked ? (isSelected ? 'SELECTED' : 'SELECT') : ('BUY ' + price)}</button>
+                <button class="menu-btn sky-btn" data-key="${key}" aria-label="${isUnlocked ? (isSelected ? 'Selected sky' : 'Select') + ' ' + conf.name : 'Buy ' + conf.name + ' for ' + price + ' coins'}">${isUnlocked ? (isSelected ? 'SELECTED' : 'SELECT') : ('BUY ' + price)}</button>
             </div>`;
         grid.appendChild(card);
 
@@ -503,8 +593,8 @@ function renderPowerupsGrid(game) {
                 <div style="font-size:11px;color:#aaa;margin:4px 0;">${conf.description || ''}</div>
                 <div style="font-size:12px;">Rarity: ${conf.rarity} · Level: ${level}/${conf.maxLevel}</div>
                 <div style="display:flex;gap:4px;margin-top:8px;justify-content:center;">
-                    <button class="menu-btn pu-buy-btn" data-key="${key}">${owned ? 'UPGRADE ' + Math.floor(price * level) : 'BUY ' + price}</button>
-                    ${owned ? `<button class="menu-btn pu-toggle-btn" data-key="${key}">${equipped ? 'ON' : 'OFF'}</button>` : ''}
+                    <button class="menu-btn pu-buy-btn" data-key="${key}" aria-label="${owned ? 'Upgrade' : 'Buy'} ${conf.name}">${owned ? 'UPGRADE ' + Math.floor(price * level) : 'BUY ' + price}</button>
+                    ${owned ? `<button class="menu-btn pu-toggle-btn" data-key="${key}" aria-label="${equipped ? 'Unequip' : 'Equip'} ${conf.name}">${equipped ? 'ON' : 'OFF'}</button>` : ''}
                 </div>
             </div>`;
         grid.appendChild(card);
@@ -600,7 +690,7 @@ export function renderLeaderboard(game, room) {
         <div class="modal" style="max-width:420px;max-height:80vh;overflow-y:auto;padding:20px;background:linear-gradient(145deg,#1a1a2e,#16213e);border-radius:16px;color:#fff;">
             <h2 style="text-align:center;">Leaderboard</h2>
             <div style="margin:12px 0;">${rowsHtml || '<p style="text-align:center;color:#aaa;">No entries yet!</p>'}</div>
-            <button class="menu-btn" id="lb-close-btn" style="display:block;margin:12px auto 0;">Close</button>
+            <button class="menu-btn" id="lb-close-btn" aria-label="Close leaderboard" style="display:block;margin:12px auto 0;">Close</button>
         </div>`;
     const closeBtn = document.getElementById('lb-close-btn');
     if (closeBtn) closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; overlay.innerHTML = ''; });
@@ -613,7 +703,8 @@ export function handlePurchase(game, type, key, price) {
         if (game.saveData.unlockedBalls.includes(key)) {
             // Equip
             game.saveData.selectedBall = key;
-            game.ballMesh.material = getBallMaterial(game);
+            const equipConf = game.ballConfigs[key];
+            applyBallSkin(game, equipConf);
             applySkinAbilities(game, key);
             saveGame(game);
             updateWalletUI(game);
@@ -623,7 +714,8 @@ export function handlePurchase(game, type, key, price) {
             game.saveData.selectedBall = key;
             game.saveData.skinLevels = game.saveData.skinLevels || {};
             game.saveData.skinLevels[key] = 1;
-            game.ballMesh.material = getBallMaterial(game);
+            const buyConf = game.ballConfigs[key];
+            applyBallSkin(game, buyConf);
             applySkinAbilities(game, key);
             saveGame(game);
             updateWalletUI(game);
@@ -657,7 +749,10 @@ export function levelUpSkin(game, key, cost) {
         game.saveData.skinLevels[key] = currentLevel + 1;
         if (game.saveData.selectedBall === key) {
             applySkinAbilities(game, key);
-            game.ballMesh.material = getBallMaterial(game);
+            const lvlConf = game.ballConfigs[key];
+            if (lvlConf && lvlConf.type !== 'gltf') {
+                game.ballMesh.material = getBallMaterial(game);
+            }
         }
         saveGame(game);
         updateWalletUI(game);

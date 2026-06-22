@@ -3,7 +3,7 @@
  Exports: onWindowResize(game), animate(game)
 
  Handles: window resize, main game loop (animation frame, physics step,
- camera orbit, rain/snow particle updates, sky rotation, scene render).
+ camera orbit, rain/snow/fire particle updates, sky rotation, scene render).
 */
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
@@ -47,6 +47,8 @@ export function animate(game) {
         // Particle/weather updates
         if (game.raining) updateRain(game, dt);
         if (game.snowing) updateSnow(game, dt);
+        if (game.hasFireSparks) updateFireSparks(game, dt);
+        if (game.hasMeteors) { updateMeteors(game, dt); checkMeteorCollisions(game); }
     }
 
     // Camera follow
@@ -124,4 +126,17 @@ function updateSnow(game, dt) {
         }
         game.snowPoints.geometry.attributes.position.needsUpdate = true;
     } catch (e) {}
+}
+
+function updateFireSparks(game, dt) {
+    // Delegates to physics.js updateFireSparks
+    if (game.updateFireSparks) game.updateFireSparks(dt);
+}
+
+function updateMeteors(game, dt) {
+    if (game.updateMeteors) game.updateMeteors(dt);
+}
+
+function checkMeteorCollisions(game) {
+    if (game.checkMeteorCollisions) game.checkMeteorCollisions();
 }

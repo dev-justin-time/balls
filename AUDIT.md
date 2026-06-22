@@ -66,7 +66,7 @@ Remaining work: per-frame GC reduction, naming conventions, accessibility, point
 
 ### 2. ✅ Ball config duplication
 - Status: DONE. ballConfigs now loaded directly from BALL_DB in ball_db.js via spread clone `{ ...BALL_DB }`. mergeBallDB() function removed. Single source of truth established.
-- 57 ball skins in ball_db.js, descriptions included.
+- 71 ball skins in ball_db.js, descriptions included.
 
 ### 3. ⬜ Inconsistent naming and key casing
 - Problem: Keys like "ball_key" in networking.js vs. camelCase keys in configs. No standard convention.
@@ -80,11 +80,13 @@ Remaining work: per-frame GC reduction, naming conventions, accessibility, point
 ### 1. ✅ Audio handling & autoplay policies
 - Status: DONE. registerSfx/playSound with clone-based Audio pool. AudioContext resume on first interaction. Music toggle with localStorage persistence. Audio files compressed 31% (1.07MB→736K).
 
-### 2. ⬜ Pointer lock and gesture handling
+### 2. ✅ Pointer lock and gesture handling
+- Status: DONE. UI button (🖱️↔🔒), Escape to release, hint overlay, pitch clamp [0.15, 1.2].
 - Problem: Pointer lock toggled with 'T' key, mouse interactions spread across many listeners. Desktop UX could be improved.
 - Fix: Consolidate pointer lock behind explicit UI button, add hint overlay, clamp camera pitch.
 
-### 3. ⬜ Accessibility
+### 3. ✅ Accessibility
+- Status: DONE. 26 aria-labels added across index.html, ui.js, ball_index_ui.js, networking.js. Focus-trap in main.js. Auto-focus on modal open, restore on close.
 - Problem: Many interactive elements lack ARIA labels. Modals not focus-trapped. Keyboard-only navigation incomplete.
 - Note: gear-btn has aria-label, settings-btn has aria-label. help-btn, shop-btn, leaderboard-btn need labels.
 - Fix: Add aria-label to all buttons, add focus-trap to modal container, ensure Tab order.
@@ -93,34 +95,33 @@ Remaining work: per-frame GC reduction, naming conventions, accessibility, point
 
 ## Priority 5 — Multiplayer & Persistence
 
-### 1. 🔶 Race conditions with room initialization
-- Status: IMPROVED. saveLeaderboard now checks `room && room.isReady` directly instead of global flag. Subscriptions in setupUI also check room readiness.
-- Remaining: add retry/backoff for failed room.initialize() calls.
+### 1. ✅ Race conditions with room initialization
+- Status: DONE. Retry/backoff wrapper (3 retries, exponential backoff 1s→2s→4s), graceful fallback to dead room on failure.
 
-### 2. ⬜ Privacy / trust of mirrored remote data
-- Problem: Remote collections merged into UI (player_clones) without sanitization. ball_stats already sanitized in ball_index_ui.js.
-- Fix: Validate and sanitize player_clones data shapes; cap numeric fields and strings.
+### 2. ✅ Privacy / trust of mirrored remote data
+- Status: DONE. sanitizeRemoteEntry() applied to leaderboard, player_clones, and ball_stats subscriptions. Strings ≤128 chars, numbers clamped to [-1e9, 1e9], empty entries dropped.
 
 ---
 
 ## NEW: Issues Discovered During Refactoring
 
-### N1. ⬜ eye_ball skin (type:'gltf') doesn't render
+### N1. ✅ eye_ball skin (type:'gltf') doesn't render
+- Status: DONE. applyBallSkin() function in engine/scene.js handles gltf type with async GLB loading, caching, and mesh swap. Physics sync preserved.
 - Problem: ball_db.js has eye_ball with type:'gltf' and tex pointing to eye_low_poly_free_cute_eyeballs.glb. getBallMaterial() in engine/scene.js only handles 'texture', 'color', 'emissive' types. Falls through to default white ball.
 - Fix: Add 'gltf' type handler in getBallMaterial that loads the GLB model as the ball mesh.
 
-### N2. ⬜ `.glb` finish model has confusing dot-prefixed name
+### N2. ✅ `.glb` finish model has confusing dot-prefixed name
+- Status: DONE. Renamed to finish_gate.glb, reference updated in engine/scene.js.
 - Problem: The finish-line model is literally named `.glb` (hidden file on Unix). Hard to identify.
 - Fix: Rename to `finish_gate.glb` and update reference in engine/scene.js.
 
-### N3. ⬜ Leftover window.__goingBalls* global flags
+### N3. ✅ Leftover window.__goingBalls* global flags
+- Status: DONE. Moved to module-scoped `let` variables in networking.js.
 - Problem: networking.js uses ~10 `window.__goingBalls*` flags for error state tracking. These pollute the global namespace.
 - Fix: Move to module-scoped variables or a single `window.__goingBalls` namespace object.
 
-### N4. ⬜ No automated tests
-- Problem: Zero tests exist. Level generation, physics, UI state, persistence are all untested.
-- Fix: Add deterministic levelgen tests (seed → assert segment count/types). Add localStorage mock tests for persistence.
-- Tooling: No package.json, no test runner, no linting config.
+### N4. ✅ No automated tests
+- Status: DONE. 29 tests across 2 files (15 persistence + 14 levelgen). Vitest with jsdom, package.json with test scripts. Deterministic seed testing, localStorage mocking, full THREE/CANNON mocks for levelgen integration tests.
 
 ### N5. ✅ Assets optimized
 - Status: DONE. PNG/JPG→WebP (28 files, ~60% avg savings). GIF→WebP (4 files, 98.6% savings). Audio compressed (6 files, 31% savings). Total: ~17MB→~10.2MB (40% reduction).
@@ -143,7 +144,8 @@ Remaining work: per-frame GC reduction, naming conventions, accessibility, point
 - ✅ Week 2: Monolithic split into 10 modules, asset optimization, SFX fixes
 - ⬜ Week 3: GC allocation reduction, pointer lock UX, accessibility
 - ⬜ Week 4: eye_ball GLTF rendering, .glb rename, global flag cleanup
-- ⬜ Week 5+: Unit tests (levelgen), linting setup, CI, naming standardization
+- ⬜ Week 5+: Linting setup, CI, naming standardization
+- ✅ Week 6: Coin-dropping obstacles (all levels + level scaling), 14 new ball skins, 4 new sky types, 5 new trail types, harder level segments
 
 ---
 
