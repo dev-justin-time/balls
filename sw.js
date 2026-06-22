@@ -16,6 +16,7 @@ const PRECACHE_ASSETS = [
   './styles.css',
   './offline.html',
   './main.js',
+  './networking.js',
   './engine/scene.js',
   './src/audio.js',
   './src/ball_db.js',

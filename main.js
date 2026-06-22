@@ -10,7 +10,7 @@ import nipplejs from 'nipplejs';
 import { NotificationManager } from './src/notification_manager.js';
 
 // Module imports
-import { initNetworking, setupLoadingManager } from './networking.js';
+import { room } from './networking.js';
 import { initPersistence, saveGame, getParticleCount } from './src/persistence.js';
 import { initAudio, registerSfx, playSound } from './src/audio.js';
 import { setupGlobalErrorHandlers } from './src/networking.js';
@@ -19,12 +19,6 @@ import { onWindowResize, animate } from './src/rendering.js';
 import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, updateFireSparks, createHeatShimmer, clearHeatShimmer, updateHeatShimmer, createMeteors, clearMeteors, updateMeteors, checkMeteorCollisions } from './src/physics.js';
 import { createLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins } from './src/levelgen.js';
 import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset } from './src/ui.js';
-
-// --- Loading Manager (must run before asset loading) ---
-setupLoadingManager();
-
-// --- Networking init (top-level await for room) ---
-const room = await initNetworking();
 
 // --- Notification manager ---
 const notifier = new NotificationManager({
