@@ -1,0 +1,20 @@
+{
+  "name": "Going Balls - Web Edition",
+  "short_name": "Going Balls",
+  "description": "Roll through procedurally generated levels, collect coins, avoid hazards, and unlock 70+ ball skins in this 3D browser game.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#87ceeb",
+  "theme_color": "#87ceeb",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "assets/image/ball.webp",
+      "sizes": "any",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ]
+}
