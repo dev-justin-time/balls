@@ -4,6 +4,11 @@
 
 A 3D physics-based rolling platformer inspired by "Going Balls".
 
+## 🌐 Play Online
+
+- **[websim.com/@ou812/going-balls-web-edition](https://websim.com/@ou812/going-balls-web-edition)**
+- **[Balls-Going.on.websim.com](https://Balls-Going.on.websim.com)**
+
 ## Features
 - Physics-driven ball movement using `cannon-es`.
 - Dynamic camera following the player.

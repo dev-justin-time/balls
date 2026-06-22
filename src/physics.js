@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { getBallMaterial } from '../engine/scene.js';
 import { getParticleCount } from './persistence.js';
+import { playPortalSound } from './audio.js';
 
 // Physics constants (module-scoped for game feel tuning)
 const BALL_RADIUS = 0.5;
@@ -95,6 +96,84 @@ export function updatePhysics(game, dt) {
             game.isGrounded = true;
         }
         if (game.isGrounded) game.jumpCount = 0;
+
+        // Spring pad bounce detection
+        try {
+            game.levelObjects.forEach(obj => {
+                if (!obj.springPad || obj._springCooldown) return;
+                const dx = Math.abs(game.ballBody.position.x - (obj.x || 0));
+                const dz = Math.abs(game.ballBody.position.z - (obj.z || 0));
+                const dy = game.ballBody.position.y - (obj.y || 0);
+                const padW = ((obj.width || 4) / 2) + BALL_RADIUS;
+                const padL = ((obj.length || 4) / 2) + BALL_RADIUS;
+                if (dx < padW && dz < padL && dy > BALL_RADIUS && dy < BALL_RADIUS + 1.2) {
+                    const bp = obj.bouncePower || 15;
+                    game.ballBody.velocity.y = bp;
+                    game.isGrounded = false;
+                    game.jumpCount = 0;
+                    obj._springCooldown = true;
+                    setTimeout(() => { obj._springCooldown = false; }, 400);
+                }
+            });
+        } catch (e) {}
+
+        // Portal teleport detection
+        try {
+            // Collect all portal entries from levelObjects
+            const portals = [];
+            for (const obj of game.levelObjects) {
+                if (obj.portal) portals.push(obj);
+            }
+            // Filter out cooled-down portals for detection
+            const active = portals.filter(p => !p._portalCooldown);
+            if (active.length >= 2) {
+                for (const portal of active) {
+                    const ringY = (portal.y || 0) + (portal.radius || 2);
+                    const dx = game.ballBody.position.x - (portal.x || 0);
+                    const dy = game.ballBody.position.y - ringY;
+                    const dz = game.ballBody.position.z - (portal.z || 0);
+                    const hDist = Math.sqrt(dx * dx + dz * dz);
+                    const r = portal.radius || 2;
+                    if (hDist < r && Math.abs(dy) < BALL_RADIUS + 0.3) {
+                        // Ball is passing through this portal — find nearest other active portal
+                        const others = active.filter(p => p !== portal);
+                        let nearest = others[0];
+                        let nearestDist = Infinity;
+                        for (const other of others) {
+                            const odx = (portal.x || 0) - (other.x || 0);
+                            const odz = (portal.z || 0) - (other.z || 0);
+                            const od = Math.sqrt(odx * odx + odz * odz);
+                            if (od < nearestDist) { nearestDist = od; nearest = other; }
+                        }
+                        if (nearest) {
+                            // Visual feedback — purple flash overlay
+                            try {
+                                let flash = document.getElementById('portal-flash');
+                                if (!flash) {
+                                    flash = document.createElement('div');
+                                    flash.id = 'portal-flash';
+                                    flash.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:20001;opacity:0;background:radial-gradient(circle at 50% 50%,rgba(136,68,255,0.3),rgba(0,0,0,0));transition:opacity 120ms ease;';
+                                    document.body.appendChild(flash);
+                                }
+                                flash.style.opacity = '1';
+                                setTimeout(() => { flash.style.opacity = '0'; }, 160);
+                            } catch (e) {}
+                            // Portal SFX
+                            try { playPortalSound(game); } catch (e) {}
+                            // Teleport ball to destination portal
+                            const destY = (nearest.y || 0) + (nearest.radius || 2) + 0.5;
+                            game.ballBody.position.set(nearest.x || 0, destY, nearest.z || 0);
+                            game.ballMesh.position.copy(game.ballBody.position);
+                            // Cooldown destination portal so we don't teleport back immediately
+                            nearest._portalCooldown = true;
+                            portal._portalCooldown = true;
+                            setTimeout(() => { nearest._portalCooldown = false; portal._portalCooldown = false; }, 1200);
+                            break; // only one teleport per frame
+                        }
+                    }
+                }
+            }
+        } catch (e) {}
 
         // Input processing
         let inputX = 0;

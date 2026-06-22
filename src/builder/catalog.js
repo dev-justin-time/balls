@@ -239,6 +239,161 @@ export const PART_CATALOG = {
         connPts: [],
         builderFn: 'placeFinishModel',
         description: '3D finish gate model. Marks the level end with a visual arch.'
+    },
+
+    // ============= NEW STRUCTURAL / SPECIAL =============
+
+    loop_de_loop: {
+        key: 'loop_de_loop',
+        name: 'Loop De Loop',
+        category: 'structural',
+        icon: '➰',
+        defaults: { width: 6, radius: 8, segments: 12 },
+        connPts: [
+            { x: 0, y: 0, z: 0, dir: 'front' },
+            { x: 0, y: 0, z: -65, dir: 'back' }
+        ],
+        builderFn: 'addLoopDeLoop',
+        description: 'Full 360° loop arch. Ball rolls through the loop!'
+    },
+
+    spiral_tube: {
+        key: 'spiral_tube',
+        name: 'Spiral Tube',
+        category: 'structural',
+        icon: '🐚',
+        defaults: { width: 6, radius: 8, turns: 2, segments: 16 },
+        connPts: [
+            { x: 0, y: 0, z: 0, dir: 'front' },
+            { x: 0, y: 5, z: -80, dir: 'back' }
+        ],
+        builderFn: 'addSpiralTube',
+        description: 'Spiraling tube with walls. Ascends as it twists.'
+    },
+
+    spring_pad: {
+        key: 'spring_pad',
+        name: 'Spring Pad',
+        category: 'surface',
+        icon: '🦘',
+        defaults: { width: 4, length: 4, bouncePower: 15 },
+        connPts: [
+            { x: 0, y: 0, z: -2, dir: 'front' },
+            { x: 0, y: 0, z: 2, dir: 'back' }
+        ],
+        builderFn: 'addSpringPad',
+        description: 'Bouncy orange pad. Launches the ball upward!'
+    },
+
+    curve: {
+        key: 'curve',
+        name: 'Curve',
+        category: 'surface',
+        icon: '↪️',
+        defaults: { width: 6, arcLength: 8, segments: 8, direction: 1 },
+        connPts: [
+            { x: 0, y: 0, z: 0, dir: 'front' },
+            { x: 8, y: 0, z: -40, dir: 'right' }
+        ],
+        builderFn: 'addCurve',
+        description: 'Curved path segment. Direction: 1 = right, -1 = left.'
+    },
+
+    stairs: {
+        key: 'stairs',
+        name: 'Stairs',
+        category: 'surface',
+        icon: '🪜',
+        defaults: { width: 6, stepCount: 5, stepLength: 4, stepHeight: 0.8 },
+        connPts: [
+            { x: 0, y: 0, z: 0, dir: 'front' },
+            { x: 0, y: 4, z: -20, dir: 'back' }
+        ],
+        builderFn: 'addStairs',
+        description: 'Ascending step platforms. Great for gradual climbs.'
+    },
+
+    portal_ring: {
+        key: 'portal_ring',
+        name: 'Portal Ring',
+        category: 'marker',
+        icon: '🟣',
+        defaults: { radius: 2 },
+        connPts: [],
+        builderFn: 'addPortalRing',
+        description: 'Functional portal ring. Teleports the ball to the nearest other portal!'
+    },
+
+    half_pipe: {
+        key: 'half_pipe',
+        name: 'Half Pipe',
+        category: 'surface',
+        icon: '🏄',
+        defaults: { width: 10, length: 20 },
+        connPts: [
+            { x: 0, y: 0, z: -10, dir: 'front' },
+            { x: 0, y: 0, z: 10, dir: 'back' }
+        ],
+        builderFn: 'addHalfPipe',
+        description: 'Wide platform with angled side walls. Keep the ball centered!'
+    },
+
+    checkerboard: {
+        key: 'checkerboard',
+        name: 'Checkerboard',
+        category: 'surface',
+        icon: '🏁',
+        defaults: { tileSize: 3, rows: 4 },
+        connPts: [
+            { x: 0, y: 0, z: 0, dir: 'front' },
+            { x: 0, y: 0, z: -20, dir: 'back' }
+        ],
+        builderFn: 'addCheckerboard',
+        description: 'Offset checkerboard tiles. Tricky footwork required!'
+    },
+
+    // ============= GLASS VARIANTS =============
+
+    glass_loop: {
+        key: 'glass_loop',
+        name: 'Glass Loop',
+        category: 'structural',
+        icon: '🫧',
+        defaults: { width: 6, radius: 8, segments: 12 },
+        connPts: [
+            { x: 0, y: 0, z: 0, dir: 'front' },
+            { x: 0, y: 0, z: -65, dir: 'back' }
+        ],
+        builderFn: 'addGlassLoopDeLoop',
+        description: 'Glass loop-de-loop. Shatters on contact — dare to ride it!'
+    },
+
+    glass_stairs: {
+        key: 'glass_stairs',
+        name: 'Glass Stairs',
+        category: 'surface',
+        icon: '🪟',
+        defaults: { width: 6, stepCount: 5, stepLength: 4, stepHeight: 0.8 },
+        connPts: [
+            { x: 0, y: 0, z: 0, dir: 'front' },
+            { x: 0, y: 4, z: -20, dir: 'back' }
+        ],
+        builderFn: 'addGlassStairs',
+        description: 'Glass stair steps. Each step cracks and shatters as you climb!'
+    },
+
+    glass_curve: {
+        key: 'glass_curve',
+        name: 'Glass Curve',
+        category: 'surface',
+        icon: '🔮',
+        defaults: { width: 6, arcLength: 8, segments: 8, direction: 1 },
+        connPts: [
+            { x: 0, y: 0, z: 0, dir: 'front' },
+            { x: 8, y: 0, z: -40, dir: 'right' }
+        ],
+        builderFn: 'addGlassCurve',
+        description: 'Curved glass path. Navigate quickly before it breaks!'
     }
 };
 

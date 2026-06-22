@@ -16,11 +16,11 @@ import { initAudio, registerSfx, playSound } from './src/audio.js';
 import { initScene, getBallMaterial, clearTextureCache } from './engine/scene.js';
 import { onWindowResize, animate } from './src/rendering.js';
 import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, updateFireSparks, createHeatShimmer, clearHeatShimmer, updateHeatShimmer, createMeteors, clearMeteors, updateMeteors, checkMeteorCollisions } from './src/physics.js';
-import { createLevel, createInfiniteLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, addBlade, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins, spawnInfiniteChunk, createShockwave } from './src/levelgen.js';
+import { createLevel, createInfiniteLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, addBlade, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins, spawnInfiniteChunk, createShockwave, addLoopDeLoop, addSpiralTube, addSpringPad, addCurve, addStairs, addPortalRing, addHalfPipe, addCheckerboard, addGlassLoopDeLoop, addGlassStairs, addGlassCurve } from './src/levelgen.js';
 import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset } from './src/ui.js';
 import { initBuilderScene, onBuilderMouseMove, onBuilderClick, onBuilderWheel, onBuilderPanStart, onBuilderPanEnd, placePart, undoLastPlacement, clearBuilderScene, disposeBuilderScene, renderBuilder, loadPartsIntoBuilder } from './src/builder/builder_scene.js';
 import { renderBuilderUI, exitBuilder, updateBuilderCount, updateBuilderUIState } from './src/builder/builder_ui.js';
-import { initBuilderMultiplayer, disposeBuilderMultiplayer } from './src/builder/builder_networking.js';
+import { initBuilderMultiplayer, disposeBuilderMultiplayer, shareTrack, loadCommunityTracks } from './src/builder/builder_networking.js';
 import { getPartDef } from './src/builder/catalog.js';
 
 // --- Notification manager ---
@@ -306,6 +306,17 @@ class Game {
     addMover(x, y, z, w, h, d, sw, s) { addMover(this, x, y, z, w, h, d, sw, s); }
     addWall(x, y, z, w, l, r) { addWall(this, x, y, z, w, l, r); }
     addBlade(x, y, z, t, ln, sw, v) { addBlade(this, x, y, z, t, ln, sw, v); }
+    addLoopDeLoop(x, y, z, w, r, s) { addLoopDeLoop(this, x, y, z, w, r, s); }
+    addSpiralTube(x, y, z, w, r, t, s) { addSpiralTube(this, x, y, z, w, r, t, s); }
+    addSpringPad(x, y, z, w, l, bp) { addSpringPad(this, x, y, z, w, l, bp); }
+    addCurve(x, y, z, w, al, s, d) { addCurve(this, x, y, z, w, al, s, d); }
+    addStairs(x, y, z, w, sc, sl, sh) { addStairs(this, x, y, z, w, sc, sl, sh); }
+    addPortalRing(x, y, z, r) { addPortalRing(this, x, y, z, r); }
+    addHalfPipe(x, y, z, w, l) { addHalfPipe(this, x, y, z, w, l); }
+    addCheckerboard(x, y, z, ts, rows) { addCheckerboard(this, x, y, z, ts, rows); }
+    addGlassLoopDeLoop(x, y, z, w, r, s) { addGlassLoopDeLoop(this, x, y, z, w, r, s); }
+    addGlassStairs(x, y, z, w, sc, sl, sh) { addGlassStairs(this, x, y, z, w, sc, sl, sh); }
+    addGlassCurve(x, y, z, w, al, s, d) { addGlassCurve(this, x, y, z, w, al, s, d); }
     addCoins(x, y, sz, l, c) { addCoins(this, x, y, sz, l, c); }
     addCheckpoint(x, y, z, w) { addCheckpoint(this, x, y, z, w); }
     placeFinishModel() { placeFinishModel(this); }
@@ -491,6 +502,39 @@ class Game {
                     this.finishX = placed.x;
                     this.finishY = placed.y;
                     break;
+                case 'loop_de_loop':
+                    this.addLoopDeLoop(placed.x, placed.y, placed.z, p.width || 6, p.radius || 8, p.segments || 12);
+                    break;
+                case 'spiral_tube':
+                    this.addSpiralTube(placed.x, placed.y, placed.z, p.width || 6, p.radius || 8, p.turns || 2, p.segments || 16);
+                    break;
+                case 'spring_pad':
+                    this.addSpringPad(placed.x, placed.y, placed.z, p.width || 4, p.length || 4, p.bouncePower ?? 15);
+                    break;
+                case 'curve':
+                    this.addCurve(placed.x, placed.y, placed.z, p.width || 6, p.arcLength || 8, p.segments || 8, p.direction ?? 1);
+                    break;
+                case 'stairs':
+                    this.addStairs(placed.x, placed.y, placed.z, p.width || 6, p.stepCount || 5, p.stepLength || 4, p.stepHeight || 0.8);
+                    break;
+                case 'portal_ring':
+                    this.addPortalRing(placed.x, placed.y, placed.z, p.radius || 2);
+                    break;
+                case 'half_pipe':
+                    this.addHalfPipe(placed.x, placed.y, placed.z, p.width || 10, p.length || 20);
+                    break;
+                case 'checkerboard':
+                    this.addCheckerboard(placed.x, placed.y, placed.z, p.tileSize || 3, p.rows || 4);
+                    break;
+                case 'glass_loop':
+                    this.addGlassLoopDeLoop(placed.x, placed.y, placed.z, p.width || 6, p.radius || 8, p.segments || 12);
+                    break;
+                case 'glass_stairs':
+                    this.addGlassStairs(placed.x, placed.y, placed.z, p.width || 6, p.stepCount || 5, p.stepLength || 4, p.stepHeight || 0.8);
+                    break;
+                case 'glass_curve':
+                    this.addGlassCurve(placed.x, placed.y, placed.z, p.width || 6, p.arcLength || 8, p.segments || 8, p.direction ?? 1);
+                    break;
             }
         }
         this.startTime = Date.now();
@@ -531,6 +575,18 @@ class Game {
         const saved = tracks[name];
         if (!saved || !saved.parts) { alert(`Track "${name}" not found.`); return; }
         loadPartsIntoBuilder(this, saved.parts);
+        updateBuilderUIState(this);
+    }
+    _builderShare() {
+        const name = prompt('Track name for sharing:', 'my_track_' + Date.now().toString(36).slice(-4));
+        if (!name) return;
+        shareTrack(this, name);
+    }
+    _builderLoadCommunity() {
+        loadCommunityTracks(this);
+    }
+    _builderLoadCommunityParts(parts) {
+        loadPartsIntoBuilder(this, parts);
         updateBuilderUIState(this);
     }
     _builderPlaceRemote(remote) {

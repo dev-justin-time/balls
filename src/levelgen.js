@@ -1093,6 +1093,234 @@ export function createInfiniteLevel(game, seed) {
     }
 }
 
+// --- Builder composite parts (not used by procedural generator, placed individually) ---
+
+export function addLoopDeLoop(game, x, y, z, width = 6, radius = 8, segments = 12) {
+    try {
+        const segs = Math.max(8, Math.min(24, segments));
+        const r = Math.max(4, Math.min(14, radius));
+        const w = Math.max(2, Math.min(10, width));
+        // Entrance ramp
+        addRamp(game, x, y, z, w + 1, 6, Math.min(5, r * 0.5));
+        let zOff = z - 6;
+        for (let i = 0; i < segs; i++) {
+            const a = (i / segs) * Math.PI * 2;
+            const px = Math.cos(a) * r;
+            const pz = Math.sin(a) * r;
+            addPlatform(game, x + px, y + Math.sin(a) * 2, zOff, w * 0.9, 4);
+            zOff -= 4;
+        }
+        // Exit ramp
+        addRamp(game, x, y, zOff, w + 1, 8, Math.min(4, r * 0.35));
+    } catch (e) {
+        console.warn('addLoopDeLoop failed', e);
+    }
+}
+
+export function addSpiralTube(game, x, y, z, width = 6, radius = 8, turns = 2, segments = 16) {
+    try {
+        const segs = Math.max(8, Math.min(24, segments));
+        const r = Math.max(4, Math.min(12, radius));
+        const t = Math.max(1, Math.min(3, turns));
+        const w = Math.max(2, Math.min(10, width));
+        let zOff = z;
+        for (let i = 0; i < segs; i++) {
+            const angle = (i / segs) * (Math.PI * 2 * t);
+            const rr = r * (1 - (i / segs) * 0.5);
+            const px = Math.cos(angle) * rr;
+            const pz = Math.sin(angle) * rr;
+            const yOff = (i / segs) * 5;
+            addPlatform(game, x + px, y + yOff, zOff, w * 0.85, 5);
+            addWall(game, x + px - w / 2 - 0.5, y + yOff + 0.5, zOff, 0.3, 5, 0);
+            addWall(game, x + px + w / 2 + 0.5, y + yOff + 0.5, zOff, 0.3, 5, 0);
+            zOff -= 5;
+        }
+    } catch (e) {
+        console.warn('addSpiralTube failed', e);
+    }
+}
+
+export function addSpringPad(game, x, y, z, width = 4, length = 4, bouncePower = 15) {
+    try {
+        const w = Math.max(2, Math.min(8, width));
+        const l = Math.max(2, Math.min(8, length));
+        addPlatform(game, x, y, z, w, l, 0xff8800);
+        // Visual spring coil indicator
+        const coilGeo = new THREE.TorusGeometry(w * 0.35, 0.15, 8, 12);
+        const coilMat = new THREE.MeshPhongMaterial({ color: 0xff6600, emissive: 0x331100, shininess: 80 });
+        const coil = new THREE.Mesh(coilGeo, coilMat);
+        coil.position.set(x, y + 0.65, z);
+        coil.rotation.x = Math.PI / 2;
+        coil.userData = { isSpringPad: true, bouncePower };
+        game.scene.add(coil);
+        game.levelObjects.push({ mesh: coil, body: null, springPad: true, bouncePower, x, y, z, width: w, length: l });
+    } catch (e) {
+        console.warn('addSpringPad failed', e);
+    }
+}export function addCurve(game, x, y, z, width = 6, arcLength = 8, segments = 8, direction = 1) {
+    try {
+        const segs = Math.max(4, Math.min(16, segments));
+        const arc = Math.max(2, Math.min(20, arcLength));
+        const dir = direction >= 0 ? 1 : -1;
+        const w = Math.max(2, Math.min(10, width));
+        const stepLen = 5;
+        let zOff = z;
+        for (let i = 0; i < segs; i++) {
+            const angle = (i / segs) * (Math.PI / 2) * dir;
+            const offX = Math.sin(angle) * arc;
+            const curX = x + offX;
+            addPlatform(game, curX, y, zOff, w, stepLen);
+            zOff -= stepLen;
+        }
+    } catch (e) {
+        console.warn('addCurve failed', e);
+    }
+}
+
+export function addStairs(game, x, y, z, width = 6, stepCount = 5, stepLength = 4, stepHeight = 0.8) {
+    try {
+        const count = Math.max(2, Math.min(12, stepCount));
+        const sLen = Math.max(2, Math.min(8, stepLength));
+        const sH = Math.max(0.3, Math.min(2, stepHeight));
+        const w = Math.max(2, Math.min(10, width));
+        let zOff = z;
+        let curY = y;
+        for (let i = 0; i < count; i++) {
+            addPlatform(game, x, curY, zOff - sLen / 2, w + 1, sLen);
+            zOff -= sLen;
+            curY += sH;
+        }
+    } catch (e) {
+        console.warn('addStairs failed', e);
+    }
+}
+
+export function addPortalRing(game, x, y, z, radius = 2) {
+    try {
+        const r = Math.max(1, Math.min(5, radius));
+        const ringGeo = new THREE.TorusGeometry(r, 0.15, 12, 24);
+        const ringMat = new THREE.MeshPhongMaterial({
+            color: 0x8844ff,
+            emissive: 0x220066,
+            shininess: 100,
+            transparent: true,
+            opacity: 0.85
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.set(x, y + r, z);
+        ring.userData = { isPortal: true, portalRadius: r };
+        game.scene.add(ring);
+        game.levelObjects.push({ mesh: ring, body: null, portal: true, x, y, z, radius: r });
+
+        // Inner glow disc
+        const discGeo = new THREE.CircleGeometry(r * 0.85, 24);
+        const discMat = new THREE.MeshBasicMaterial({
+            color: 0x9966ff,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.35,
+            depthWrite: false
+        });
+        const disc = new THREE.Mesh(discGeo, discMat);
+        disc.position.set(x, y + r, z + 0.1);
+        disc.rotation.x = Math.PI / 2;
+        game.scene.add(disc);
+        game.levelObjects.push({ mesh: disc, body: null });
+    } catch (e) {
+        console.warn('addPortalRing failed', e);
+    }
+}
+
+export function addHalfPipe(game, x, y, z, width = 10, length = 20) {
+    try {
+        const w = Math.max(6, Math.min(16, width));
+        const l = Math.max(8, Math.min(40, length));
+        addPlatform(game, x, y, z, w, l);
+        const wallAngle = Math.PI / 4;
+        const wallW = 0.3;
+        const wallH = 2.5;
+        addWall(game, x - w / 2 - 0.3, y + wallH / 2, z, wallW, l, wallAngle);
+        addWall(game, x + w / 2 + 0.3, y + wallH / 2, z, wallW, l, -wallAngle);
+    } catch (e) {
+        console.warn('addHalfPipe failed', e);
+    }
+}
+
+export function addCheckerboard(game, x, y, z, tileSize = 3, rows = 4) {
+    try {
+        const size = Math.max(2, Math.min(6, tileSize));
+        const count = Math.max(2, Math.min(8, rows));
+        let zOff = z;
+        for (let r = 0; r < count; r++) {
+            const offX = (r % 2 === 0) ? -size : size;
+            addPlatform(game, x + offX, y, zOff - size / 2, size, size);
+            zOff -= size + 2;
+        }
+    } catch (e) {
+        console.warn('addCheckerboard failed', e);
+    }
+}
+
+// --- Glass variants of composite parts ---
+
+export function addGlassLoopDeLoop(game, x, y, z, width = 6, radius = 8, segments = 12) {
+    try {
+        const segs = Math.max(8, Math.min(24, segments));
+        const r = Math.max(4, Math.min(14, radius));
+        const w = Math.max(2, Math.min(10, width));
+        addRamp(game, x, y, z, w + 1, 6, Math.min(5, r * 0.5));
+        let zOff = z - 6;
+        for (let i = 0; i < segs; i++) {
+            const a = (i / segs) * Math.PI * 2;
+            const px = Math.cos(a) * r;
+            const pz = Math.sin(a) * r;
+            addGlassPlatform(game, x + px, y + Math.sin(a) * 2 + 0.2, zOff, w * 0.8, 4);
+            zOff -= 4;
+        }
+        addRamp(game, x, y, zOff, w + 1, 8, Math.min(4, r * 0.35));
+    } catch (e) {
+        console.warn('addGlassLoopDeLoop failed', e);
+    }
+}
+
+export function addGlassStairs(game, x, y, z, width = 6, stepCount = 5, stepLength = 4, stepHeight = 0.8) {
+    try {
+        const count = Math.max(2, Math.min(12, stepCount));
+        const sLen = Math.max(2, Math.min(8, stepLength));
+        const sH = Math.max(0.3, Math.min(2, stepHeight));
+        const w = Math.max(2, Math.min(10, width));
+        let zOff = z;
+        let curY = y;
+        for (let i = 0; i < count; i++) {
+            addGlassPlatform(game, x, curY + 0.2, zOff - sLen / 2, w * 0.8, sLen);
+            zOff -= sLen;
+            curY += sH;
+        }
+    } catch (e) {
+        console.warn('addGlassStairs failed', e);
+    }
+}
+
+export function addGlassCurve(game, x, y, z, width = 6, arcLength = 8, segments = 8, direction = 1) {
+    try {
+        const segs = Math.max(4, Math.min(16, segments));
+        const arc = Math.max(2, Math.min(20, arcLength));
+        const dir = direction >= 0 ? 1 : -1;
+        const w = Math.max(2, Math.min(10, width));
+        const stepLen = 5;
+        let zOff = z;
+        for (let i = 0; i < segs; i++) {
+            const angle = (i / segs) * (Math.PI / 2) * dir;
+            const offX = Math.sin(angle) * arc;
+            const curX = x + offX;
+            addGlassPlatform(game, curX, y + 0.2, zOff, w * 0.8, stepLen);
+            zOff -= stepLen;
+        }
+    } catch (e) {
+        console.warn('addGlassCurve failed', e);
+    }
+}
+
 export function spawnDroppedCoins(game, worldPos, totalValue) {
     try {
         const coinCount = Math.min(20, Math.max(3, Math.floor(totalValue / 2)));

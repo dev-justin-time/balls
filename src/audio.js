@@ -148,3 +148,40 @@ export function registerSfx(name, url) {
         _sfxPool[name] = a;
     } catch (e) { /* ignore */ }
 }
+
+// Portal teleport sound — Web Audio API generated whoosh (no file needed)
+export function playPortalSound(game) {
+    try {
+        const ctx = game._audioCtx;
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        // Noise buffer for whoosh texture
+        const bufSize = ctx.sampleRate * 0.3;
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+
+        const noise = ctx.createBufferSource();
+        noise.buffer = buf;
+
+        // Bandpass filter for sci-fi character
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(3000, now);
+        filter.frequency.exponentialRampToValueAtTime(400, now + 0.25);
+        filter.Q.value = 1.5;
+
+        // Gain envelope: quick attack, decay
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.15, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        noise.start(now);
+        noise.stop(now + 0.3);
+    } catch (e) { /* non-fatal — portal SFX is optional */ }
+}

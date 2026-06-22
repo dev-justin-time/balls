@@ -128,25 +128,54 @@ export function renderBuilderUI(game) {
         <button id="builder-play-btn" class="menu-btn" aria-label="Play this track" style="font-size:10px;padding:6px 10px;background:rgba(0,180,0,0.4);border-color:#44ff44;">▶ PLAY</button>
         <button id="builder-save-btn" class="menu-btn" aria-label="Save track" style="font-size:10px;padding:6px 10px;">💾 SAVE</button>
         <button id="builder-load-btn" class="menu-btn" aria-label="Load track" style="font-size:10px;padding:6px 10px;">📂 LOAD</button>
+        <button id="builder-share-btn" class="menu-btn" aria-label="Share to community" style="font-size:10px;padding:6px 10px;background:rgba(100,40,180,0.4);border-color:#9944ff;">🌐 SHARE</button>
+        <button id="builder-community-btn" class="menu-btn" aria-label="Load from community" style="font-size:10px;padding:6px 10px;">🌍 COMMUNITY</button>
         <button id="builder-export-btn" class="menu-btn" aria-label="Export track" style="font-size:10px;padding:6px 10px;">📋 EXPORT</button>
     `;
     sidebar.appendChild(actions);
 
-    // Status bar
+    // Status bar container (static outer, dynamic inner)
+    const statusWrap = document.createElement('div');
+    statusWrap.style.cssText = `
+        padding: 8px 12px;
+        border-top: 1px solid rgba(255,255,255,0.05);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-family: 'Segoe UI', sans-serif;
+    `;
+
+    // Static rotate button — persists across status refreshes
+    const rotateBtn = document.createElement('button');
+    rotateBtn.id = 'builder-rotate-btn';
+    rotateBtn.setAttribute('aria-label', 'Rotate part 90°');
+    rotateBtn.style.cssText = `
+        background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;
+        border-radius:6px;cursor:pointer;font-size:10px;padding:3px 7px;
+        font-family:'Segoe UI',sans-serif;transition:background 0.15s;flex-shrink:0;
+    `;
+    rotateBtn.innerText = '🔄';
+    rotateBtn.addEventListener('mouseenter', () => { rotateBtn.style.background = 'rgba(255,255,255,0.18)'; });
+    rotateBtn.addEventListener('mouseleave', () => { rotateBtn.style.background = 'rgba(255,255,255,0.08)'; });
+    statusWrap.appendChild(rotateBtn);
+
+    // Dynamic status text
     const status = document.createElement('div');
     status.id = 'builder-status';
     status.style.cssText = `
-        padding: 8px 12px;
-        border-top: 1px solid rgba(255,255,255,0.05);
         font-size: 10px;
         color: #888;
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
         font-family: 'Segoe UI', sans-serif;
+        flex: 1;
     `;
     updateBuilderStatus(game, status);
-    sidebar.appendChild(status);
+    statusWrap.appendChild(status);
+
+    sidebar.appendChild(statusWrap);
 
     overlay.appendChild(sidebar);
 
@@ -300,6 +329,34 @@ function wireBuilderUIEvents(game) {
     if (exportBtn) {
         exportBtn.addEventListener('click', () => {
             if (typeof game._builderExport === 'function') game._builderExport();
+        });
+    }
+
+    // Share to community
+    const shareBtn = document.getElementById('builder-share-btn');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', () => {
+            if (typeof game._builderShare === 'function') game._builderShare();
+        });
+    }
+
+    // Load from community
+    const communityBtn = document.getElementById('builder-community-btn');
+    if (communityBtn) {
+        communityBtn.addEventListener('click', () => {
+            if (typeof game._builderLoadCommunity === 'function') game._builderLoadCommunity();
+        });
+    }
+
+    // Rotate part
+    const rotateBtn = document.getElementById('builder-rotate-btn');
+    if (rotateBtn) {
+        rotateBtn.addEventListener('click', () => {
+            if (game._builderPendingPos) {
+                game._builderPendingPos.rotation =
+                    ((game._builderPendingPos.rotation || 0) + Math.PI / 2) % (Math.PI * 2);
+                updateBuilderStatus(game);
+            }
         });
     }
 }
