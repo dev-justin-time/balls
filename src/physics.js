@@ -210,19 +210,50 @@ export function updatePhysics(game, dt) {
             } catch (e) {}
         });
 
-        // Mover sliding
+        // Mover sliding (includes blade motion)
         game.movers.forEach(m => {
             try {
-                const sin = Math.sin(Date.now() * 0.002 * m.speedMult);
-                if (m.sideways) {
-                    m.body.position.x = m.baseX + sin * m.range;
+                if (m.type === 'blade') {
+                    // Blade hazard: oscillate near base position
+                    const bm = m.bladeMesh;
+                    if (!bm) return;
+                    const t = Date.now() * 0.003 * (m.speedMult || 1) + (m.offset || 0);
+                    const ud = bm.userData || {};
+                    if (ud.vertical) {
+                        bm.position.y = (m.basePos ? m.basePos.y : 0) + Math.sin(t * 2.5) * (ud.swing || 1) * 2;
+                        bm.position.x = (m.basePos ? m.basePos.x : 0) + Math.cos(t * 1.8) * 1.5;
+                    } else {
+                        bm.position.x = (m.basePos ? m.basePos.x : 0) + Math.sin(t * 3) * (ud.swing || 1) * 3;
+                        bm.position.y = (m.basePos ? m.basePos.y : 0) + Math.cos(t * 2.2) * 0.8;
+                    }
+                    bm.rotation.z = Math.sin(t * 2) * 1.2;
+                    // Blade proximity coin drop
+                    if (game.ballMesh && game.ballMesh.position) {
+                        const dx = Math.abs(game.ballMesh.position.x - bm.position.x);
+                        const dy = Math.abs(game.ballMesh.position.y - bm.position.y);
+                        const dz = Math.abs(game.ballMesh.position.z - bm.position.z);
+                        if (dx < 2.0 && dy < 2.5 && dz < 2.0 && !m._lastContact) {
+                            m._lastContact = true;
+                            const levelMult = 1 + (game.currentLevel - 1) * 0.1;
+                            if (game.triggerDropFromObstacle) {
+                                game.triggerDropFromObstacle(m, { baseLoss: 6 * levelMult });
+                            }
+                        } else if (dx >= 2.5 || dy >= 3 || dz >= 2.5) {
+                            m._lastContact = false;
+                        }
+                    }
                 } else {
-                    m.body.position.z = m.baseZ + sin * m.range;
-                }
-                m.mesh.position.copy(m.body.position);
-                if (m.trail) {
-                    m.trail.position.copy(m.body.position);
-                    m.trail.quaternion.copy(m.body.quaternion);
+                    const sin = Math.sin(Date.now() * 0.002 * m.speedMult);
+                    if (m.sideways) {
+                        m.body.position.x = m.baseX + sin * m.range;
+                    } else {
+                        m.body.position.z = m.baseZ + sin * m.range;
+                    }
+                    m.mesh.position.copy(m.body.position);
+                    if (m.trail) {
+                        m.trail.position.copy(m.body.position);
+                        m.trail.quaternion.copy(m.body.quaternion);
+                    }
                 }
             } catch (e) {}
         });

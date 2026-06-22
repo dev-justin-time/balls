@@ -16,8 +16,12 @@ import { initAudio, registerSfx, playSound } from './src/audio.js';
 import { initScene, getBallMaterial, clearTextureCache } from './engine/scene.js';
 import { onWindowResize, animate } from './src/rendering.js';
 import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, updateFireSparks, createHeatShimmer, clearHeatShimmer, updateHeatShimmer, createMeteors, clearMeteors, updateMeteors, checkMeteorCollisions } from './src/physics.js';
-import { createLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins } from './src/levelgen.js';
+import { createLevel, createInfiniteLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, addBlade, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins, spawnInfiniteChunk, createShockwave } from './src/levelgen.js';
 import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset } from './src/ui.js';
+import { initBuilderScene, onBuilderMouseMove, onBuilderClick, onBuilderWheel, onBuilderPanStart, onBuilderPanEnd, placePart, undoLastPlacement, clearBuilderScene, disposeBuilderScene, renderBuilder, loadPartsIntoBuilder } from './src/builder/builder_scene.js';
+import { renderBuilderUI, exitBuilder, updateBuilderCount, updateBuilderUIState } from './src/builder/builder_ui.js';
+import { initBuilderMultiplayer, disposeBuilderMultiplayer } from './src/builder/builder_networking.js';
+import { getPartDef } from './src/builder/catalog.js';
 
 // --- Notification manager ---
 const notifier = new NotificationManager({
@@ -290,6 +294,8 @@ class Game {
 
     createLevel(seed) { createLevel(this, seed); }
     clearLevel() { clearLevel(this); }
+    createInfiniteLevel(seed) { createInfiniteLevel(this, seed); }
+    spawnInfiniteChunk() { spawnInfiniteChunk(this); }
     addPlatform(x, y, z, w, l, c) { addPlatform(this, x, y, z, w, l, c); }
     addGlassPlatform(x, y, z, w, l) { addGlassPlatform(this, x, y, z, w, l); }
     addTunnelWalls(x, y, z, w, l) { addTunnelWalls(this, x, y, z, w, l); }
@@ -299,11 +305,13 @@ class Game {
     addHammer(x, y, z, s) { addHammer(this, x, y, z, s); }
     addMover(x, y, z, w, h, d, sw, s) { addMover(this, x, y, z, w, h, d, sw, s); }
     addWall(x, y, z, w, l, r) { addWall(this, x, y, z, w, l, r); }
+    addBlade(x, y, z, t, ln, sw, v) { addBlade(this, x, y, z, t, ln, sw, v); }
     addCoins(x, y, sz, l, c) { addCoins(this, x, y, sz, l, c); }
     addCheckpoint(x, y, z, w) { addCheckpoint(this, x, y, z, w); }
     placeFinishModel() { placeFinishModel(this); }
     triggerDropFromObstacle(o, opts) { triggerDropFromObstacle(this, o, opts); }
     spawnDroppedCoins(p, v) { spawnDroppedCoins(this, p, v); }
+    createShockwave(z, i) { createShockwave(this, z, i); }
 
     setupUI() { setupUI(this, room); }
     updateWalletUI() { updateWalletUI(this); }
@@ -328,6 +336,217 @@ class Game {
     getBallMaterial() { return getBallMaterial(this); }
     playSound(name) { playSound(name); }
     clearTextureCache() { clearTextureCache(this); }
+
+    // ---- Builder mode ----
+
+    enterBuilder() {
+        // Initialize builder if first time
+        if (!this._builderScene) {
+            initBuilderScene(this);
+            initBuilderMultiplayer(this, room);
+        }
+        // Store game-mode state so we can restore
+        this._wasInfinite = this._isInfinite || false;
+        // Switch to builder mode
+        this._builderActive = true;
+        this.isGameOver = true; // pause physics
+        renderBuilderUI(this);
+
+        // Wire builder input handlers
+        this._builderMouseMove = (e) => {
+            if (e.target.closest('#builder-sidebar') || e.target.closest('#overlay')) return;
+            this.builderMouseMove(e.clientX, e.clientY);
+        };
+        this._builderMouseDown = (e) => {
+            if (e.target.closest('#builder-sidebar') || e.target.closest('#overlay')) return;
+            if (e.button === 2) {
+                // Right click — pan
+                this.builderPanStart(e.clientX, e.clientY);
+            } else if (e.button === 0) {
+                // Left click — place or delete (shift)
+                this.builderClick(e.clientX, e.clientY);
+                updateBuilderUIState(this);
+            }
+        };
+        this._builderMouseUp = (e) => {
+            if (this._builderIsPanning) this.builderPanEnd();
+        };
+        this._builderWheel = (e) => {
+            if (e.target.closest('#builder-sidebar') || e.target.closest('#overlay')) return;
+            this.builderWheel(e.deltaY);
+        };
+        this._builderContext = (e) => {
+            if (!e.target.closest('#builder-sidebar')) e.preventDefault();
+        };
+        this._builderKeyDown = (e) => {
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                this._builderShiftDown = true;
+                return;
+            }
+            if (e.code === 'KeyR' && this._builderSelectedKey) {
+                // Rotate selected part by 90 degrees
+                if (this._builderPendingPos) {
+                    this._builderPendingPos.rotation =
+                        ((this._builderPendingPos.rotation || 0) + Math.PI / 2) % (Math.PI * 2);
+                }
+            } else if (e.code === 'KeyZ' && (e.ctrlKey || e.metaKey)) {
+                this._builderUndo();
+                updateBuilderCount(this);
+            } else if (e.code === 'Escape') {
+                exitBuilder(this);
+            }
+        };
+        this._builderKeyUp = (e) => {
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                this._builderShiftDown = false;
+            }
+        };
+
+        document.addEventListener('mousemove', this._builderMouseMove);
+        document.addEventListener('mousedown', this._builderMouseDown);
+        document.addEventListener('mouseup', this._builderMouseUp);
+        document.addEventListener('wheel', this._builderWheel, { passive: true });
+        document.addEventListener('contextmenu', this._builderContext);
+        document.addEventListener('keydown', this._builderKeyDown);
+        document.addEventListener('keyup', this._builderKeyUp);
+    }
+
+    _onExitBuilder() {
+        this._builderActive = false;
+        this.isGameOver = false;
+        this._isInfinite = this._wasInfinite || false;
+        this._lastFrameTime = 0; // reset dt accumulator
+
+        // Remove builder input handlers
+        if (this._builderMouseMove) document.removeEventListener('mousemove', this._builderMouseMove);
+        if (this._builderMouseDown) document.removeEventListener('mousedown', this._builderMouseDown);
+        if (this._builderMouseUp) document.removeEventListener('mouseup', this._builderMouseUp);
+        if (this._builderWheel) document.removeEventListener('wheel', this._builderWheel);
+        if (this._builderContext) document.removeEventListener('contextmenu', this._builderContext);
+        if (this._builderKeyDown) document.removeEventListener('keydown', this._builderKeyDown);
+        if (this._builderKeyUp) document.removeEventListener('keyup', this._builderKeyUp);
+    }
+
+    _builderUndo() { undoLastPlacement(this); }
+    _builderClear() { clearBuilderScene(this); }
+    _builderPlay() {
+        // Export placed parts as a level definition and play it
+        const def = this._builderExport();
+        if (!def) return;
+        exitBuilder(this);
+        // Build the level from exported definition
+        this.clearLevel();
+        this.lastCheckpointPos.set(0, 5, 0);
+        this._isInfinite = false;
+        this.finishZ = undefined;
+        this.score = 0;
+        this.levelLength = 500;
+        this.startTime = Date.now();
+        // Place each part using the real levelgen functions with destructured params
+        for (const placed of this._builderPlacedParts || []) {
+            const partDef = getPartDef(placed.partKey);
+            if (!partDef || !partDef.builderFn) continue;
+            const p = placed.params || {};
+            switch (placed.partKey) {
+                case 'platform':
+                case 'speed_strip':
+                case 'finish_line':
+                    this.addPlatform(placed.x, placed.y, placed.z, p.width || 8, p.length || 15, p.color || null);
+                    break;
+                case 'ramp':
+                    this.addRamp(placed.x, placed.y, placed.z, p.width || 8, p.length || 15, p.height || 5);
+                    break;
+                case 'glass_platform':
+                    this.addGlassPlatform(placed.x, placed.y, placed.z, p.width || 6, p.length || 14);
+                    break;
+                case 'wall':
+                    this.addWall(placed.x, placed.y, placed.z, p.width || 1, p.length || 20, p.rotZ || 0);
+                    break;
+                case 'tunnel_walls':
+                    this.addTunnelWalls(placed.x, placed.y, placed.z, p.width || 8, p.length || 30);
+                    break;
+                case 'pendulum':
+                    this.addPendulum(placed.x, placed.y, placed.z, p.speedMult || 1.0);
+                    break;
+                case 'spinner':
+                    this.addSpinner(placed.x, placed.y, placed.z, p.speedMult || 1.0);
+                    break;
+                case 'hammer':
+                    this.addHammer(placed.x, placed.y, placed.z, p.speedMult || 1.0);
+                    break;
+                case 'mover':
+                    this.addMover(placed.x, placed.y, placed.z, p.width || 3, p.height || 1, p.depth || 2, p.sideways || false, p.speedMult || 1.0);
+                    break;
+                case 'blade':
+                    this.addBlade(placed.x, placed.y, placed.z, p.thickness || 0.12, p.length || 2.0, p.swing || 1.0, p.vertical || false);
+                    break;
+                case 'coin_line':
+                    this.addCoins(placed.x, placed.y + 1, placed.z, p.length || 20, p.count || 5);
+                    break;
+                case 'checkpoint':
+                    this.addCheckpoint(placed.x, placed.y, placed.z, p.width || 8);
+                    break;
+                case 'finish_model':
+                    this.finishZ = placed.z;
+                    this.finishX = placed.x;
+                    this.finishY = placed.y;
+                    break;
+            }
+        }
+        this.startTime = Date.now();
+    }
+    _builderExport() {
+        const parts = (this._builderPlacedParts || []).map(p => ({
+            partKey: p.partKey,
+            x: p.x, y: p.y, z: p.z,
+            rotation: p.rotation || 0,
+            params: p.params || {}
+        }));
+        if (parts.length === 0) return null;
+        const json = JSON.stringify(parts, null, 2);
+        try {
+            navigator.clipboard.writeText(json).catch(() => {});
+        } catch (e) {}
+        console.info('Exported track:', parts.length, 'parts');
+        alert(`Track exported! ${parts.length} parts copied to clipboard.`);
+        return { parts };
+    }
+    _builderSave() {
+        const parts = (this._builderPlacedParts || []).map(p => ({
+            partKey: p.partKey,
+            x: p.x, y: p.y, z: p.z,
+            rotation: p.rotation || 0,
+            params: p.params || {}
+        }));
+        if (parts.length === 0) { alert('Nothing to save! Place some parts first.'); return; }
+        const name = prompt('Track name:', 'my_track_' + Date.now().toString(36).slice(-4));
+        if (!name) return;
+        const tracks = JSON.parse(localStorage.getItem('goingBalls_builder_tracks') || '{}');
+        tracks[name] = { parts, savedAt: Date.now() };
+        localStorage.setItem('goingBalls_builder_tracks', JSON.stringify(tracks));
+        alert(`Track "${name}" saved! (${parts.length} parts)`);
+    }
+    _builderLoad(name) {
+        const tracks = JSON.parse(localStorage.getItem('goingBalls_builder_tracks') || '{}');
+        const saved = tracks[name];
+        if (!saved || !saved.parts) { alert(`Track "${name}" not found.`); return; }
+        loadPartsIntoBuilder(this, saved.parts);
+        updateBuilderUIState(this);
+    }
+    _builderPlaceRemote(remote) {
+        const partDef = getPartDef(remote.partKey);
+        if (!partDef) return;
+        placePart(this, remote.partKey, remote.x, remote.y, remote.z, remote.rotation || 0);
+        updateBuilderCount(this);
+    }
+
+    // ---- Builder delegation methods (called from builder_scene.js) ----
+
+    builderMouseMove(cx, cy) { onBuilderMouseMove(this, cx, cy); }
+    builderClick(cx, cy) { onBuilderClick(this, cx, cy); }
+    builderWheel(dy) { onBuilderWheel(this, dy); }
+    builderPanStart(cx, cy) { onBuilderPanStart(this, cx, cy); }
+    builderPanEnd() { onBuilderPanEnd(this); }
 }
 
 // ============================================================================

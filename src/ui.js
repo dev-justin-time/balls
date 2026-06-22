@@ -16,7 +16,7 @@ import { renderBallIndexUI } from './ball_index_ui.js';
 import { saveGame } from './persistence.js';
 import { playSound } from './audio.js';
 import { applySkyConfig, getBallMaterial, applyBallSkin } from '../engine/scene.js';
-import { createLevel } from './levelgen.js';
+import { createLevel, createInfiniteLevel } from './levelgen.js';
 
 // --- Remote data sanitization ---
 const REMOTE_MAX_STRING = 128;
@@ -111,14 +111,47 @@ export function setupUI(game, room) {
         });
     }
 
-    // Close overlay on background click
+    // Close overlay on background click (unless builder is active)
     if (overlay) {
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
+                if (game._builderActive) return; // Don't kill builder via background click
                 overlay.style.display = 'none';
                 overlay.innerHTML = '';
             }
         });
+    }
+
+    // --- Builder button ---
+    const builderBtn = document.getElementById('builder-btn');
+    if (builderBtn) {
+        builderBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof game.enterBuilder === 'function') {
+                game.enterBuilder();
+            }
+        });
+    }
+
+    // --- Survival Mode button ---
+    const survivalBtn = document.getElementById('survival-btn');
+    if (survivalBtn) {
+        const updateSurvivalLabel = () => {
+            survivalBtn.textContent = game._isInfinite ? 'SURVIVAL ✓' : 'SURVIVAL';
+            survivalBtn.style.background = game._isInfinite
+                ? 'rgba(30,180,30,0.6)'
+                : 'rgba(180,30,30,0.6)';
+            survivalBtn.style.borderColor = game._isInfinite ? '#44ff44' : '#ff4444';
+        };
+        survivalBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!game._isInfinite) {
+                game.createInfiniteLevel();
+                updateSurvivalLabel();
+            }
+        });
+        // Expose updater so reset() can refresh the label
+        game._updateSurvivalLabel = updateSurvivalLabel;
     }
 
     // --- Leaderboard button ---
@@ -440,7 +473,12 @@ export function reset(game) {
     game.ballBody.velocity.set(0, 0, 0);
     game.ballBody.angularVelocity.set(0, 0, 0);
     game.lastCheckpointPos.set(0, 5, 0);
-    createLevel(game);
+    if (game._isInfinite) {
+        createInfiniteLevel(game);
+        if (game._updateSurvivalLabel) game._updateSurvivalLabel();
+    } else {
+        createLevel(game);
+    }
     updateWalletUI(game);
 }
 

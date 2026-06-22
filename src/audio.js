@@ -16,6 +16,49 @@ export function initAudio(game) {
     game.backgroundMusicStarted = false;
     game.musicEnabled = (localStorage.getItem('goingBalls_musicEnabled') !== 'false');
 
+    // --- Music visualizer: AudioContext analyser + border canvas ---
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        game._audioCtx = new AudioCtx();
+        game._mediaSrc = game._audioCtx.createMediaElementSource(game.backgroundMusic);
+        game._analyser = game._audioCtx.createAnalyser();
+        game._analyser.fftSize = 256;
+        game._analyser.smoothingTimeConstant = 0.6;
+        game._mediaSrc.connect(game._analyser);
+        game._analyser.connect(game._audioCtx.destination);
+        game._freqData = new Uint8Array(game._analyser.frequencyBinCount);
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'music-visualizer';
+        canvas.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1001;';
+        document.body.appendChild(canvas);
+        game._visCanvas = canvas;
+        game._visCtx = canvas.getContext('2d');
+        const resizeVis = () => {
+            canvas.width = Math.max(300, window.innerWidth);
+            canvas.height = Math.max(200, window.innerHeight);
+        };
+        resizeVis();
+        window.addEventListener('resize', resizeVis);
+    } catch (e) {
+        console.warn('AudioContext/analyser unavailable, visualizer disabled', e);
+        game._audioCtx = null;
+        game._analyser = null;
+        game._freqData = null;
+        game._visCanvas = null;
+        game._visCtx = null;
+    }
+
+    // Resume audio context on user interaction
+    const resumeAudioCtx = async () => {
+        try {
+            if (game._audioCtx && game._audioCtx.state === 'suspended') await game._audioCtx.resume();
+        } catch (e) {}
+    };
+    window.addEventListener('keydown', resumeAudioCtx, { once: true });
+    window.addEventListener('mousedown', resumeAudioCtx, { once: true });
+    window.addEventListener('touchstart', resumeAudioCtx, { once: true });
+
     // Resume audio context on first interaction
     const resumeAudio = () => {
         if (!game.rollSoundStarted) {

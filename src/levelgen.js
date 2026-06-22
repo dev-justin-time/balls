@@ -1,11 +1,12 @@
 /*
  Level Generation module.
- Exports: createLevel(game, seed), clearLevel(game),
+ Exports: createLevel(game, seed), createInfiniteLevel(game, seed), clearLevel(game),
  addPlatform(game, ...), addRamp(game, ...), addCoins(game, ...),
  addPendulum(game, ...), addSpinner(game, ...), addHammer(game, ...),
  addMover(game, ...), addWall(game, ...), addTunnelWalls(game, ...),
- addGlassPlatform(game, ...), addCheckpoint(game, ...),
+ addGlassPlatform(game, ...), addCheckpoint(game, ...), addBlade(game, ...),
  placeFinishModel(game), spawnDroppedCoins(game, worldPos, totalValue),
+ createShockwave(game, centerZ, intensity), spawnInfiniteChunk(game),
  triggerDropFromObstacle(game, obstacle, options).
 
  Contains the full procedural level generator with ~40+ segment types,
@@ -49,6 +50,13 @@ export function clearLevel(game) {
         if (s.trail) { disposeMesh(s.trail); }
     });
     game.movers.forEach(m => {
+        if (m.type === 'blade') {
+            if (m.bladeMesh) {
+                game.scene.remove(m.bladeMesh);
+                if (m.bladeMesh.geometry) m.bladeMesh.geometry.dispose();
+            }
+            return;
+        }
         if (m.body) game.world.removeBody(m.body);
         game.scene.remove(m.mesh);
         if (m.mesh && m.mesh.geometry) m.mesh.geometry.dispose();
@@ -879,6 +887,210 @@ export function triggerDropFromObstacle(game, obstacle, options = {}) {
         game.saveData.totalCoins -= drop;
         spawnDroppedCoins(game, obstacle.body ? obstacle.body.position : game.ballBody.position, drop);
     } catch (e) { /* non-fatal */ }
+}
+
+// --- Blade hazard ---
+export function addBlade(game, x, y, z, thickness = 0.12, length = 2.0, swing = 1.0, vertical = false) {
+    try {
+        const bladeGeo = new THREE.BoxGeometry(thickness, length, 0.08);
+        const bladeMat = new THREE.MeshPhongMaterial({ color: 0x222222, emissive: 0x661111, shininess: 60 });
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        blade.position.set(x, y + length / 2, z);
+        blade.frustumCulled = false;
+        blade.userData = { oscill: Math.random() * Math.PI * 2, swing, vertical: !!vertical };
+        game.scene.add(blade);
+        game.levelObjects.push({ mesh: blade, blade: true });
+        game.movers.push({ bladeMesh: blade, type: 'blade', basePos: new THREE.Vector3(x, y, z), offset: Math.random() * Math.PI, speedMult: 0.9 + Math.random() * 1.4 });
+    } catch (e) {
+        console.warn('addBlade failed', e);
+    }
+}
+
+// --- Shockwave event ---
+export function createShockwave(game, centerZ, intensity = 3) {
+    try {
+        const id = 'shockwave-overlay';
+        let overlay = document.getElementById(id);
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = id;
+            overlay.style.position = 'fixed';
+            overlay.style.inset = '0';
+            overlay.style.pointerEvents = 'none';
+            overlay.style.zIndex = '20000';
+            overlay.style.opacity = '0';
+            overlay.style.background = 'radial-gradient(circle at 50% 40%, rgba(255,60,60,0.22), rgba(0,0,0,0))';
+            document.body.appendChild(overlay);
+        }
+        overlay.style.transition = 'opacity 180ms ease';
+        overlay.style.opacity = '1';
+        setTimeout(() => { overlay.style.opacity = '0'; }, 220 + Math.floor(Math.random() * 120));
+
+        // Debris particles
+        const count = Math.min(18, 6 + Math.floor(intensity * 4));
+        for (let i = 0; i < count; i++) {
+            const p = document.createElement('div');
+            p.style.cssText = `
+                position:fixed;width:${4 + Math.floor(Math.random() * 8)}px;height:${4 + Math.floor(Math.random() * 8)}px;
+                background:rgba(120,20,20,0.95);border-radius:2px;z-index:20001;pointer-events:none;opacity:1;
+                left:${50 + (Math.random() - 0.5) * 40}%;top:${40 + (Math.random() - 0.5) * 40}%;
+                transform:translate(-50%,-50%) scale(${0.6 + Math.random() * 1.6}) rotate(${Math.random() * 360}deg);
+            `;
+            document.body.appendChild(p);
+            setTimeout(() => {
+                p.style.transition = 'transform 900ms ease, opacity 700ms ease';
+                p.style.transform += ` translate(${(Math.random() - 0.5) * 300}px, ${(Math.random() - 0.5) * 300}px)`;
+                p.style.opacity = '0';
+            }, 20 + Math.random() * 80);
+            setTimeout(() => { try { p.remove(); } catch (e) {} }, 1200 + Math.random() * 800);
+        }
+
+        // Camera impulse
+        game._shockwaveEnd = Math.max(game._shockwaveEnd || 0, Date.now()) + 380 + intensity * 40;
+        game._shockwaveIntensity = Math.max(game._shockwaveIntensity || 0, intensity);
+    } catch (e) {
+        console.warn('createShockwave failed', e);
+    }
+}
+
+// --- Infinite runner: spawn one procedural chunk ---
+export function spawnInfiniteChunk(game) {
+    const rand = () => (game.rnd ? game.rnd() : Math.random());
+    const ds = game._difficultyScale || 0;
+
+    // Scale hazard chance with difficulty
+    const hazardChance = Math.min(0.92, 0.06 + ds * 0.004 + rand() * 0.08);
+    const ampHazard = Math.min(0.98, hazardChance + ds * 0.006 + 0.06);
+
+    // Occasional environmental events when difficulty is high
+    if (ds > 60 && rand() < 0.08) {
+        if (rand() < 0.5) {
+            game.windy = true;
+            game.wind = { dirX: (rand() - 0.5) * 2.5, strength: 1.2 + rand() * 1.6 };
+            createWind(game);
+            setTimeout(() => { clearWind(game); game.windy = false; }, 3000 + Math.floor(rand() * 2500));
+        } else {
+            game.raining = true;
+            createRain(game);
+            setTimeout(() => { clearRain(game); game.raining = false; }, 3000 + Math.floor(rand() * 3000));
+        }
+    }
+
+    const pick = rand();
+    const sz = game._spawnZ;
+
+    if (pick < 0.10) {
+        const len = 8 + Math.floor(rand() * 14);
+        addPlatform(game, (rand() - 0.5) * 1.6, 0, sz - len / 2, Math.max(0.8, 2.6 - ds * 0.035), len);
+        if (rand() < 0.9) addCoins(game, 0, 1.0 + rand() * 0.6, sz, len, 2 + (rand() < 0.35 ? 1 : 0));
+        if (rand() < ampHazard) addMover(game, 0, 1, sz - len / 2, 3.2, 1.6, len, true, 1.2 + ds * 0.08);
+        if (rand() < Math.min(0.85, 0.25 + ds * 0.022)) {
+            const blades = 1 + Math.floor(rand() * 2);
+            for (let b = 0; b < blades; b++) {
+                addBlade(game, (rand() - 0.5) * 1.8, 1.2, sz - (len * (0.2 + rand() * 0.6)), 0.12 + rand() * 0.3, 2.2 + rand() * 1.8, 0.6 + rand() * 1.4);
+            }
+        }
+        game._spawnZ -= len;
+    } else if (pick < 0.30) {
+        const rampL = 6 + Math.floor(rand() * 16);
+        const rampH = 2 + Math.floor(rand() * 6);
+        addRamp(game, (rand() - 0.5) * 1.8, 0, sz, 6, rampL, rampH);
+        game._spawnZ -= rampL;
+        if (rand() < Math.max(0.4, ampHazard)) addPendulum(game, (rand() - 0.5) * 2.2, 2 + rampH, sz + 4, 1.2 + ds * 0.045);
+        if (rand() < Math.min(0.35, 0.12 + ds * 0.01)) createShockwave(game, sz + 2, 3 + Math.floor(rand() * 3));
+    } else if (pick < 0.60) {
+        const len = 14 + Math.floor(rand() * 18);
+        const offX = (rand() - 0.5) * 3.2;
+        addPlatform(game, offX, 0, sz - len / 2, 6.2, len);
+        if (rand() < 0.8) addSpinner(game, offX, 0.6, sz - len / 2, 1.5 + ds * 0.05);
+        if (rand() < 0.92) addCoins(game, offX, 1.2, sz, len, 3 + (rand() < 0.45 ? 1 : 0));
+        if (rand() < ampHazard * 0.95) addMover(game, offX, 0.8, sz - len / 2, 2.4, 1.2, len * 0.7, false, 1 + ds * 0.05);
+        if (rand() < 0.35 + Math.min(0.4, ds * 0.02)) addBlade(game, offX + (rand() - 0.5) * 1.6, 1.0 + rand() * 0.6, sz - len / 3, 0.16 + rand() * 0.22, 2.6 + rand() * 2.4, 0.9 + rand() * 1.8, true);
+        game._spawnZ -= len;
+    } else {
+        if (rand() < 0.48) {
+            const len = 10 + Math.floor(rand() * 10);
+            const w = Math.max(0.7, 4 - ds * 0.06);
+            addGlassPlatform(game, (rand() - 0.5) * 2.6, 0.2, sz - len / 2, w, len);
+            if (rand() < 0.85) addCoins(game, (rand() - 0.5) * 2, 1.6, sz, len, 2 + (rand() < 0.25 ? 1 : 0));
+            if (rand() < ampHazard * 0.65) addHammer(game, (rand() - 0.5) * 2.2, 0.6, sz - len / 2, 1.2 + ds * 0.03);
+            if (rand() < ampHazard * 0.45) addBlade(game, (rand() - 0.5) * 2.1, 0.9, sz - len * 0.3, 0.12, 2.0, 0.5);
+            game._spawnZ -= len;
+        } else {
+            const len = 20;
+            const dir = rand() < 0.5 ? -1 : 1;
+            const segs = 4;
+            for (let s = 0; s < segs; s++) {
+                addPlatform(game, dir * (s + 1) * 0.8, 0, sz - (len / segs) / 2, Math.max(1.6, 5 - ds * 0.05), len / segs);
+                if (rand() < 0.7) addCoins(game, dir * (s + 1) * 0.8, 1.2, sz, len / segs, 1 + (rand() < 0.25 ? 1 : 0));
+                if (rand() < ampHazard * 0.45) addMover(game, dir * (s + 1) * 0.8, 0.6, sz, 1.6, 1.0, len / segs, true, 1 + ds * 0.03);
+                if (rand() < ampHazard * 0.25) addBlade(game, dir * (s + 1) * 0.8, 1.0, sz - (s * (len / segs)), 0.12, 1.6 + rand() * 1.2, 0.6);
+                game._spawnZ -= len / segs;
+            }
+        }
+    }
+
+    // Occasional coin clusters
+    if (rand() < Math.max(0.25, Math.min(0.8, 0.35 - ds * 0.0005 + rand() * 0.25))) {
+        addCoins(game, (rand() - 0.5) * 2, 1.4, sz + 8, 6 + Math.floor(rand() * 6), 3);
+    }
+
+    // Increase difficulty
+    game._difficultyScale += 1.2 + rand() * 2.2;
+
+    // Visual difficulty cue: red fog tint
+    if (!game._difficultyVisualTimer && ds > 45 && rand() < 0.18) {
+        game._difficultyVisualTimer = Date.now();
+        try { game._prevFogColor = game.scene.fog && game.scene.fog.color ? game.scene.fog.color.clone() : null; } catch (e) {}
+        try {
+            if (game.scene.fog) game.scene.fog.color.setHex(0x7f1a1a);
+            else game.scene.fog = new THREE.Fog(0x7f1a1a, 20, 150);
+            setTimeout(() => {
+                try { if (game._prevFogColor && game.scene.fog) game.scene.fog.color.copy(game._prevFogColor); } catch (e) {}
+                game._difficultyVisualTimer = 0;
+            }, 2200);
+        } catch (e) {}
+    }
+}
+
+// --- Infinite runner mode: replaces finite level with procedural chunk spawning ---
+export function createInfiniteLevel(game, seed) {
+    try {
+        if (typeof seed === 'number' && !Number.isNaN(seed)) {
+            game._seed = seed >>> 0;
+            game.rng = mulberry32(game._seed);
+            game.rnd = () => game.rng();
+        }
+    } catch (e) {}
+
+    clearLevel(game);
+    game.lastCheckpointPos.set(0, 5, 0);
+    game._spawnZ = -10;
+    game._spawnAhead = 200;
+    game._difficultyScale = 0;
+    game._survivalStart = Date.now();
+    game._isInfinite = true;
+
+    // Initial corridor
+    const rand = () => (game.rnd ? game.rnd() : Math.random());
+    addPlatform(game, 0, 0, 0, 10, 18);
+    for (let i = 0; i < 6; i++) {
+        const len = 14 + Math.floor(rand() * 10);
+        addPlatform(game, 0, 0, game._spawnZ - len / 2, 7 - Math.min(5, Math.floor(game._difficultyScale)), len);
+        addCoins(game, 0, 1.2, game._spawnZ, len, 3);
+        game._spawnZ -= len;
+    }
+
+    game.finishZ = -999999;
+    game.score = 0;
+    game.saveData.totalCoins = game.saveData.totalCoins || 0;
+    game.levelLength = 500;
+    game.startTime = Date.now();
+
+    // Pre-fill chunks ahead
+    while (Math.abs(game._spawnZ) < game._spawnAhead) {
+        spawnInfiniteChunk(game);
+    }
 }
 
 export function spawnDroppedCoins(game, worldPos, totalValue) {
