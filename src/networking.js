@@ -20,6 +20,36 @@ const ROOM_INIT_BASE_DELAY = 1000; // ms
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// Dismisses the loading overlay once both assets are loaded AND the scene is initialized.
+// Called from manager.onLoad (when assets ready) and from Game constructor (when scene ready).
+function tryDismissLoadingOverlay() {
+    if (!window.__goingBallsAssetsReady || !window.__goingBallsSceneReady) return;
+    const overlay = document.getElementById('loading-overlay');
+    if (!overlay) return;
+    try {
+        overlay.style.transition = 'opacity 400ms ease';
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            try { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) {}
+        }, 450);
+    } catch (e) {}
+}
+
+// Called from main.js after Game constructor finishes
+window.__signalSceneReady = function() {
+    window.__goingBallsSceneReady = true;
+    tryDismissLoadingOverlay();
+};
+
+// Safety timeout: dismiss loading overlay after 6s regardless of asset state.
+// Prevents a stuck loading screen if onLoad never fires (cached assets, etc.).
+setTimeout(() => {
+    if (!window.__goingBallsAssetsReady) {
+        window.__goingBallsAssetsReady = true;
+        tryDismissLoadingOverlay();
+    }
+}, 6000);
+
 const loadingManager = {
     active: false
 };
@@ -49,11 +79,10 @@ export function setupLoadingManager() {
         try {
             if (loadingBar()) loadingBar().style.width = '100%';
             if (loadingText()) loadingText().innerText = `Finalizing...`;
-            setTimeout(() => {
-                const overlay = document.getElementById('loading-overlay');
-                if (overlay) overlay.style.transition = 'opacity 400ms ease', overlay.style.opacity = '0';
-                setTimeout(() => { try { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) {} }, 450);
-            }, 350);
+            // Signal that assets are loaded — Game constructor will dismiss the overlay
+            // once initialization is complete so loading doesn't vanish before the scene appears.
+            window.__goingBallsAssetsReady = true;
+            tryDismissLoadingOverlay();
         } catch (e) {}
     };
     manager.onError = function (url) {

@@ -439,6 +439,94 @@ export function updateFireSparks(game, dt) {
     } catch (e) {}
 }
 
+// --- Heat shimmer particle system (Inferno sky: heat haze visual) ---
+// Two-layer approach: a shimmer layer near the ground + rising distortion columns
+
+export function createHeatShimmer(game) {
+    try {
+        const count = getParticleCount(game, 'heat', 250);
+        const positions = new Float32Array(count * 3);
+        const area = Math.max(28, Math.min(80, Math.floor((window.innerWidth + window.innerHeight) / 28)));
+        const cx = game.ballMesh ? game.ballMesh.position.x : 0;
+        const cz = game.ballMesh ? game.ballMesh.position.z : 0;
+        for (let i = 0; i < count; i++) {
+            const ix = i * 3;
+            positions[ix] = cx + (Math.random() - 0.5) * area;
+            // Start near ground level and scattered up to mid-height
+            positions[ix + 1] = Math.random() * 14;
+            positions[ix + 2] = cz + (Math.random() - 0.5) * area;
+        }
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const mat = new THREE.PointsMaterial({
+            color: 0xffddaa, size: 0.10,
+            transparent: true, opacity: 0.35,
+            depthWrite: false, blending: THREE.NormalBlending
+        });
+        game.heatShimmer = new THREE.Points(geom, mat);
+        game.heatShimmer.frustumCulled = false;
+        game.scene.add(game.heatShimmer);
+        // Per-particle phase offset for wave animation
+        game._heatPhases = new Float32Array(count);
+        for (let i = 0; i < count; i++) {
+            game._heatPhases[i] = Math.random() * Math.PI * 2;
+        }
+        game._heatSpeeds = new Float32Array(count);
+        for (let i = 0; i < count; i++) {
+            game._heatSpeeds[i] = 1.2 + Math.random() * 2.8;
+        }
+    } catch (e) {
+        console.warn('createHeatShimmer failed', e);
+    }
+}
+
+export function clearHeatShimmer(game) {
+    try {
+        if (game.heatShimmer) {
+            game.scene.remove(game.heatShimmer);
+            if (game.heatShimmer.geometry) game.heatShimmer.geometry.dispose();
+            if (game.heatShimmer.material) game.heatShimmer.material.dispose();
+            game.heatShimmer = null;
+        }
+        game._heatPhases = null;
+        game._heatSpeeds = null;
+    } catch (e) {}
+}
+
+export function updateHeatShimmer(game, dt) {
+    try {
+        if (!game.heatShimmer) return;
+        const positions = game.heatShimmer.geometry.attributes.position.array;
+        const count = positions.length / 3;
+        const phases = game._heatPhases || [];
+        const speeds = game._heatSpeeds || [];
+        const areaX = 60, areaLowY = 16, areaZ = 50;
+        const cx = game.ballMesh ? game.ballMesh.position.x : 0;
+        const cz = game.ballMesh ? game.ballMesh.position.z : 0;
+        const now = Date.now() * 0.001;
+
+        // Pulse opacity for shimmer effect
+        game.heatShimmer.material.opacity = 0.28 + Math.sin(now * 3.5) * 0.10;
+
+        for (let i = 0; i < count; i++) {
+            const ix = i * 3;
+            const phase = phases[i] || 0;
+            const speed = speeds[i] || 2;
+            // Slow upward drift with sinusoidal horizontal wobble
+            positions[ix + 1] += speed * dt;
+            positions[ix] += Math.sin(now * 4.0 + phase) * 1.0 * dt;
+            positions[ix + 2] += Math.cos(now * 3.2 + phase + 1) * 0.8 * dt;
+            // Respawn at ground when above ceiling
+            if (positions[ix + 1] > 14) {
+                positions[ix] = cx + (Math.random() - 0.5) * areaX;
+                positions[ix + 1] = Math.random() * 2;
+                positions[ix + 2] = cz + (Math.random() - 0.5) * areaZ;
+            }
+        }
+        game.heatShimmer.geometry.attributes.position.needsUpdate = true;
+    } catch (e) {}
+}
+
 // --- Meteor hazard system (Void Storm sky condition) ---
 
 function spawnMeteor(game) {
@@ -479,7 +567,9 @@ function spawnMeteor(game) {
 
 export function createMeteors(game) {
     game.meteors = game.meteors || [];
-    for (let i = 0; i < 6; i++) {
+    const count = getParticleCount(game, 'meteor', 6);
+    game._maxMeteors = getParticleCount(game, 'meteor', 12);
+    for (let i = 0; i < count; i++) {
         const m = spawnMeteor(game);
         if (m) game.meteors.push(m);
     }
@@ -502,7 +592,7 @@ export function updateMeteors(game, dt) {
     // Spawn new meteors periodically
     game._meteorSpawnTimer = (game._meteorSpawnTimer || 0) + dt;
     const interval = 0.7 + Math.random() * 0.9;
-    const maxMeteors = 12;
+    const maxMeteors = game._maxMeteors || 12;
     if (game._meteorSpawnTimer > interval && game.meteors.length < maxMeteors) {
         game._meteorSpawnTimer = 0;
         const m = spawnMeteor(game);

@@ -4,11 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "serve -o",
+    "start": "serve -o",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
+    "serve": "^14.2.4",
     "cannon-es": "^0.20.0",
     "jsdom": "^29.1.1",
     "three": "^0.184.0",

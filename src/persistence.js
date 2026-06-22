@@ -145,8 +145,10 @@ export function getParticleCount(game, type, defaultCount) {
         else if (type === 'snow') typeBias = 0.6;
         else if (type === 'wind') typeBias = 0.35;
         else if (type === 'fire') typeBias = 0.55;
+        else if (type === 'heat') typeBias = 0.6;
+        else if (type === 'meteor') typeBias = 0.45;
         const scaled = Math.round(defaultCount * quality * typeBias);
-        const minByType = { rain: 120, snow: 80, wind: 20, fire: 40 };
+        const minByType = { rain: 120, snow: 80, wind: 20, fire: 40, heat: 50, meteor: 3 };
         const min = minByType[type] || 30;
         return Math.max(min, Math.min(defaultCount, scaled));
     } catch (e) {

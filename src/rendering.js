@@ -47,8 +47,12 @@ export function animate(game) {
         // Particle/weather updates
         if (game.raining) updateRain(game, dt);
         if (game.snowing) updateSnow(game, dt);
-        if (game.hasFireSparks) updateFireSparks(game, dt);
-        if (game.hasMeteors) { updateMeteors(game, dt); checkMeteorCollisions(game); }
+        if (game.hasFireSparks && game.updateFireSparks) game.updateFireSparks(dt);
+        if (game.hasHeatShimmer && game.updateHeatShimmer) game.updateHeatShimmer(dt);
+        if (game.hasMeteors) {
+            if (game.updateMeteors) game.updateMeteors(dt);
+            if (game.checkMeteorCollisions) game.checkMeteorCollisions();
+        }
     }
 
     // Camera follow
@@ -126,17 +130,4 @@ function updateSnow(game, dt) {
         }
         game.snowPoints.geometry.attributes.position.needsUpdate = true;
     } catch (e) {}
-}
-
-function updateFireSparks(game, dt) {
-    // Delegates to physics.js updateFireSparks
-    if (game.updateFireSparks) game.updateFireSparks(dt);
-}
-
-function updateMeteors(game, dt) {
-    if (game.updateMeteors) game.updateMeteors(dt);
-}
-
-function checkMeteorCollisions(game) {
-    if (game.checkMeteorCollisions) game.checkMeteorCollisions();
 }

@@ -143,7 +143,7 @@ export const BALL_DB = {
   fireglass: {
     name: 'Fire Glass',
     price: 2600,
-    tex: 'assets/image/Fire Spirit.webp',
+    tex: 'assets/image/fire_spirit.webp',
     type: 'texture',
     ability: { key: 'coins', base: 1.30, perLevel: 0.12 },
     description: 'A glass-like orb containing a fiery spirit; strong coin multiplier with translucent glass visuals.'

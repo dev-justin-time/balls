@@ -15,7 +15,7 @@ import { initAudio, registerSfx, playSound } from './src/audio.js';
 import { initNetworking, setupLoadingManager, setupGlobalErrorHandlers } from './src/networking.js';
 import { initScene, getBallMaterial, clearTextureCache } from './engine/scene.js';
 import { onWindowResize, animate } from './src/rendering.js';
-import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, updateFireSparks, createMeteors, clearMeteors, updateMeteors, checkMeteorCollisions } from './src/physics.js';
+import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, updateFireSparks, createHeatShimmer, clearHeatShimmer, updateHeatShimmer, createMeteors, clearMeteors, updateMeteors, checkMeteorCollisions } from './src/physics.js';
 import { createLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins } from './src/levelgen.js';
 import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset } from './src/ui.js';
 
@@ -72,6 +72,12 @@ class Game {
 
         // --- Game loop ---
         animate(this);
+
+        // Signal that the scene/level are initialized — dismiss loading overlay
+        // when combined with asset-loading readiness (tracked in networking.js).
+        if (typeof window.__signalSceneReady === 'function') {
+            window.__signalSceneReady();
+        }
     }
 
     // ---- Controls (kept in main.js as they're closely tied to DOM events) ----
@@ -280,6 +286,9 @@ class Game {
     createFireSparks() { createFireSparks(this); }
     clearFireSparks() { clearFireSparks(this); }
     updateFireSparks(dt) { updateFireSparks(this, dt); }
+    createHeatShimmer() { createHeatShimmer(this); }
+    clearHeatShimmer() { clearHeatShimmer(this); }
+    updateHeatShimmer(dt) { updateHeatShimmer(this, dt); }
     createMeteors() { createMeteors(this); }
     clearMeteors() { clearMeteors(this); }
     updateMeteors(dt) { updateMeteors(this, dt); }

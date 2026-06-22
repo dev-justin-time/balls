@@ -15,7 +15,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { mulberry32, getParticleCount, saveGame } from './persistence.js';
 import { applySkyConfig } from '../engine/scene.js';
-import { createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, createMeteors, clearMeteors } from './physics.js';
+import { createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, createHeatShimmer, clearHeatShimmer, createMeteors, clearMeteors } from './physics.js';
 
 /** Module-level RNG used by all helper functions. Overridden by createLevel() with a seeded RNG, restored afterward. */
 let _rand = Math.random.bind(Math);
@@ -46,6 +46,7 @@ export function clearLevel(game) {
         game.snowing = false;
     }
     if (game.hasFireSparks) { clearFireSparks(game); game.hasFireSparks = false; }
+    if (game.hasHeatShimmer) { clearHeatShimmer(game); game.hasHeatShimmer = false; }
     if (game.hasMeteors) { clearMeteors(game); game.hasMeteors = false; }
 
     game.checkpoints = [];
@@ -120,14 +121,14 @@ export function createLevel(game, seed) {
     // --- Sky condition overrides (#8) — run before weather application ---
     const skyCond = game.skyConfigs[game.saveData.selectedSky]?.conditions;
     if (skyCond) {
-        // Inferno: fire sparks + heat haze
+        // Inferno: fire sparks + heat shimmer
         if (skyCond.fireSparks) {
             createFireSparks(game);
             game.hasFireSparks = true;
         }
         if (skyCond.heatHaze) {
-            // Heat haze visual: warm reddish fog tint
-            if (game.scene.fog) game.scene.fog.color.setHex(0x3a0a00);
+            createHeatShimmer(game);
+            game.hasHeatShimmer = true;
         }
         // Void Storm: meteors + forced wind
         if (skyCond.meteorHazards) {
@@ -208,6 +209,11 @@ export function createLevel(game, seed) {
         game.scene.fog.color.setHex(tier.color);
     }
     document.body.style.backgroundColor = `#${tier.color.toString(16).padStart(6, '0')}`;
+
+    // Heat haze (Inferno sky) — applied after tier visuals so tier color doesn't override it
+    if (skyCond && skyCond.heatHaze && game.scene.fog) {
+        game.scene.fog.color.setHex(0x3a0a00);
+    }
 
     // Rain/wind based on level number (only when no condition sky active)
     if (!skyCond && game.currentLevel % 5 === 0) {

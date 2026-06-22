@@ -104,6 +104,8 @@ vi.mock('./physics.js', () => ({
   clearWind: vi.fn(),
   createFireSparks: vi.fn(),
   clearFireSparks: vi.fn(),
+  createHeatShimmer: vi.fn(),
+  clearHeatShimmer: vi.fn(),
   createMeteors: vi.fn(),
   clearMeteors: vi.fn(),
 }));

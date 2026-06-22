@@ -10,7 +10,7 @@ export function initAudio(game) {
     game.rollSoundStarted = false;
 
     // Background music
-    game.backgroundMusic = new Audio('assets/sfx/Elevator Music.mp3');
+    game.backgroundMusic = new Audio('assets/sfx/elevator_music.mp3');
     game.backgroundMusic.loop = true;
     game.backgroundMusic.volume = 0.18;
     game.backgroundMusicStarted = false;

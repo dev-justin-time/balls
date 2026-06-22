@@ -304,6 +304,49 @@
             animation: hint-pulse 2.4s ease-in-out infinite;
         }
 
+        /* Desktop font scale: bump pixel-font sizes on larger screens */
+        @media (min-width: 1024px) {
+            .stats {
+                font-size: 26px;
+            }
+            #time-display {
+                font-size: 20px;
+            }
+            #difficulty-label {
+                font-size: 13px;
+                padding: 4px 14px;
+            }
+            .menu-btn {
+                font-size: 12px;
+                padding: 10px 16px;
+            }
+            #total-coins {
+                font-size: 15px;
+                top: 64px;
+            }
+            #overlay h1 {
+                font-size: 38px;
+            }
+            #overlay button {
+                font-size: 18px;
+                padding: 18px 48px;
+            }
+            #jump-btn {
+                font-size: 14px;
+                width: 80px;
+                height: 80px;
+            }
+            #pointerlock-hint {
+                font-size: 13px;
+            }
+            #loading-overlay > div:first-child {
+                font-size: 24px;
+            }
+            #loading-text {
+                font-size: 15px;
+            }
+        }
+
     </style>
 </head>
 <body>

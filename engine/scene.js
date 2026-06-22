@@ -429,8 +429,8 @@ function preloadTrailModels(game) {
         { key: 'skeleton', url: 'assets/image/skeleton.webp' },
         { key: 'zombie', url: 'assets/model/_halloween_Um_zumbi__0523105301_.glb' },
         { key: 'eye', url: 'assets/model/eye_low_poly_free_cute_eyeballs.glb' },
-        { key: 'soldier2', url: 'assets/image/Soldier (3).webp' },
-        { key: 'venus', url: 'assets/image/Venus Fly Trap.webp' },
+        { key: 'soldier2', url: 'assets/image/soldier3.webp' },
+        { key: 'venus', url: 'assets/image/venus_fly_trap.webp' },
         // --- New trail types (#8) ---
         { key: 'dragon', url: 'assets/image/dragon-ball.webp' },
         { key: 'bowling_strike', url: 'assets/image/bowling-strike.gif' },
