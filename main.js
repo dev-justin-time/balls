@@ -10,9 +10,10 @@ import nipplejs from 'nipplejs';
 import { NotificationManager } from './src/notification_manager.js';
 
 // Module imports
+import { initNetworking, setupLoadingManager } from './networking.js';
 import { initPersistence, saveGame, getParticleCount } from './src/persistence.js';
 import { initAudio, registerSfx, playSound } from './src/audio.js';
-import { initNetworking, setupLoadingManager, setupGlobalErrorHandlers } from './src/networking.js';
+import { setupGlobalErrorHandlers } from './src/networking.js';
 import { initScene, getBallMaterial, clearTextureCache } from './engine/scene.js';
 import { onWindowResize, animate } from './src/rendering.js';
 import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, updateFireSparks, createHeatShimmer, clearHeatShimmer, updateHeatShimmer, createMeteors, clearMeteors, updateMeteors, checkMeteorCollisions } from './src/physics.js';

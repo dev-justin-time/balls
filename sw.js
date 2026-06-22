@@ -13,6 +13,8 @@ const CACHE_NAME = `going-balls-${CACHE_VERSION}`;
 const PRECACHE_ASSETS = [
   './',
   './index.html',
+  './styles.css',
+  './offline.html',
   './main.js',
   './engine/scene.js',
   './src/audio.js',
@@ -53,7 +55,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Navigation requests (HTML pages): network first, fallback to cache
+  // Navigation requests (HTML pages): network first, fallback to cache, then offline page
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -62,7 +64,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(() => caches.match(request).then((cached) => cached || caches.match('./offline.html')))
     );
     return;
   }

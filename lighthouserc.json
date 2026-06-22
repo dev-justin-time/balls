@@ -1,9 +1,10 @@
 {
   "ci": {
     "collect": {
-      "startServerCommand": "npx serve -s . -p 9001 --no-clipboard",
-      "startServerReadyPattern": "Accepting connections",
-      "url": ["http://localhost:9001"],
+      "startServerCommand": "node server.js",
+      
+      "startServerReadyPattern": "Health:",
+      "url": ["http://localhost:3000"],
       "numberOfRuns": 1,
       "settings": {
         "chromeFlags": "--no-sandbox --headless --disable-gpu",
