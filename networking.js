@@ -7,10 +7,14 @@
 import * as THREE from 'three';
 import { setupLoadingManager, initNetworking } from './src/networking.js';
 
+console.log('[networking.js] Bootstrap started — setting up loading manager and initializing networking BEFORE main.js loads assets.');
+
 // Set up loading progress/error hooks BEFORE any assets load
 setupLoadingManager();
 
 // Initialize networking (top-level await — blocks main.js until ready)
 const room = await initNetworking();
+
+console.log('[networking.js] Networking initialized. Now main.js will begin loading.');
 
 export { room };

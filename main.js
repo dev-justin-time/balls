@@ -20,6 +20,8 @@ import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, cl
 import { createLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins } from './src/levelgen.js';
 import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset } from './src/ui.js';
 
+console.log('[main.js] Starting — room has already been initialized by networking.js.');
+
 // --- Notification manager ---
 const notifier = new NotificationManager({
     maxConcurrent: 3,
