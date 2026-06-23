@@ -543,6 +543,8 @@ export function createLevel(game, seed) {
     game.levelLength = Math.abs(currentZ);
     game.startTime = Date.now();
     game.timeBonusShown = false;
+    // Persist level progress so player can resume after refresh
+    try { saveGame(game); } catch (_e) {}
     } finally {
         _rand = _prevRand;
     }
@@ -1106,7 +1108,6 @@ export function addLoopDeLoop(game, x, y, z, width = 6, radius = 8, segments = 1
         for (let i = 0; i < segs; i++) {
             const a = (i / segs) * Math.PI * 2;
             const px = Math.cos(a) * r;
-            const pz = Math.sin(a) * r;
             addPlatform(game, x + px, y + Math.sin(a) * 2, zOff, w * 0.9, 4);
             zOff -= 4;
         }
@@ -1128,7 +1129,6 @@ export function addSpiralTube(game, x, y, z, width = 6, radius = 8, turns = 2, s
             const angle = (i / segs) * (Math.PI * 2 * t);
             const rr = r * (1 - (i / segs) * 0.5);
             const px = Math.cos(angle) * rr;
-            const pz = Math.sin(angle) * rr;
             const yOff = (i / segs) * 5;
             addPlatform(game, x + px, y + yOff, zOff, w * 0.85, 5);
             addWall(game, x + px - w / 2 - 0.5, y + yOff + 0.5, zOff, 0.3, 5, 0);
@@ -1261,6 +1261,82 @@ export function addCheckerboard(game, x, y, z, tileSize = 3, rows = 4) {
     }
 }
 
+// --- Play a community track directly (main menu usage) ---
+
+export function playCommunityTrack(game, parts) {
+    try {
+        clearLevel(game);
+        game.lastCheckpointPos.set(0, 5, 0);
+        game._isInfinite = false;
+        game.finishZ = undefined;
+        game.score = 0;
+        game.currentLevel = 1;
+        game.levelLength = 500;
+        game.isGameOver = false;
+        game.isWin = false;
+        game.ballBody.position.set(0, 1, 0);
+        game.ballBody.velocity.set(0, 0, 0);
+        game.ballMesh.position.copy(game.ballBody.position);
+
+        for (const placed of parts) {
+            const p = placed.params || {};
+            switch (placed.partKey) {
+                case 'platform': case 'speed_strip': case 'finish_line':
+                    addPlatform(game, placed.x, placed.y, placed.z, p.width || 8, p.length || 15, p.color || null); break;
+                case 'ramp':
+                    addRamp(game, placed.x, placed.y, placed.z, p.width || 8, p.length || 15, p.height || 5); break;
+                case 'glass_platform':
+                    addGlassPlatform(game, placed.x, placed.y, placed.z, p.width || 6, p.length || 14); break;
+                case 'wall':
+                    addWall(game, placed.x, placed.y, placed.z, p.width || 1, p.length || 20, p.rotZ || 0); break;
+                case 'tunnel_walls':
+                    addTunnelWalls(game, placed.x, placed.y, placed.z, p.width || 8, p.length || 30); break;
+                case 'pendulum':
+                    addPendulum(game, placed.x, placed.y, placed.z, p.speedMult || 1.0); break;
+                case 'spinner':
+                    addSpinner(game, placed.x, placed.y, placed.z, p.speedMult || 1.0); break;
+                case 'hammer':
+                    addHammer(game, placed.x, placed.y, placed.z, p.speedMult || 1.0); break;
+                case 'mover':
+                    addMover(game, placed.x, placed.y, placed.z, p.width || 3, p.height || 1, p.depth || 2, p.sideways || false, p.speedMult || 1.0); break;
+                case 'blade':
+                    addBlade(game, placed.x, placed.y, placed.z, p.thickness || 0.12, p.length || 2.0, p.swing || 1.0, p.vertical || false); break;
+                case 'coin_line':
+                    addCoins(game, placed.x, placed.y + 1, placed.z, p.length || 20, p.count || 5); break;
+                case 'checkpoint':
+                    addCheckpoint(game, placed.x, placed.y, placed.z, p.width || 8); break;
+                case 'finish_model':
+                    game.finishZ = placed.z; game.finishX = placed.x; game.finishY = placed.y; break;
+                case 'loop_de_loop':
+                    addLoopDeLoop(game, placed.x, placed.y, placed.z, p.width || 6, p.radius || 8, p.segments || 12); break;
+                case 'spiral_tube':
+                    addSpiralTube(game, placed.x, placed.y, placed.z, p.width || 6, p.radius || 8, p.turns || 2, p.segments || 16); break;
+                case 'spring_pad':
+                    addSpringPad(game, placed.x, placed.y, placed.z, p.width || 4, p.length || 4, p.bouncePower ?? 15); break;
+                case 'curve':
+                    addCurve(game, placed.x, placed.y, placed.z, p.width || 6, p.arcLength || 8, p.segments || 8, p.direction ?? 1); break;
+                case 'stairs':
+                    addStairs(game, placed.x, placed.y, placed.z, p.width || 6, p.stepCount || 5, p.stepLength || 4, p.stepHeight || 0.8); break;
+                case 'portal_ring':
+                    addPortalRing(game, placed.x, placed.y, placed.z, p.radius || 2); break;
+                case 'half_pipe':
+                    addHalfPipe(game, placed.x, placed.y, placed.z, p.width || 10, p.length || 20); break;
+                case 'checkerboard':
+                    addCheckerboard(game, placed.x, placed.y, placed.z, p.tileSize || 3, p.rows || 4); break;
+                case 'glass_loop':
+                    addGlassLoopDeLoop(game, placed.x, placed.y, placed.z, p.width || 6, p.radius || 8, p.segments || 12); break;
+                case 'glass_stairs':
+                    addGlassStairs(game, placed.x, placed.y, placed.z, p.width || 6, p.stepCount || 5, p.stepLength || 4, p.stepHeight || 0.8); break;
+                case 'glass_curve':
+                    addGlassCurve(game, placed.x, placed.y, placed.z, p.width || 6, p.arcLength || 8, p.segments || 8, p.direction ?? 1); break;
+            }
+        }
+        game.startTime = Date.now();
+    } catch (e) {
+        console.warn('playCommunityTrack failed', e);
+    }
+}
+
 // --- Glass variants of composite parts ---
 
 export function addGlassLoopDeLoop(game, x, y, z, width = 6, radius = 8, segments = 12) {
@@ -1273,7 +1349,6 @@ export function addGlassLoopDeLoop(game, x, y, z, width = 6, radius = 8, segment
         for (let i = 0; i < segs; i++) {
             const a = (i / segs) * Math.PI * 2;
             const px = Math.cos(a) * r;
-            const pz = Math.sin(a) * r;
             addGlassPlatform(game, x + px, y + Math.sin(a) * 2 + 0.2, zOff, w * 0.8, 4);
             zOff -= 4;
         }

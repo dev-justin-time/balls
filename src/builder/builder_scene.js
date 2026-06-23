@@ -6,8 +6,9 @@
 */
 
 import * as THREE from 'three';
-import { snapToGrid, computePlacement, createPreviewGhost } from './builder_snap.js';
+import { computePlacement, createPreviewGhost } from './builder_snap.js';
 import { getPartDef } from './catalog.js';
+import { addBuilderXP } from './builder_xp.js';
 
 /**
  * Initialize the builder scene within the game's existing renderer.
@@ -350,6 +351,12 @@ export function placePart(game, partKey, x, y, z, rotation) {
     // Sync to multiplayer if active
     if (game._builderSyncAdd) {
         game._builderSyncAdd(placedParts[placedParts.length - 1]);
+    }
+
+    // Award XP for part placement (skip notification for bulk loads)
+    if (!game._builderBulkLoad) {
+        game.saveData.totalPartsPlaced = (game.saveData.totalPartsPlaced || 0) + 1;
+        addBuilderXP(game, 2, `Placed ${partDef.name}`);
     }
 }
 
@@ -714,21 +721,25 @@ export function clearBuilderScene(game) {
  */
 export function loadPartsIntoBuilder(game, parts) {
     clearBuilderScene(game);
-    for (const p of parts) {
-        const partDef = getPartDef(p.partKey);
-        if (!partDef) continue;
-        const d = { ...partDef.defaults, ...(p.params || {}) };
-        // Use buildPartMesh directly — skip placePart to avoid
-        // pushing to undo stack and spamming multiplayer sync during bulk load.
-        const meshes = buildPartMesh(game, partDef, p.x, p.y, p.z, p.rotation || 0, d);
-        game._builderPlacedParts.push({
-            partKey: p.partKey,
-            x: p.x, y: p.y, z: p.z,
-            rotation: p.rotation || 0,
-            params: d,
-            meshes,
-            id: Date.now() + '_' + Math.random().toString(36).slice(2, 7)
-        });
+    // Mark bulk load to suppress per-part XP notifications
+    game._builderBulkLoad = true;
+    try {
+        for (const p of parts) {
+            const partDef = getPartDef(p.partKey);
+            if (!partDef) continue;
+            const d = { ...partDef.defaults, ...(p.params || {}) };
+            const meshes = buildPartMesh(game, partDef, p.x, p.y, p.z, p.rotation || 0, d);
+            game._builderPlacedParts.push({
+                partKey: p.partKey,
+                x: p.x, y: p.y, z: p.z,
+                rotation: p.rotation || 0,
+                params: d,
+                meshes,
+                id: Date.now() + '_' + Math.random().toString(36).slice(2, 7)
+            });
+        }
+    } finally {
+        game._builderBulkLoad = false;
     }
 }
 

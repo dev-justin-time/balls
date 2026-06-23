@@ -13,6 +13,7 @@
  wallet, purchase, equip, skin leveling.
 */
 import { renderBallIndexUI } from './ball_index_ui.js';
+import { renderCatalogPanel } from './catalog_ui.js';
 import { saveGame } from './persistence.js';
 import { playSound } from './audio.js';
 import { applySkyConfig, getBallMaterial, applyBallSkin } from '../engine/scene.js';
@@ -130,6 +131,51 @@ export function setupUI(game, room) {
             if (typeof game.enterBuilder === 'function') {
                 game.enterBuilder();
             }
+        });
+    }
+
+    // --- Community button ---
+    const communityBtn = document.getElementById('community-btn');
+    if (communityBtn) {
+        communityBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof game._showCommunityMenu === 'function') {
+                game._showCommunityMenu();
+            }
+        });
+    }
+
+    // --- Catalog button ---
+    const catalogBtn = document.getElementById('catalog-btn');
+    if (catalogBtn && overlay) {
+        catalogBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            renderCatalogPanel(game);
+        });
+    }
+
+    // --- World Map button ---
+    const worldBtn = document.getElementById('world-btn');
+    if (worldBtn) {
+        worldBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof game.enterWorld === 'function') {
+                game.enterWorld();
+            }
+        });
+    }
+
+    // --- Neighbor Preview toggle button ---
+    const neighborBtn = document.getElementById('neighbor-preview-btn');
+    if (neighborBtn) {
+        neighborBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const visible = game._toggleNeighborPreview();
+            neighborBtn.style.background = visible
+                ? 'rgba(136,68,255,0.4)'
+                : 'rgba(100,100,100,0.3)';
+            neighborBtn.style.borderColor = visible ? '#9944ff' : '#666';
+            neighborBtn.textContent = visible ? '👁️' : '👁️‍🗨️';
         });
     }
 
@@ -379,9 +425,43 @@ export function checkGameState(game, dt, room) {
     }
 }
 
+/** Show a small floating 'Back to Builder' HUD button during test play. */
+export function showTestPlayHUD(game) {
+    if (!game._isTestPlayFromBuilder) return;
+    // Remove any existing button without clearing the flag
+    const prev = document.getElementById('test-play-back-btn');
+    if (prev) prev.remove();
+    const btn = document.createElement('button');
+    btn.id = 'test-play-back-btn';
+    btn.textContent = '🔧 BACK';
+    btn.style.cssText = `position:fixed;top:12px;left:12px;z-index:15000;
+        padding:6px 12px;font-size:11px;font-family:'Segoe UI',sans-serif;
+        background:rgba(220,120,0,0.65);border:1px solid #ff8800;color:#fff;
+        border-radius:8px;cursor:pointer;pointer-events:auto;
+        box-shadow:0 2px 8px rgba(0,0,0,0.4);transition:opacity 0.2s;
+        font-weight:600;`;
+    btn.addEventListener('mouseenter', () => { btn.style.opacity = '0.85'; });
+    btn.addEventListener('mouseleave', () => { btn.style.opacity = '1'; });
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (typeof game._returnToBuilder === 'function') game._returnToBuilder();
+    });
+    document.body.appendChild(btn);
+}
+
+/** Remove the test-play HUD button. */
+export function removeTestPlayHUD(game) {
+    const existing = document.getElementById('test-play-back-btn');
+    if (existing) existing.remove();
+    if (game) game._isTestPlayFromBuilder = false;
+}
+
 export function gameOver(game, win, room) {
     game.isGameOver = true;
     game.isWin = win;
+    // Read flag BEFORE removing HUD (removeTestPlayHUD clears it)
+    const isTestPlay = !!game._isTestPlayFromBuilder;
+    removeTestPlayHUD(game);
     const overlay = document.getElementById('overlay');
     if (!overlay) return;
 
@@ -408,22 +488,40 @@ export function gameOver(game, win, room) {
                 <h2>🏆 Level Complete!</h2>
                 <p style="font-size:14px;margin:8px 0;">Level ${game.currentLevel - 1} cleared in ${timeTaken.toFixed(1)}s</p>
                 <p style="font-size:14px;">Time Bonus: +${bonus} 🪙</p>
-                <button class="menu-btn" id="next-level-btn" aria-label="Next level" style="margin-top:12px;">Next Level →</button>
+                ${isTestPlay
+                    ? `<button class="menu-btn" id="back-to-builder-btn" aria-label="Back to builder" style="margin-top:12px;background:rgba(220,120,0,0.5);border-color:#ff8800;">🔧 BACK TO BUILDER</button>`
+                    : `<button class="menu-btn" id="next-level-btn" aria-label="Next level" style="margin-top:12px;">Next Level →</button>`
+                }
             </div>`;
-        const nextBtn = document.getElementById('next-level-btn');
-        if (nextBtn) nextBtn.addEventListener('click', () => {
-            overlay.style.display = 'none';
-            overlay.innerHTML = '';
-            reset(game);
-        });
+        if (isTestPlay) {
+            const backBtn = document.getElementById('back-to-builder-btn');
+            if (backBtn) backBtn.addEventListener('click', () => {
+                overlay.style.display = 'none';
+                overlay.innerHTML = '';
+                if (typeof game._returnToBuilder === 'function') game._returnToBuilder();
+            });
+        } else {
+            const nextBtn = document.getElementById('next-level-btn');
+            if (nextBtn) nextBtn.addEventListener('click', () => {
+                overlay.style.display = 'none';
+                overlay.innerHTML = '';
+                reset(game);
+            });
+        }
     } else {
-        // Fall/death — just show retry
+        // Fall/death — show retry (and back-to-builder if test-playing)
         overlay.style.display = 'flex';
         overlay.innerHTML = `
             <div class="modal" style="max-width:360px;padding:20px;background:linear-gradient(145deg,#2e1a1a,#3e1621);border-radius:16px;color:#fff;text-align:center;">
                 <h2>💀 You Fell!</h2>
                 <p style="font-size:14px;margin:8px 0;">Try again!</p>
-                <button class="menu-btn" id="retry-btn" aria-label="Retry level" style="margin-top:12px;">Retry</button>
+                <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;">
+                    <button class="menu-btn" id="retry-btn" aria-label="Retry level">Retry</button>
+                    ${isTestPlay
+                        ? `<button class="menu-btn" id="back-to-builder-btn" aria-label="Back to builder" style="background:rgba(220,120,0,0.5);border-color:#ff8800;">🔧 BACK TO BUILDER</button>`
+                        : ''
+                    }
+                </div>
             </div>`;
         const retryBtn = document.getElementById('retry-btn');
         if (retryBtn) retryBtn.addEventListener('click', () => {
@@ -433,6 +531,14 @@ export function gameOver(game, win, room) {
             game.ballBody.velocity.set(0, 0, 0);
             game.isGameOver = false;
         });
+        if (isTestPlay) {
+            const backBtn = document.getElementById('back-to-builder-btn');
+            if (backBtn) backBtn.addEventListener('click', () => {
+                overlay.style.display = 'none';
+                overlay.innerHTML = '';
+                if (typeof game._returnToBuilder === 'function') game._returnToBuilder();
+            });
+        }
     }
 }
 
@@ -670,11 +776,11 @@ export function renderBallIndex(game, room) {
 // --- Leaderboard ---
 
 export function getLeaderboard(game, room) {
-    let entries = [];
+    let entries;
     try {
         const raw = localStorage.getItem('goingBalls_leaderboard');
         entries = raw ? JSON.parse(raw) : [];
-    } catch (e) { entries = []; }
+    } catch (_e) { entries = []; }
 
     // Merge remote
     if (room && room.isReady && game._remoteLeaderboard && Array.isArray(game._remoteLeaderboard)) {

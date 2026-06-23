@@ -105,18 +105,24 @@ function getSnapRotation(snapTargetDir, newPartDir) {
     // We want the new part to extend AWAY from the connection point =
     // the new part's front (-Z) should face the OPPOSITE of the snap target's direction.
     //
-    // e.g., snapTargetDir 'front' means the existing part extends -Z.
-    // The connection point is at the front (-Z end) of the existing part.
-    // The new part should extend in +Z (away from the existing part).
-    // So we rotate the new part 180° so its front (-Z) faces +Z.
+    // newPartDir indicates which face of the new part connects to the snap point.
+    // We combine both directions to determine the final Y rotation.
+    const baseRotation = {
+        'front': Math.PI,
+        'back': 0,
+        'left': -Math.PI / 2,
+        'right': Math.PI / 2
+    }[snapTargetDir] || 0;
 
-    switch (snapTargetDir) {
-        case 'front': return normalizeAngle(Math.PI);     // new part extends +Z (away from existing -Z)
-        case 'back':  return normalizeAngle(0);           // new part extends -Z (away from existing +Z)
-        case 'left':  return normalizeAngle(-Math.PI / 2); // new part extends +X (away from existing -X)
-        case 'right': return normalizeAngle(Math.PI / 2);  // new part extends -X (away from existing +X)
-        default: return 0;
-    }
+    // Offset by the new part's connection face direction
+    const partOffset = {
+        'front': 0,
+        'back': Math.PI,
+        'left': Math.PI / 2,
+        'right': -Math.PI / 2
+    }[newPartDir] || 0;
+
+    return normalizeAngle(baseRotation + partOffset);
 }
 
 function normalizeAngle(angle) {

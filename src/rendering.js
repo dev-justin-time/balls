@@ -12,6 +12,7 @@ import * as CANNON from 'cannon-es';
 import { updateGroovyCanvas } from '../engine/scene.js';
 import { saveGame } from './persistence.js';
 import { spawnInfiniteChunk } from './levelgen.js';
+import { updateNeighborPreview, animateNeighborPreview } from './world/world_minimap.js';
 
 export function onWindowResize(game) {
     game.camera.aspect = window.innerWidth / window.innerHeight;
@@ -19,12 +20,26 @@ export function onWindowResize(game) {
     game.renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+// Log engine versions once on first render for debugging
+let _versionsLogged = false;
+function logEngineVersions() {
+    if (_versionsLogged) return;
+    _versionsLogged = true;
+    console.info(`[GoingBalls] THREE.js r${THREE.REVISION} · CANNON-es v${CANNON.version || '?'}`);
+}
+
 export function animate(game) {
     requestAnimationFrame(() => animate(game));
+    logEngineVersions();
 
     // Builder mode — render builder scene exclusively
     if (game._builderActive) {
         try { game.renderer.render(game._builderScene, game._builderCamera); } catch (e) {}
+        return;
+    }
+
+    // World map mode — don't render game scene behind the overlay
+    if (game._worldActive) {
         return;
     }
 
@@ -36,6 +51,12 @@ export function animate(game) {
 
     // Round delta-time for smoother feel across varying monitors
     try { dt = Math.round(dt * 100) / 100; } catch (e) {}
+
+    // Update 3D neighbor site previews (throttled rebuild + animation)
+    try {
+        updateNeighborPreview(game, dt);
+        animateNeighborPreview(game, dt);
+    } catch (_e) {}
 
     // Update groovy canvas if active
     if (game.saveData && game.saveData.selectedBall === 'groovy') {

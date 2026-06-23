@@ -1,0 +1,716 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "generated": "2026-06-22",
+    "description": "Complete inventory of all track parts, builder composites, procedural segments, and 3D model assets used in the game."
+  },
+
+  "categories": {
+    "surface":     { "label": "Surfaces",    "icon": "🟫" },
+    "structural":  { "label": "Structural",  "icon": "🧱" },
+    "hazard":      { "label": "Hazards",     "icon": "⚠️"  },
+    "collectible": { "label": "Collectibles","icon": "🪙" },
+    "marker":      { "label": "Markers",     "icon": "🏁" }
+  },
+
+  "catalog_parts": [
+    {
+      "key": "platform",
+      "name": "Platform",
+      "category": "surface",
+      "icon": "⬜",
+      "defaults": { "width": 8, "length": 15, "color": null },
+      "builderFn": "addPlatform",
+      "levelgenFn": "addPlatform",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": -7.5, "dir": "front" },
+        { "x": 0, "y": 0, "z": 7.5, "dir": "back" },
+        { "x": -4, "y": 0, "z": 0, "dir": "left" },
+        { "x": 4, "y": 0, "z": 0, "dir": "right" }
+      ],
+      "description": "Flat wooden platform. Basic building block."
+    },
+    {
+      "key": "ramp",
+      "name": "Ramp",
+      "category": "surface",
+      "icon": "📐",
+      "defaults": { "width": 8, "length": 15, "height": 5 },
+      "builderFn": "addRamp",
+      "levelgenFn": "addRamp",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" },
+        { "x": 0, "y": 5, "z": -15, "dir": "back" }
+      ],
+      "description": "Angled ramp connecting different heights."
+    },
+    {
+      "key": "glass_platform",
+      "name": "Glass Platform",
+      "category": "surface",
+      "icon": "🫧",
+      "defaults": { "width": 6, "length": 14 },
+      "builderFn": "addGlassPlatform",
+      "levelgenFn": "addGlassPlatform",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": -7, "dir": "front" },
+        { "x": 0, "y": 0, "z": 7, "dir": "back" }
+      ],
+      "description": "Breakable glass platform. Shatters when the ball rolls over it."
+    },
+    {
+      "key": "speed_strip",
+      "name": "Speed Strip",
+      "category": "surface",
+      "icon": "⚡",
+      "defaults": { "width": 7, "length": 20, "color": "0xffff00" },
+      "builderFn": "addPlatform",
+      "levelgenFn": "addPlatform",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": -10, "dir": "front" },
+        { "x": 0, "y": 0, "z": 10, "dir": "back" }
+      ],
+      "description": "Yellow platform. Visually marks speed zones."
+    },
+    {
+      "key": "finish_line",
+      "name": "Finish Line",
+      "category": "surface",
+      "icon": "🏁",
+      "defaults": { "width": 8, "length": 30, "color": "0x00ff00" },
+      "builderFn": "addPlatform",
+      "levelgenFn": "addPlatform",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": -15, "dir": "front" },
+        { "x": 0, "y": 0, "z": 15, "dir": "back" }
+      ],
+      "description": "Green finish platform. Marks the end of a level."
+    },
+    {
+      "key": "spring_pad",
+      "name": "Spring Pad",
+      "category": "surface",
+      "icon": "🦘",
+      "defaults": { "width": 4, "length": 4, "bouncePower": 15 },
+      "builderFn": "addSpringPad",
+      "levelgenFn": "addSpringPad",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": -2, "dir": "front" },
+        { "x": 0, "y": 0, "z": 2, "dir": "back" }
+      ],
+      "description": "Bouncy orange pad. Launches the ball upward!"
+    },
+    {
+      "key": "curve",
+      "name": "Curve",
+      "category": "surface",
+      "icon": "↪️",
+      "defaults": { "width": 6, "arcLength": 8, "segments": 8, "direction": 1 },
+      "builderFn": "addCurve",
+      "levelgenFn": "addCurve",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" },
+        { "x": 8, "y": 0, "z": -40, "dir": "right" }
+      ],
+      "description": "Curved path segment. Direction: 1 = right, -1 = left."
+    },
+    {
+      "key": "stairs",
+      "name": "Stairs",
+      "category": "surface",
+      "icon": "🪜",
+      "defaults": { "width": 6, "stepCount": 5, "stepLength": 4, "stepHeight": 0.8 },
+      "builderFn": "addStairs",
+      "levelgenFn": "addStairs",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" },
+        { "x": 0, "y": 4, "z": -20, "dir": "back" }
+      ],
+      "description": "Ascending step platforms. Great for gradual climbs."
+    },
+    {
+      "key": "half_pipe",
+      "name": "Half Pipe",
+      "category": "surface",
+      "icon": "🏄",
+      "defaults": { "width": 10, "length": 20 },
+      "builderFn": "addHalfPipe",
+      "levelgenFn": "addHalfPipe",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": -10, "dir": "front" },
+        { "x": 0, "y": 0, "z": 10, "dir": "back" }
+      ],
+      "description": "Wide platform with angled side walls. Keep the ball centered!"
+    },
+    {
+      "key": "checkerboard",
+      "name": "Checkerboard",
+      "category": "surface",
+      "icon": "🏁",
+      "defaults": { "tileSize": 3, "rows": 4 },
+      "builderFn": "addCheckerboard",
+      "levelgenFn": "addCheckerboard",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" },
+        { "x": 0, "y": 0, "z": -20, "dir": "back" }
+      ],
+      "description": "Offset checkerboard tiles. Tricky footwork required!"
+    },
+    {
+      "key": "glass_stairs",
+      "name": "Glass Stairs",
+      "category": "surface",
+      "icon": "🪟",
+      "defaults": { "width": 6, "stepCount": 5, "stepLength": 4, "stepHeight": 0.8 },
+      "builderFn": "addGlassStairs",
+      "levelgenFn": "addGlassStairs",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" },
+        { "x": 0, "y": 4, "z": -20, "dir": "back" }
+      ],
+      "description": "Glass stair steps. Each step cracks and shatters as you climb!"
+    },
+    {
+      "key": "glass_curve",
+      "name": "Glass Curve",
+      "category": "surface",
+      "icon": "🔮",
+      "defaults": { "width": 6, "arcLength": 8, "segments": 8, "direction": 1 },
+      "builderFn": "addGlassCurve",
+      "levelgenFn": "addGlassCurve",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" },
+        { "x": 8, "y": 0, "z": -40, "dir": "right" }
+      ],
+      "description": "Curved glass path. Navigate quickly before it breaks!"
+    },
+    {
+      "key": "wall",
+      "name": "Wall",
+      "category": "structural",
+      "icon": "🧱",
+      "defaults": { "width": 1, "length": 20, "rotZ": 0 },
+      "builderFn": "addWall",
+      "levelgenFn": "addWall",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": -10, "dir": "front" },
+        { "x": 0, "y": 0, "z": 10, "dir": "back" }
+      ],
+      "description": "Angled wall barrier. Blocks the ball or guides it."
+    },
+    {
+      "key": "tunnel_walls",
+      "name": "Tunnel Walls",
+      "category": "structural",
+      "icon": "🚇",
+      "defaults": { "width": 8, "length": 30 },
+      "builderFn": "addTunnelWalls",
+      "levelgenFn": "addTunnelWalls",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": -15, "dir": "front" },
+        { "x": 0, "y": 0, "z": 15, "dir": "back" }
+      ],
+      "description": "Parallel wall pair forming a tunnel corridor."
+    },
+    {
+      "key": "loop_de_loop",
+      "name": "Loop De Loop",
+      "category": "structural",
+      "icon": "➰",
+      "defaults": { "width": 6, "radius": 8, "segments": 12 },
+      "builderFn": "addLoopDeLoop",
+      "levelgenFn": "addLoopDeLoop",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" },
+        { "x": 0, "y": 0, "z": -65, "dir": "back" }
+      ],
+      "description": "Full 360° loop arch. Ball rolls through the loop!"
+    },
+    {
+      "key": "spiral_tube",
+      "name": "Spiral Tube",
+      "category": "structural",
+      "icon": "🐚",
+      "defaults": { "width": 6, "radius": 8, "turns": 2, "segments": 16 },
+      "builderFn": "addSpiralTube",
+      "levelgenFn": "addSpiralTube",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" },
+        { "x": 0, "y": 5, "z": -80, "dir": "back" }
+      ],
+      "description": "Spiraling tube with walls. Ascends as it twists."
+    },
+    {
+      "key": "glass_loop",
+      "name": "Glass Loop",
+      "category": "structural",
+      "icon": "🫧",
+      "defaults": { "width": 6, "radius": 8, "segments": 12 },
+      "builderFn": "addGlassLoopDeLoop",
+      "levelgenFn": "addGlassLoopDeLoop",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" },
+        { "x": 0, "y": 0, "z": -65, "dir": "back" }
+      ],
+      "description": "Glass loop-de-loop. Shatters on contact — dare to ride it!"
+    },
+    {
+      "key": "pendulum",
+      "name": "Pendulum",
+      "category": "hazard",
+      "icon": "💣",
+      "defaults": { "speedMult": 1.0 },
+      "builderFn": "addPendulum",
+      "levelgenFn": "addPendulum",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" }
+      ],
+      "description": "Swinging wrecking ball hazard. Knocks coins from the player."
+    },
+    {
+      "key": "spinner",
+      "name": "Spinner",
+      "category": "hazard",
+      "icon": "🌀",
+      "defaults": { "speedMult": 1.0 },
+      "builderFn": "addSpinner",
+      "levelgenFn": "addSpinner",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" }
+      ],
+      "description": "Rotating bar hazard. Spins around its center."
+    },
+    {
+      "key": "hammer",
+      "name": "Hammer",
+      "category": "hazard",
+      "icon": "🔨",
+      "defaults": { "speedMult": 1.0 },
+      "builderFn": "addHammer",
+      "levelgenFn": "addHammer",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" }
+      ],
+      "description": "Slamming hammer hazard. Pounds down on the track."
+    },
+    {
+      "key": "mover",
+      "name": "Moving Block",
+      "category": "hazard",
+      "icon": "📦",
+      "defaults": { "width": 3, "height": 1, "depth": 2, "sideways": false, "speedMult": 1.0 },
+      "builderFn": "addMover",
+      "levelgenFn": "addMover",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" }
+      ],
+      "description": "Sliding block that moves back and forth."
+    },
+    {
+      "key": "blade",
+      "name": "Blade",
+      "category": "hazard",
+      "icon": "🔪",
+      "defaults": { "thickness": 0.12, "length": 2.0, "swing": 1.0, "vertical": false },
+      "builderFn": "addBlade",
+      "levelgenFn": "addBlade",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" }
+      ],
+      "description": "Oscillating blade hazard. Slices through the track area."
+    },
+    {
+      "key": "coin_line",
+      "name": "Coin Line",
+      "category": "collectible",
+      "icon": "🪙",
+      "defaults": { "count": 5, "length": 20 },
+      "builderFn": "addCoins",
+      "levelgenFn": "addCoins",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": -10, "dir": "front" },
+        { "x": 0, "y": 0, "z": 10, "dir": "back" }
+      ],
+      "description": "A line of coins. Collect them for points!"
+    },
+    {
+      "key": "checkpoint",
+      "name": "Checkpoint",
+      "category": "collectible",
+      "icon": "💾",
+      "defaults": { "width": 8 },
+      "builderFn": "addCheckpoint",
+      "levelgenFn": "addCheckpoint",
+      "connectionPoints": [
+        { "x": 0, "y": 0, "z": 0, "dir": "front" }
+      ],
+      "description": "Checkpoint flag. Player respawns here after falling."
+    },
+    {
+      "key": "finish_model",
+      "name": "Finish Gate",
+      "category": "marker",
+      "icon": "🎯",
+      "defaults": {},
+      "builderFn": "placeFinishModel",
+      "levelgenFn": "placeFinishModel",
+      "connectionPoints": [],
+      "description": "3D finish gate model (finish_gate.glb). Marks the level end with a visual arch."
+    },
+    {
+      "key": "portal_ring",
+      "name": "Portal Ring",
+      "category": "marker",
+      "icon": "🟣",
+      "defaults": { "radius": 2 },
+      "builderFn": "addPortalRing",
+      "levelgenFn": "addPortalRing",
+      "connectionPoints": [],
+      "description": "Functional portal ring. Teleports the ball to the nearest other portal!"
+    }
+  ],
+
+  "procedural_segments": {
+    "_doc": "Segment types used by the procedural level generator (createLevel). These are composite layouts, not individual builder parts.",
+    "easy": [
+      { "type": "straight", "description": "Flat platform with coins", "minLevel": 1 },
+      { "type": "ramp", "description": "Angled incline", "minLevel": 1 },
+      { "type": "tunnel", "description": "Platform + side walls", "minLevel": 1 },
+      { "type": "speed_strip", "description": "Yellow speed zone platform", "minLevel": 1 },
+      { "type": "jump_gap", "description": "8-unit gap jump", "minLevel": 1 }
+    ],
+    "normal": [
+      { "type": "zigzag", "description": "Two offset platforms", "minLevel": 4 },
+      { "type": "bumpy", "description": "6 uneven platforms", "minLevel": 4 },
+      { "type": "climb", "description": "3 stepped platforms with gap jumps", "minLevel": 4 }
+    ],
+    "challenging": [
+      { "type": "gap", "description": "5-8 unit gap between platforms", "minLevel": 7 },
+      { "type": "spinner", "description": "Platform + spinner hazard", "minLevel": 7 },
+      { "type": "archipelago", "description": "5 scattered small platforms", "minLevel": 7 },
+      { "type": "double_jump_gap", "description": "16-unit gap with 2 coin arcs", "minLevel": 7 }
+    ],
+    "hard": [
+      { "type": "pendulum", "description": "Platform + swinging wrecking ball", "minLevel": 10 },
+      { "type": "stairs", "description": "5 ascending step platforms", "minLevel": 10 },
+      { "type": "halfpipe", "description": "Wide platform with angled walls", "minLevel": 10 }
+    ],
+    "tough": [
+      { "type": "hammer_gauntlet", "description": "Platform + 3 hammers", "minLevel": 13 },
+      { "type": "moving_rects", "description": "Platform + 4 movers", "minLevel": 13 },
+      { "type": "checkerboard", "description": "4 offset platforms", "minLevel": 13 },
+      { "type": "triple_jump_gap", "description": "24-unit gap with 3 coin arcs", "minLevel": 13 }
+    ],
+    "expert": [
+      { "type": "side_crusher", "description": "Platform + 2 lateral movers", "minLevel": 16 },
+      { "type": "narrow", "description": "Narrow platform (40% width)", "minLevel": 16 }
+    ],
+    "insane": [
+      { "type": "loop_d_loop", "description": "Full 360° loop with ramps", "minLevel": 22 }
+    ],
+    "impossible": [
+      { "type": "spiral_tube", "description": "Spiraling tube with walls", "minLevel": 25 }
+    ],
+    "glass": [
+      { "type": "glass", "description": "Breakable glass platform", "minLevel": 7 }
+    ],
+    "curve": [
+      { "type": "curve", "description": "Curved path segments", "minLevel": 7 }
+    ]
+  },
+
+  "difficulty_tiers": [
+    { "level": 1,  "color": "0x7cfc00", "label": "EASY",       "bgHex": "#7cfc00", "types": ["straight", "ramp", "tunnel", "speed_strip", "jump_gap"] },
+    { "level": 4,  "color": "0x32cd32", "label": "NORMAL",     "bgHex": "#32cd32", "types": ["straight", "ramp", "tunnel", "zigzag", "bumpy", "jump_gap", "climb"] },
+    { "level": 7,  "color": "0x1e90ff", "label": "CHALLENGING","bgHex": "#1e90ff", "types": ["zigzag", "gap", "archipelago", "spinner", "double_jump_gap", "climb"] },
+    { "level": 10, "color": "0xffff00", "label": "HARD",       "bgHex": "#ffff00", "types": ["gap", "spinner", "pendulum", "stairs", "halfpipe", "double_jump_gap"] },
+    { "level": 13, "color": "0xffa500", "label": "TOUGH",      "bgHex": "#ffa500", "types": ["pendulum", "hammer_gauntlet", "moving_rects", "checkerboard", "triple_jump_gap"] },
+    { "level": 16, "color": "0xff4500", "label": "EXPERT",     "bgHex": "#ff4500", "types": ["hammer_gauntlet", "side_crusher", "narrow", "moving_rects", "triple_jump_gap"] },
+    { "level": 19, "color": "0x8b0000", "label": "EXTREME",    "bgHex": "#8b0000", "types": ["narrow", "side_crusher", "checkerboard", "archipelago", "triple_jump_gap"] },
+    { "level": 22, "color": "0x4b0082", "label": "INSANE",     "bgHex": "#4b0082", "types": ["narrow", "side_crusher", "hammer_gauntlet", "checkerboard", "triple_jump_gap", "loop_d_loop"] },
+    { "level": 25, "color": "0x000000", "label": "IMPOSSIBLE", "bgHex": "#000000", "types": ["narrow", "side_crusher", "hammer_gauntlet", "checkerboard", "triple_jump_gap", "loop_d_loop", "spiral_tube"] }
+  ],
+
+  "builder_functions": [
+    {
+      "name": "addPlatform",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width, length, color = null",
+      "physics": "CANNON.Box",
+      "mesh": "THREE.BoxGeometry",
+      "material": "sharedMaterials.wood (or .finish if color set)",
+      "description": "Core building block. Creates a static box with wood material."
+    },
+    {
+      "name": "addGlassPlatform",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width, length",
+      "physics": "CANNON.Box",
+      "mesh": "THREE.BoxGeometry",
+      "material": "sharedMaterials.glass",
+      "description": "Breakable glass platform. Tracked in game.glassPlatforms."
+    },
+    {
+      "name": "addRamp",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width, length, height",
+      "physics": "CANNON.Box (rotated)",
+      "mesh": "THREE.BoxGeometry (rotated)",
+      "material": "sharedMaterials.wood",
+      "description": "Angled ramp. Uses quaternion rotation."
+    },
+    {
+      "name": "addWall",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, w, l, rotZ",
+      "physics": "CANNON.Box",
+      "mesh": "THREE.BoxGeometry",
+      "material": "sharedMaterials.wall",
+      "description": "Angled wall barrier. 4 units tall."
+    },
+    {
+      "name": "addTunnelWalls",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width, length",
+      "physics": "2 × CANNON.Box",
+      "mesh": "2 × THREE.BoxGeometry",
+      "material": "sharedMaterials.wall",
+      "description": "Parallel wall pair forming a tunnel."
+    },
+    {
+      "name": "addPendulum",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, speedMult = 1",
+      "physics": "CANNON.Sphere (mass: 10)",
+      "mesh": "THREE.SphereGeometry (r=1.6)",
+      "material": "sharedMaterials.pendulum",
+      "extra": "Rope line, trail model attachment",
+      "description": "Swinging wrecking ball with rope visualization."
+    },
+    {
+      "name": "addSpinner",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, speedMult = 1",
+      "physics": "CANNON.Box (8×0.3×0.3)",
+      "mesh": "THREE.BoxGeometry",
+      "material": "sharedMaterials.spinner",
+      "extra": "Trail model attachment",
+      "description": "Rotating bar hazard (width: 8)."
+    },
+    {
+      "name": "addHammer",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, speedMult = 1",
+      "physics": "CANNON.Box (5×1.2×1.2)",
+      "mesh": "THREE.BoxGeometry",
+      "material": "sharedMaterials.hazard",
+      "description": "Rotating hammer. Uses spinner system."
+    },
+    {
+      "name": "addMover",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, w, h, d, sideways, speedMult = 1",
+      "physics": "CANNON.Box",
+      "mesh": "THREE.BoxGeometry",
+      "material": "sharedMaterials.hazard",
+      "extra": "Trail model attachment, range: 6",
+      "description": "Sliding block that moves back/forth or sideways."
+    },
+    {
+      "name": "addBlade",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, thickness = 0.12, length = 2.0, swing = 1.0, vertical = false",
+      "physics": "none (visual only)",
+      "mesh": "THREE.BoxGeometry",
+      "material": "MeshPhongMaterial (0x222222, emissive: 0x661111)",
+      "description": "Oscillating blade. Uses movers system for animation."
+    },
+    {
+      "name": "addCoins",
+      "source": "levelgen.js",
+      "params": "game, x, y, startZ, length, count",
+      "physics": "none",
+      "mesh": "THREE.CylinderGeometry (cached by size)",
+      "material": "sharedMaterials.coin",
+      "description": "Spawns weighted random coins (small/medium/large/big/huge)."
+    },
+    {
+      "name": "addCheckpoint",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width",
+      "physics": "none",
+      "description": "Records checkpoint position for respawn."
+    },
+    {
+      "name": "placeFinishModel",
+      "source": "levelgen.js",
+      "params": "game",
+      "physics": "none",
+      "mesh": "game.finishModel clone (finish_gate.glb)",
+      "description": "Places 3D finish gate model at finish position."
+    },
+    {
+      "name": "addLoopDeLoop",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width = 6, radius = 8, segments = 12",
+      "physics": "multiple CANNON.Box (via addPlatform)",
+      "mesh": "multiple THREE.BoxGeometry + ramps",
+      "description": "Composite: entrance ramp + circular platforms + exit ramp."
+    },
+    {
+      "name": "addSpiralTube",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width = 6, radius = 8, turns = 2, segments = 16",
+      "physics": "multiple CANNON.Box (via addPlatform + addWall)",
+      "mesh": "multiple platforms + walls",
+      "description": "Composite: spiral platform path with side walls."
+    },
+    {
+      "name": "addSpringPad",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width = 4, length = 4, bouncePower = 15",
+      "physics": "CANNON.Box (via addPlatform)",
+      "mesh": "Platform + TorusGeometry coil",
+      "material": "MeshPhongMaterial (0xff6600, emissive: 0x331100)",
+      "description": "Bouncy pad with visual spring coil indicator."
+    },
+    {
+      "name": "addCurve",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width = 6, arcLength = 8, segments = 8, direction = 1",
+      "physics": "multiple CANNON.Box (via addPlatform)",
+      "mesh": "multiple THREE.BoxGeometry",
+      "description": "Composite: curved path of platform segments."
+    },
+    {
+      "name": "addStairs",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width = 6, stepCount = 5, stepLength = 4, stepHeight = 0.8",
+      "physics": "multiple CANNON.Box (via addPlatform)",
+      "mesh": "multiple THREE.BoxGeometry",
+      "description": "Composite: ascending step platforms."
+    },
+    {
+      "name": "addPortalRing",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, radius = 2",
+      "physics": "none",
+      "mesh": "TorusGeometry (r, 0.15, 12, 24) + CircleGeometry inner glow",
+      "material": "MeshPhongMaterial (0x8844ff, emissive: 0x220066)",
+      "description": "Teleport portal. Triggers particle burst + teleport on contact."
+    },
+    {
+      "name": "addHalfPipe",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width = 10, length = 20",
+      "physics": "CANNON.Box (via addPlatform + addWall)",
+      "mesh": "Platform + 2 angled walls",
+      "description": "Composite: wide platform with angled side walls (π/4)."
+    },
+    {
+      "name": "addCheckerboard",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, tileSize = 3, rows = 4",
+      "physics": "multiple CANNON.Box (via addPlatform)",
+      "mesh": "multiple THREE.BoxGeometry",
+      "description": "Composite: alternating offset tile platforms."
+    },
+    {
+      "name": "addGlassLoopDeLoop",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width = 6, radius = 8, segments = 12",
+      "physics": "multiple (via addGlassPlatform + addRamp)",
+      "description": "Glass variant of loop-de-loop. All platforms breakable."
+    },
+    {
+      "name": "addGlassStairs",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width = 6, stepCount = 5, stepLength = 4, stepHeight = 0.8",
+      "physics": "multiple (via addGlassPlatform)",
+      "description": "Glass variant of stairs. Steps shatter on contact."
+    },
+    {
+      "name": "addGlassCurve",
+      "source": "levelgen.js",
+      "params": "game, x, y, z, width = 6, arcLength = 8, segments = 8, direction = 1",
+      "physics": "multiple (via addGlassPlatform)",
+      "description": "Glass variant of curve path. Navigate before it breaks!"
+    }
+  ],
+
+  "model_assets": [
+    {
+      "file": "assets/model/finish_gate.glb",
+      "format": "GLB (glTF Binary)",
+      "usedBy": "engine/scene.js → game.finishModel",
+      "usage": "3D finish gate model placed at level end",
+      "fallback": "createFallbackFinishModel() — procedural green arch"
+    },
+    {
+      "file": "assets/model/_halloween_Um_zumbi__0523105301_.glb",
+      "format": "GLB (glTF Binary)",
+      "usedBy": "engine/scene.js → trailModelPool['zombie']",
+      "usage": "Zombie trail effect on hazards + zombie ball skin",
+      "type": "Trail model"
+    },
+    {
+      "file": "assets/model/eye_low_poly_free_cute_eyeballs.glb",
+      "format": "GLB (glTF Binary)",
+      "usedBy": "engine/scene.js → trailModelPool['eye'], ball_db.js → eye_ball skin",
+      "usage": "Eye trail effect + 'Cute Eye' ball skin (type: gltf, price: 900)",
+      "type": "Trail model + Ball skin"
+    },
+    {
+      "file": "assets/model/scene_NEBULA.gltf",
+      "format": "glTF + BIN",
+      "usedBy": "ball_db.js → nebula skin",
+      "usage": "'Nebula' ball skin (type: gltf, price: 220)",
+      "companion": "assets/model/scene_NEBULA.bin",
+      "type": "Ball skin"
+    }
+  ],
+
+  "physics_materials": {
+    "wood":      "MeshPhongMaterial with wood_texture.webp map",
+    "finish":    "MeshPhongMaterial (0x00ff00) — green finish",
+    "coin":      "MeshPhongMaterial (0xffd700, shininess: 80)",
+    "pendulum":  "MeshPhongMaterial (0xaa0000) — red wrecking ball",
+    "spinner":   "MeshPhongMaterial (0x0000ff) — blue spinner",
+    "rope":      "LineBasicMaterial (0x333333)",
+    "wall":      "MeshPhongMaterial (0x666666, transparent, opacity: 0.5)",
+    "speed":     "MeshPhongMaterial (0xffff00, emissive: 0x444400)",
+    "hazard":    "MeshPhongMaterial (0xff4500) — orange hazard",
+    "neon":      "MeshPhongMaterial (0x00ffff, emissive, emissiveIntensity: 1.4, shininess: 120)",
+    "glass":     "MeshPhongMaterial (0xddeeff, transparent, opacity: 0.28, shininess: 90)"
+  },
+
+  "weather_systems": {
+    "rain":   "createRain / clearRain — reduces friction to ~30% of base",
+    "wind":   "createWind / clearWind — applies horizontal force (dirX, strength)",
+    "snow":   "THREE.Points particle system — reduces friction to ~45% of base",
+    "fire_sparks":  "createFireSparks / clearFireSparks — Inferno sky condition",
+    "heat_shimmer": "createHeatShimmer / clearHeatShimmer — Inferno sky condition",
+    "meteors":      "createMeteors / clearMeteors — Void Storm sky condition"
+  },
+
+  "coin_tiers": [
+    { "name": "small",  "value": 2,  "size": 0.15, "probability": "45%" },
+    { "name": "medium", "value": 5,  "size": 0.22, "probability": "30%" },
+    { "name": "large",  "value": 12, "size": 0.30, "probability": "17%" },
+    { "name": "big",    "value": 25, "size": 0.40, "probability": "6%" },
+    { "name": "huge",   "value": 50, "size": 0.55, "probability": "2%" }
+  ],
+
+  "trail_models": [
+    { "key": "skeleton",      "source": "assets/image/skeleton.webp",          "type": "sprite" },
+    { "key": "zombie",        "source": "assets/model/_halloween_Um_zumbi__0523105301_.glb", "type": "glb" },
+    { "key": "eye",           "source": "assets/model/eye_low_poly_free_cute_eyeballs.glb", "type": "glb" },
+    { "key": "soldier2",      "source": "assets/image/soldier3.webp",          "type": "sprite" },
+    { "key": "venus",         "source": "assets/image/venus_fly_trap.webp",    "type": "sprite" },
+    { "key": "dragon",        "source": "assets/image/dragon-ball.webp",       "type": "sprite" },
+    { "key": "bowling_strike","source": "assets/image/bowling-strike.gif",     "type": "sprite" },
+    { "key": "easter",        "source": "assets/image/easter.gif",             "type": "sprite" },
+    { "key": "life",          "source": "assets/image/life.gif",               "type": "sprite" },
+    { "key": "love",          "source": "assets/image/love.gif",               "type": "sprite" }
+  ]
+}

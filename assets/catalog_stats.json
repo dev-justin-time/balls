@@ -1,0 +1,201 @@
+{
+  "_meta": {
+    "generated": "2026-06-22",
+    "description": "Catalog statistics summary: part counts by category and usage frequency."
+  },
+  "total_catalog_parts": 26,
+  "category_counts": {
+    "surface": 12,
+    "structural": 5,
+    "hazard": 5,
+    "collectible": 2,
+    "marker": 2
+  },
+  "category_labels": {
+    "surface": "Surfaces 🟫",
+    "structural": "Structural 🧱",
+    "hazard": "Hazards ⚠️",
+    "collectible": "Collectibles 🪙",
+    "marker": "Markers 🏁"
+  },
+  "usage_frequency": {
+    "procedural_segment_appearances": {
+      "straight": 1,
+      "ramp": 1,
+      "tunnel": 1,
+      "speed_strip": 1,
+      "jump_gap": 1,
+      "zigzag": 1,
+      "bumpy": 1,
+      "climb": 1,
+      "gap": 1,
+      "spinner": 1,
+      "archipelago": 1,
+      "double_jump_gap": 1,
+      "pendulum": 1,
+      "stairs": 1,
+      "halfpipe": 1,
+      "hammer_gauntlet": 1,
+      "moving_rects": 1,
+      "checkerboard": 1,
+      "triple_jump_gap": 1,
+      "side_crusher": 1,
+      "narrow": 1,
+      "loop_d_loop": 1,
+      "spiral_tube": 1,
+      "glass": 1,
+      "curve": 1
+    },
+    "difficulty_tier_appearances": {
+      "straight": 2,
+      "ramp": 2,
+      "tunnel": 2,
+      "speed_strip": 1,
+      "jump_gap": 2,
+      "zigzag": 2,
+      "bumpy": 1,
+      "climb": 2,
+      "gap": 2,
+      "spinner": 2,
+      "archipelago": 2,
+      "double_jump_gap": 3,
+      "pendulum": 2,
+      "stairs": 1,
+      "halfpipe": 1,
+      "hammer_gauntlet": 4,
+      "moving_rects": 2,
+      "checkerboard": 4,
+      "triple_jump_gap": 5,
+      "side_crusher": 4,
+      "narrow": 4,
+      "loop_d_loop": 2,
+      "spiral_tube": 1
+    },
+    "combined_total": {
+      "triple_jump_gap": 6,
+      "hammer_gauntlet": 5,
+      "checkerboard": 5,
+      "side_crusher": 5,
+      "narrow": 5,
+      "double_jump_gap": 4,
+      "straight": 3,
+      "ramp": 3,
+      "tunnel": 3,
+      "jump_gap": 3,
+      "zigzag": 3,
+      "climb": 3,
+      "gap": 3,
+      "spinner": 3,
+      "archipelago": 3,
+      "pendulum": 3,
+      "moving_rects": 3,
+      "loop_de_loop": 3,
+      "speed_strip": 2,
+      "bumpy": 2,
+      "stairs": 2,
+      "halfpipe": 2,
+      "spiral_tube": 2,
+      "glass": 1,
+      "curve": 1
+    }
+  },
+  "most_used_segments_by_tier_count": [
+    { "type": "triple_jump_gap", "tier_count": 5, "tiers": ["TOUGH", "EXPERT", "EXTREME", "INSANE", "IMPOSSIBLE"] },
+    { "type": "hammer_gauntlet", "tier_count": 4, "tiers": ["TOUGH", "EXPERT", "INSANE", "IMPOSSIBLE"] },
+    { "type": "checkerboard", "tier_count": 4, "tiers": ["TOUGH", "EXTREME", "INSANE", "IMPOSSIBLE"] },
+    { "type": "side_crusher", "tier_count": 4, "tiers": ["EXPERT", "EXTREME", "INSANE", "IMPOSSIBLE"] },
+    { "type": "narrow", "tier_count": 4, "tiers": ["EXPERT", "EXTREME", "INSANE", "IMPOSSIBLE"] },
+    { "type": "double_jump_gap", "tier_count": 3, "tiers": ["CHALLENGING", "HARD"] },
+    { "type": "straight", "tier_count": 2, "tiers": ["EASY", "NORMAL"] },
+    { "type": "ramp", "tier_count": 2, "tiers": ["EASY", "NORMAL"] },
+    { "type": "tunnel", "tier_count": 2, "tiers": ["EASY", "NORMAL"] },
+    { "type": "jump_gap", "tier_count": 2, "tiers": ["EASY", "NORMAL"] },
+    { "type": "zigzag", "tier_count": 2, "tiers": ["NORMAL", "CHALLENGING"] },
+    { "type": "climb", "tier_count": 2, "tiers": ["NORMAL", "CHALLENGING"] },
+    { "type": "gap", "tier_count": 2, "tiers": ["CHALLENGING", "HARD"] },
+    { "type": "spinner", "tier_count": 2, "tiers": ["CHALLENGING", "HARD"] },
+    { "type": "archipelago", "tier_count": 2, "tiers": ["CHALLENGING", "EXTREME"] },
+    { "type": "pendulum", "tier_count": 2, "tiers": ["HARD", "TOUGH"] },
+    { "type": "moving_rects", "tier_count": 2, "tiers": ["TOUGH", "EXPERT"] },
+    { "type": "loop_d_loop", "tier_count": 2, "tiers": ["INSANE", "IMPOSSIBLE"] },
+    { "type": "bumpy", "tier_count": 1, "tiers": ["NORMAL"] },
+    { "type": "speed_strip", "tier_count": 1, "tiers": ["EASY"] },
+    { "type": "stairs", "tier_count": 1, "tiers": ["HARD"] },
+    { "type": "halfpipe", "tier_count": 1, "tiers": ["HARD"] },
+    { "type": "spiral_tube", "tier_count": 1, "tiers": ["IMPOSSIBLE"] }
+  ],
+  "parts_by_category": {
+    "surface": {
+      "label": "Surfaces",
+      "icon": "🟫",
+      "count": 12,
+      "parts": [
+        { "key": "platform", "name": "Platform", "icon": "⬜", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "ramp", "name": "Ramp", "icon": "📐", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "glass_platform", "name": "Glass Platform", "icon": "🫧", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "speed_strip", "name": "Speed Strip", "icon": "⚡", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "finish_line", "name": "Finish Line", "icon": "🏁", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "spring_pad", "name": "Spring Pad", "icon": "🦘", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "curve", "name": "Curve", "icon": "↪️", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "stairs", "name": "Stairs", "icon": "🪜", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "half_pipe", "name": "Half Pipe", "icon": "🏄", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "checkerboard", "name": "Checkerboard", "icon": "🏁", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "glass_stairs", "name": "Glass Stairs", "icon": "🪟", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "glass_curve", "name": "Glass Curve", "icon": "🔮", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 }
+      ]
+    },
+    "structural": {
+      "label": "Structural",
+      "icon": "🧱",
+      "count": 5,
+      "parts": [
+        { "key": "wall", "name": "Wall", "icon": "🧱", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "tunnel_walls", "name": "Tunnel Walls", "icon": "🚇", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "loop_de_loop", "name": "Loop De Loop", "icon": "➰", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "spiral_tube", "name": "Spiral Tube", "icon": "🐚", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "glass_loop", "name": "Glass Loop", "icon": "🫧", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 }
+      ]
+    },
+    "hazard": {
+      "label": "Hazards",
+      "icon": "⚠️",
+      "count": 5,
+      "parts": [
+        { "key": "pendulum", "name": "Pendulum", "icon": "💣", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "spinner", "name": "Spinner", "icon": "🌀", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "hammer", "name": "Hammer", "icon": "🔨", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "mover", "name": "Moving Block", "icon": "📦", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "blade", "name": "Blade", "icon": "🔪", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 }
+      ]
+    },
+    "collectible": {
+      "label": "Collectibles",
+      "icon": "🪙",
+      "count": 2,
+      "parts": [
+        { "key": "coin_line", "name": "Coin Line", "icon": "🪙", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "checkpoint", "name": "Checkpoint", "icon": "💾", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 }
+      ]
+    },
+    "marker": {
+      "label": "Markers",
+      "icon": "🏁",
+      "count": 2,
+      "parts": [
+        { "key": "finish_model", "name": "Finish Gate", "icon": "🎯", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 },
+        { "key": "portal_ring", "name": "Portal Ring", "icon": "🟣", "usage_in_segments": 0, "usage_in_tiers": 0, "total_usage": 0 }
+      ]
+    }
+  },
+  "summary": {
+    "most_used_segment": "triple_jump_gap (5 tiers: TOUGH through IMPOSSIBLE)",
+    "second_most_used": "hammer_gauntlet, checkerboard, side_crusher, narrow (4 tiers each)",
+    "least_used_segments": "glass and curve (1 procedural definition each, not in any tier)",
+    "surface_parts_dominant": "12 of 26 catalog parts are surfaces (46%)",
+    "hazard_parts": "5 hazard parts, all with dedicated builder/levelgen functions",
+    "glass_variants": "3 glass composite parts: glass_loop, glass_stairs, glass_curve",
+    "procedural_segment_types": 25,
+    "difficulty_tiers": 9,
+    "unique_segment_types_in_tiers": 23
+  }
+}

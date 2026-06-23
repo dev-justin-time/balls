@@ -51,6 +51,12 @@
 - Shared materials, configs, and state go on the `game` object.
 - Document each module with a JSDoc-style header comment listing exports.
 
+## Unused Imports Rule
+- NEVER delete an unused import/variable just to silence a lint warning.
+- Instead, find a way to USE it that adds real user value — validation, logging, feature hooks, error context, undo tracking, etc.
+- If an import is truly dead (no future use at all), prefix with `_` only as a last resort.
+- The goal is: every import earns its place by solving a real problem or enabling a real feature.
+
 ## Before Committing Changes
 - Run the code-reviewer-deepseek agent on significant changes.
 - Fix all issues found before marking work as complete.

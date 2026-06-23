@@ -21,7 +21,8 @@ const BALL_RADIUS = 0.5;
 const GRAVITY = -45;
 const BALL_SPEED = 5000;
 const STEER_SPEED = 22;
-const MAX_VELOCITY = 18;
+const STEER_DAMPING = 0.92; // angular velocity decay factor applied per frame
+const MAX_VELOCITY = 22;
 const JUMP_FORCE = 25;
 
 export function initPhysics(game) {
@@ -160,6 +161,13 @@ export function updatePhysics(game, dt) {
                             } catch (e) {}
                             // Portal SFX
                             try { playPortalSound(game); } catch (e) {}
+                            // Portal particle burst at source and destination
+                            try {
+                                const srcY = ringY;
+                                spawnPortalParticles(game, portal.x || 0, srcY, portal.z || 0);
+                                const dstY = (nearest.y || 0) + (nearest.radius || 2);
+                                spawnPortalParticles(game, nearest.x || 0, dstY, nearest.z || 0);
+                            } catch (e) {}
                             // Teleport ball to destination portal
                             const destY = (nearest.y || 0) + (nearest.radius || 2) + 0.5;
                             game.ballBody.position.set(nearest.x || 0, destY, nearest.z || 0);
@@ -250,6 +258,24 @@ export function updatePhysics(game, dt) {
             const scale = maxVel / hSpeed;
             game.ballBody.velocity.x *= scale;
             game.ballBody.velocity.z *= scale;
+        }
+
+        // Angular velocity damping — use STEER_SPEED to blend angular momentum
+        // toward the movement direction for smoother, more responsive turning
+        if (game.isGrounded && hSpeed > 1) {
+            const moveAngle = Math.atan2(vel.x, vel.z);
+            // Extract Y rotation from quaternion properly
+            const q = game.ballBody.quaternion;
+            const curAngle = Math.atan2(
+                2 * (q.w * q.y + q.x * q.z),
+                1 - 2 * (q.y * q.y + q.z * q.z)
+            );
+            const angleDiff = moveAngle - curAngle;
+            // Normalize to [-PI, PI]
+            const normalizedDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+            const steerForce = Math.max(-STEER_SPEED, Math.min(STEER_SPEED, normalizedDiff * STEER_SPEED)) * dt;
+            game.ballBody.angularVelocity.y += steerForce;
+            game.ballBody.angularVelocity.y *= STEER_DAMPING;
         }
 
         // Sync physics -> render
@@ -400,6 +426,9 @@ export function updatePhysics(game, dt) {
             const targetVolume = hSpeed > 1 && game.isGrounded ? Math.min(0.35, hSpeed / 12) : 0;
             game.rollSound.volume += (targetVolume - game.rollSound.volume) * 4 * dt;
         }
+
+        // Portal particle animation
+        updatePortalParticles(game, dt);
     } catch (e) {
         console.warn('updatePhysics error', e);
     }
@@ -528,7 +557,9 @@ export function updateFireSparks(game, dt) {
         const positions = game.firePoints.geometry.attributes.position.array;
         const count = positions.length / 3;
         const speed = 7;
-        const areaX = 50, areaY = 24, areaZ = 40;
+        const areaX = 50, areaZ = 40;
+        const spawnCeiling = 22;
+        const spawnFloor = 3;
         const cx = game.ballMesh ? game.ballMesh.position.x : 0;
         const cz = game.ballMesh ? game.ballMesh.position.z : 0;
         const now = Date.now() * 0.001;
@@ -539,9 +570,9 @@ export function updateFireSparks(game, dt) {
             positions[ix] += Math.sin(now * 2.5 + i * 0.7) * 0.8 * dt;
             positions[ix + 2] += Math.cos(now * 1.8 + i * 0.9) * 0.5 * dt;
             // Respawn at bottom when rising above ceiling
-            if (positions[ix + 1] > 22) {
+            if (positions[ix + 1] > spawnCeiling) {
                 positions[ix] = cx + (Math.random() - 0.5) * areaX;
-                positions[ix + 1] = Math.random() * 3;
+                positions[ix + 1] = Math.random() * spawnFloor;
                 positions[ix + 2] = cz + (Math.random() - 0.5) * areaZ;
             }
         }
@@ -610,7 +641,8 @@ export function updateHeatShimmer(game, dt) {
         const count = positions.length / 3;
         const phases = game._heatPhases || [];
         const speeds = game._heatSpeeds || [];
-        const areaX = 60, areaLowY = 16, areaZ = 50;
+        const shimmerCeiling = 16;
+        const heatAreaX = 50, heatAreaZ = 40;
         const cx = game.ballMesh ? game.ballMesh.position.x : 0;
         const cz = game.ballMesh ? game.ballMesh.position.z : 0;
         const now = Date.now() * 0.001;
@@ -626,11 +658,11 @@ export function updateHeatShimmer(game, dt) {
             positions[ix + 1] += speed * dt;
             positions[ix] += Math.sin(now * 4.0 + phase) * 1.0 * dt;
             positions[ix + 2] += Math.cos(now * 3.2 + phase + 1) * 0.8 * dt;
-            // Respawn at ground when above ceiling
-            if (positions[ix + 1] > 14) {
-                positions[ix] = cx + (Math.random() - 0.5) * areaX;
+            // Respawn at ground when above ceiling — use areaLowY as the height threshold
+            if (positions[ix + 1] > shimmerCeiling) {
+                positions[ix] = cx + (Math.random() - 0.5) * heatAreaX;
                 positions[ix + 1] = Math.random() * 2;
-                positions[ix + 2] = cz + (Math.random() - 0.5) * areaZ;
+                positions[ix + 2] = cz + (Math.random() - 0.5) * heatAreaZ;
             }
         }
         game.heatShimmer.geometry.attributes.position.needsUpdate = true;
@@ -724,6 +756,79 @@ export function updateMeteors(game, dt) {
             game.meteors.splice(i, 1);
         }
     }
+}
+
+// --- Portal particle burst (visual effect on teleport) ---
+
+function spawnPortalParticles(game, x, y, z) {
+    try {
+        const count = 24;
+        const positions = new Float32Array(count * 3);
+        const velocities = [];
+        for (let i = 0; i < count; i++) {
+            const ix = i * 3;
+            positions[ix] = x;
+            positions[ix + 1] = y;
+            positions[ix + 2] = z;
+            velocities.push({
+                vx: (Math.random() - 0.5) * 8,
+                vy: (Math.random() - 0.5) * 8 + 2,
+                vz: (Math.random() - 0.5) * 8
+            });
+        }
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const mat = new THREE.PointsMaterial({
+            color: 0x9944ff,
+            size: 0.18,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        const points = new THREE.Points(geom, mat);
+        points.frustumCulled = false;
+        game.scene.add(points);
+
+        game._portalParticles = game._portalParticles || [];
+        game._portalParticles.push({
+            points,
+            velocities,
+            born: Date.now(),
+            lifetime: 550
+        });
+    } catch (e) {}
+}
+
+function updatePortalParticles(game, dt) {
+    try {
+        if (!game._portalParticles) return;
+        const now = Date.now();
+        for (let i = game._portalParticles.length - 1; i >= 0; i--) {
+            const pp = game._portalParticles[i];
+            const age = now - pp.born;
+            if (age > pp.lifetime) {
+                game.scene.remove(pp.points);
+                pp.points.geometry.dispose();
+                pp.points.material.dispose();
+                game._portalParticles.splice(i, 1);
+                continue;
+            }
+            const pos = pp.points.geometry.attributes.position.array;
+            const vel = pp.velocities;
+            const fade = 1 - age / pp.lifetime;
+            pp.points.material.opacity = fade * 0.85;
+            pp.points.material.size = 0.18 * (0.5 + fade * 0.5);
+            for (let j = 0; j < vel.length; j++) {
+                const ix = j * 3;
+                pos[ix] += vel[j].vx * dt;
+                pos[ix + 1] += vel[j].vy * dt;
+                pos[ix + 2] += vel[j].vz * dt;
+                vel[j].vy += 1.5 * dt; // floaty upward drift
+            }
+            pp.points.geometry.attributes.position.needsUpdate = true;
+        }
+    } catch (e) {}
 }
 
 export function checkMeteorCollisions(game) {

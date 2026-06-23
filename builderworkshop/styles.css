@@ -1,0 +1,174 @@
+:root{
+  --ui-bg: rgba(20,20,20,0.85);
+  --accent: #ff7a50;
+  --fg: #f3f3f3;
+}
+html,body,#root{height:100%;margin:0;background:#111;font-family:Inter,system-ui,Arial}
+#c{display:block;width:100%;height:100%}
+#ui{
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 220px;
+  background:var(--ui-bg);
+  color:var(--fg);
+  padding:10px;
+  border-radius:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.6);
+  font-size:13px;
+  user-select:none;
+}
+.group{margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
+button,select,input[type="range"],input[type="color"]{
+  appearance:none;
+  border:0;
+  background:#222;
+  color:var(--fg);
+  padding:8px;
+  border-radius:6px;
+  font-size:13px;
+}
+button{cursor:pointer}
+.hidden{display:none}
+#info{font-size:12px;opacity:0.9;padding:6px;background:transparent}
+label{font-size:12px;color:#ddd}
+
+/* help modal */
+#help-modal{
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+}
+#help-content{
+  pointer-events:auto;
+  max-width:420px;
+  background:rgba(16,16,16,0.95);
+  color:var(--fg);
+  padding:16px;
+  border-radius:10px;
+  box-shadow:0 8px 30px rgba(0,0,0,0.7);
+  font-size:13px;
+}
+#help-content h3{margin:0 0 8px 0}
+#help-content pre{
+  background:#111;padding:8px;border-radius:6px;color:#ddd;overflow:auto;font-size:12px
+
+:root{
+  --ui-bg: rgba(20,20,20,0.85);
+  --accent: #ff7a50;
+  --fg: #f3f3f3;
+}
+html,body,#root{height:100%;margin:0;background:#111;font-family:Inter,system-ui,Arial}
+#c{display:block;width:100%;height:100%}
+
+/* Main Right Sidebar */
+#ui{
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 220px;
+  background:var(--ui-bg);
+  color:var(--fg);
+  padding:10px;
+  border-radius:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.6);
+  font-size:13px;
+  user-select:none;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+}
+
+/* NEW: Bottom Left Panel Container */
+#ui-panels-container {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 250px);
+  z-index: 10;
+}
+
+/* NEW: Tool Panel Styling */
+.tool-panel {
+  background: var(--ui-bg);
+  color: var(--fg);
+  padding: 12px;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+  font-size: 13px;
+  min-width: 220px;
+  backdrop-filter: blur(8px);
+}
+.tool-panel h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: var(--accent);
+  border-bottom: 1px solid #333;
+  padding-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tool-panel button {
+  margin: 3px;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+.tool-panel label {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #aaa;
+}
+.tool-panel input[type="range"] {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* NEW: Rigging Grid Styling */
+.rig-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.slot {
+  background: #222;
+  padding: 8px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  border: 1px solid #333;
+}
+.slot button {
+  padding: 4px 8px;
+  font-size: 11px;
+  margin: 0;
+}
+
+/* General UI Elements */
+.group{margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
+button,select,input[type="range"],input[type="color"]{
+  appearance:none;
+  border:0;
+  background:#222;
+  color:var(--fg);
+  padding:8px;
+  border-radius:6px;
+  font-size:13px;
+}
+button{cursor:pointer; transition: background 0.2s;}
+button:hover{background:#333;}
+.hidden{display:none}
+#info{font-size:12px;opacity:0.9;padding:6px;background:transparent}
+label{font-size:12px;color:#ddd}
+

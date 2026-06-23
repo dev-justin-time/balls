@@ -16,12 +16,19 @@ import { initAudio, registerSfx, playSound } from './src/audio.js';
 import { initScene, getBallMaterial, clearTextureCache } from './engine/scene.js';
 import { onWindowResize, animate } from './src/rendering.js';
 import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, updateFireSparks, createHeatShimmer, clearHeatShimmer, updateHeatShimmer, createMeteors, clearMeteors, updateMeteors, checkMeteorCollisions } from './src/physics.js';
-import { createLevel, createInfiniteLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, addBlade, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins, spawnInfiniteChunk, createShockwave, addLoopDeLoop, addSpiralTube, addSpringPad, addCurve, addStairs, addPortalRing, addHalfPipe, addCheckerboard, addGlassLoopDeLoop, addGlassStairs, addGlassCurve } from './src/levelgen.js';
-import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset } from './src/ui.js';
+import { createLevel, createInfiniteLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, addBlade, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins, spawnInfiniteChunk, createShockwave, addLoopDeLoop, addSpiralTube, addSpringPad, addCurve, addStairs, addPortalRing, addHalfPipe, addCheckerboard, addGlassLoopDeLoop, addGlassStairs, addGlassCurve, playCommunityTrack } from './src/levelgen.js';
+import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset, showTestPlayHUD, removeTestPlayHUD } from './src/ui.js';
 import { initBuilderScene, onBuilderMouseMove, onBuilderClick, onBuilderWheel, onBuilderPanStart, onBuilderPanEnd, placePart, undoLastPlacement, clearBuilderScene, disposeBuilderScene, renderBuilder, loadPartsIntoBuilder } from './src/builder/builder_scene.js';
 import { renderBuilderUI, exitBuilder, updateBuilderCount, updateBuilderUIState } from './src/builder/builder_ui.js';
-import { initBuilderMultiplayer, disposeBuilderMultiplayer, shareTrack, loadCommunityTracks } from './src/builder/builder_networking.js';
+import { initBuilderMultiplayer, disposeBuilderMultiplayer, shareTrack, loadCommunityTracks, renderCommunityModal, recordTrackPlay } from './src/builder/builder_networking.js';
 import { getPartDef } from './src/builder/catalog.js';
+import { addBuilderXP, calculateTrackBonusXP } from './src/builder/builder_xp.js';
+import { initWorkshop } from './src/builder/ws_app.js';
+import { initWorldNetworking, disposeWorldNetworking } from './src/world/world_networking.js';
+import { renderWorldUI, exitWorld } from './src/world/world_ui.js';
+import { purchaseSite, listSiteForSale, delistSite } from './src/world/marketplace.js';
+import { initARVR, disposeARVR, updateMobilePointers } from './src/world/world_arvr.js';
+import { initNeighborPreview, updateNeighborPreview, animateNeighborPreview, markNeighborPreviewDirty, disposeNeighborPreview, toggleNeighborPreview } from './src/world/world_minimap.js';
 
 // --- Notification manager ---
 const notifier = new NotificationManager({
@@ -41,6 +48,12 @@ class Game {
     constructor() {
         // --- Persistence / Data ---
         initPersistence(this);
+
+        // Store room reference for community track access outside builder
+        this._builderRoom = room;
+        // Assign a player ID early so likes/upvotes work from the main menu
+        // (initBuilderMultiplayer may overwrite it later when entering the builder)
+        this._builderPlayerId = 'player_' + Math.random().toString(36).slice(2, 8);
 
         // --- Audio ---
         initAudio(this);
@@ -67,6 +80,13 @@ class Game {
 
         // Apply initial skin abilities
         applySkinAbilities(this, this.saveData.selectedBall || 'rainbow');
+
+        // --- World system (initialized on first enter) ---
+        this._worldActive = false;
+        this._worldGrid = null;
+        this._worldSync = null;
+        this._worldPlayers = [];
+        this._worldListings = [];
 
         // --- Game loop ---
         animate(this);
@@ -428,6 +448,24 @@ class Game {
         this._isInfinite = this._wasInfinite || false;
         this._lastFrameTime = 0; // reset dt accumulator
 
+        // Auto-save builder parts to the current world site before cleanup destroys them
+        if (this._worldCurrentSite && this._worldSync && this._builderPlacedParts && this._builderPlacedParts.length > 0) {
+            const site = this._worldCurrentSite;
+            const parts = this._builderPlacedParts.map(p => ({
+                partKey: p.partKey, x: p.x, y: p.y, z: p.z,
+                rotation: p.rotation || 0, params: p.params || {}
+            }));
+            this._worldSaveSiteParts(site.col, site.row, parts);
+            // Also update the local grid cache so neighbor previews reflect changes
+            const gridSite = this._worldGrid ? this._worldGrid.getSite(site.col, site.row) : null;
+            if (gridSite) {
+                gridSite.parts = parts;
+                gridSite.partCount = parts.length;
+                gridSite.lastEdited = Date.now();
+            }
+            markNeighborPreviewDirty(this);
+        }
+
         // Remove builder input handlers
         if (this._builderMouseMove) document.removeEventListener('mousemove', this._builderMouseMove);
         if (this._builderMouseDown) document.removeEventListener('mousedown', this._builderMouseDown);
@@ -436,108 +474,56 @@ class Game {
         if (this._builderContext) document.removeEventListener('contextmenu', this._builderContext);
         if (this._builderKeyDown) document.removeEventListener('keydown', this._builderKeyDown);
         if (this._builderKeyUp) document.removeEventListener('keyup', this._builderKeyUp);
+
+        // Cleanup multiplayer sync
+        disposeBuilderMultiplayer(this);
+
+        // Dispose builder scene resources
+        disposeBuilderScene(this);
     }
 
     _builderUndo() { undoLastPlacement(this); }
     _builderClear() { clearBuilderScene(this); }
     _builderPlay() {
-        // Export placed parts as a level definition and play it
-        const def = this._builderExport();
-        if (!def) return;
-        exitBuilder(this);
-        // Build the level from exported definition
-        this.clearLevel();
-        this.lastCheckpointPos.set(0, 5, 0);
-        this._isInfinite = false;
-        this.finishZ = undefined;
-        this.score = 0;
-        this.levelLength = 500;
-        this.startTime = Date.now();
-        // Place each part using the real levelgen functions with destructured params
-        for (const placed of this._builderPlacedParts || []) {
-            const partDef = getPartDef(placed.partKey);
-            if (!partDef || !partDef.builderFn) continue;
-            const p = placed.params || {};
-            switch (placed.partKey) {
-                case 'platform':
-                case 'speed_strip':
-                case 'finish_line':
-                    this.addPlatform(placed.x, placed.y, placed.z, p.width || 8, p.length || 15, p.color || null);
-                    break;
-                case 'ramp':
-                    this.addRamp(placed.x, placed.y, placed.z, p.width || 8, p.length || 15, p.height || 5);
-                    break;
-                case 'glass_platform':
-                    this.addGlassPlatform(placed.x, placed.y, placed.z, p.width || 6, p.length || 14);
-                    break;
-                case 'wall':
-                    this.addWall(placed.x, placed.y, placed.z, p.width || 1, p.length || 20, p.rotZ || 0);
-                    break;
-                case 'tunnel_walls':
-                    this.addTunnelWalls(placed.x, placed.y, placed.z, p.width || 8, p.length || 30);
-                    break;
-                case 'pendulum':
-                    this.addPendulum(placed.x, placed.y, placed.z, p.speedMult || 1.0);
-                    break;
-                case 'spinner':
-                    this.addSpinner(placed.x, placed.y, placed.z, p.speedMult || 1.0);
-                    break;
-                case 'hammer':
-                    this.addHammer(placed.x, placed.y, placed.z, p.speedMult || 1.0);
-                    break;
-                case 'mover':
-                    this.addMover(placed.x, placed.y, placed.z, p.width || 3, p.height || 1, p.depth || 2, p.sideways || false, p.speedMult || 1.0);
-                    break;
-                case 'blade':
-                    this.addBlade(placed.x, placed.y, placed.z, p.thickness || 0.12, p.length || 2.0, p.swing || 1.0, p.vertical || false);
-                    break;
-                case 'coin_line':
-                    this.addCoins(placed.x, placed.y + 1, placed.z, p.length || 20, p.count || 5);
-                    break;
-                case 'checkpoint':
-                    this.addCheckpoint(placed.x, placed.y, placed.z, p.width || 8);
-                    break;
-                case 'finish_model':
-                    this.finishZ = placed.z;
-                    this.finishX = placed.x;
-                    this.finishY = placed.y;
-                    break;
-                case 'loop_de_loop':
-                    this.addLoopDeLoop(placed.x, placed.y, placed.z, p.width || 6, p.radius || 8, p.segments || 12);
-                    break;
-                case 'spiral_tube':
-                    this.addSpiralTube(placed.x, placed.y, placed.z, p.width || 6, p.radius || 8, p.turns || 2, p.segments || 16);
-                    break;
-                case 'spring_pad':
-                    this.addSpringPad(placed.x, placed.y, placed.z, p.width || 4, p.length || 4, p.bouncePower ?? 15);
-                    break;
-                case 'curve':
-                    this.addCurve(placed.x, placed.y, placed.z, p.width || 6, p.arcLength || 8, p.segments || 8, p.direction ?? 1);
-                    break;
-                case 'stairs':
-                    this.addStairs(placed.x, placed.y, placed.z, p.width || 6, p.stepCount || 5, p.stepLength || 4, p.stepHeight || 0.8);
-                    break;
-                case 'portal_ring':
-                    this.addPortalRing(placed.x, placed.y, placed.z, p.radius || 2);
-                    break;
-                case 'half_pipe':
-                    this.addHalfPipe(placed.x, placed.y, placed.z, p.width || 10, p.length || 20);
-                    break;
-                case 'checkerboard':
-                    this.addCheckerboard(placed.x, placed.y, placed.z, p.tileSize || 3, p.rows || 4);
-                    break;
-                case 'glass_loop':
-                    this.addGlassLoopDeLoop(placed.x, placed.y, placed.z, p.width || 6, p.radius || 8, p.segments || 12);
-                    break;
-                case 'glass_stairs':
-                    this.addGlassStairs(placed.x, placed.y, placed.z, p.width || 6, p.stepCount || 5, p.stepLength || 4, p.stepHeight || 0.8);
-                    break;
-                case 'glass_curve':
-                    this.addGlassCurve(placed.x, placed.y, placed.z, p.width || 6, p.arcLength || 8, p.segments || 8, p.direction ?? 1);
-                    break;
-            }
+        // Serialize parts BEFORE exitBuilder destroys them
+        const parts = (this._builderPlacedParts || []).map(p => ({
+            partKey: p.partKey,
+            x: p.x, y: p.y, z: p.z,
+            rotation: p.rotation || 0,
+            params: p.params || {},
+            _category: getPartDef(p.partKey)?.category
+        }));
+        if (parts.length === 0) { alert('Place some parts first!'); return; }
+
+        // Save parts for return-to-builder flow
+        this._testPlayParts = parts;
+        this._isTestPlayFromBuilder = true;
+
+        // Award XP for test-play with track bonus
+        addBuilderXP(this, 15, 'Test play');
+        const bonusXP = calculateTrackBonusXP(parts);
+        for (const b of bonusXP.breakdown) {
+            addBuilderXP(this, b.xp, b.label, { skipNotify: true });
         }
-        this.startTime = Date.now();
+
+        // Exit builder (destroys builder scene), then load the track
+        exitBuilder(this);
+        playCommunityTrack(this, parts);
+
+        // Show floating 'Back to Builder' button
+        showTestPlayHUD(this);
+    }
+    _returnToBuilder() {
+        const parts = this._testPlayParts;
+        removeTestPlayHUD(this);
+        this._testPlayParts = null;
+        if (!parts || parts.length === 0) {
+            this.enterBuilder();
+            return;
+        }
+        this.enterBuilder();
+        loadPartsIntoBuilder(this, parts);
+        updateBuilderUIState(this);
     }
     _builderExport() {
         const parts = (this._builderPlacedParts || []).map(p => ({
@@ -568,6 +554,8 @@ class Game {
         const tracks = JSON.parse(localStorage.getItem('goingBalls_builder_tracks') || '{}');
         tracks[name] = { parts, savedAt: Date.now() };
         localStorage.setItem('goingBalls_builder_tracks', JSON.stringify(tracks));
+        this.saveData.totalTracksCreated = (this.saveData.totalTracksCreated || 0) + 1;
+        addBuilderXP(this, 10, 'Track saved');
         alert(`Track "${name}" saved! (${parts.length} parts)`);
     }
     _builderLoad(name) {
@@ -580,14 +568,36 @@ class Game {
     _builderShare() {
         const name = prompt('Track name for sharing:', 'my_track_' + Date.now().toString(36).slice(-4));
         if (!name) return;
+        // Award share XP with track bonus
+        const parts = (this._builderPlacedParts || []).map(p => ({
+            partKey: p.partKey, x: p.x, y: p.y, z: p.z,
+            rotation: p.rotation || 0, params: p.params || {},
+            _category: getPartDef(p.partKey)?.category
+        }));
+        const bonusXP = calculateTrackBonusXP(this, parts);
+        addBuilderXP(this, 25, 'Track shared');
+        for (const b of bonusXP.breakdown) {
+            addBuilderXP(this, b.xp, b.label, { skipNotify: true });
+        }
         shareTrack(this, name);
     }
+    _builderRenderPreview() { renderBuilder(this); }
     _builderLoadCommunity() {
-        loadCommunityTracks(this);
+        loadCommunityTracks(this, 'builder');
     }
     _builderLoadCommunityParts(parts) {
         loadPartsIntoBuilder(this, parts);
         updateBuilderUIState(this);
+    }
+    _playCommunityTrack(parts, trackId) {
+        playCommunityTrack(this, parts);
+        if (trackId) recordTrackPlay(this, trackId);
+    }
+    _showCommunityMenu() {
+        loadCommunityTracks(this, 'play');
+    }
+    _openCommunityInBuilder() {
+        renderCommunityModal(this, [], 'builder');
     }
     _builderPlaceRemote(remote) {
         const partDef = getPartDef(remote.partKey);
@@ -596,7 +606,96 @@ class Game {
         updateBuilderCount(this);
     }
 
+    // ---- 3D Workshop mode ----
+
+    _enterWorkshop() {
+        if (!this._workshop) {
+            this._workshop = initWorkshop(this);
+        }
+        this._builderActive = false;
+        this._workshopActive = true;
+        this.isGameOver = true; // pause physics
+
+        // Hide the builder sidebar
+        const sidebar = document.getElementById('builder-sidebar');
+        if (sidebar) sidebar.style.display = 'none';
+
+        // Show the overlay for workshop UI panels
+        const overlay = document.getElementById('overlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+            overlay.innerHTML = '';
+        }
+
+        this._workshop.enter();
+    }
+
+    _exitWorkshop() {
+        if (!this._workshop) return;
+        this._workshop.exit();
+        this._workshopActive = false;
+        this.isGameOver = false;
+    }
+
     // ---- Builder delegation methods (called from builder_scene.js) ----
+
+    // ---- World mode ----
+
+    enterWorld() {
+        if (!this._worldGrid) {
+            this._worldGrid = initWorldNetworking(this, room);
+            initARVR(this);
+        }
+        // Initialize 3D neighbor preview if not already done
+        if (!this._neighborPreviewGroup) {
+            initNeighborPreview(this);
+        }
+        this._worldActive = true;
+        this.isGameOver = true; // pause physics
+        renderWorldUI(this);
+    }
+
+    _onExitWorld() {
+        this._worldActive = false;
+        this.isGameOver = false;
+        this._lastFrameTime = 0;
+        exitWorld(this);
+        // Mark neighbor preview dirty so it rebuilds with fresh data
+        markNeighborPreviewDirty(this);
+    }
+
+    _worldBuySite(col, row) {
+        return purchaseSite(this, col, row);
+    }
+
+    _worldSellSite(col, row, price) {
+        return listSiteForSale(this, col, row, price);
+    }
+
+    _worldDelistSite(col, row) {
+        return delistSite(this, col, row);
+    }
+
+    _worldSaveSiteParts(col, row, parts) {
+        if (this._worldSync) {
+            return this._worldSync.saveSiteParts(col, row, parts);
+        }
+    }
+
+    _worldUpdatePresence(col, row) {
+        if (this._worldSync) {
+            this._worldSync.updatePresence(col, row);
+        }
+        if (this._mobilePointers) {
+            updateMobilePointers(this);
+        }
+        // Mark neighbor preview dirty when player moves to a new site
+        markNeighborPreviewDirty(this);
+    }
+
+    _toggleNeighborPreview() {
+        return toggleNeighborPreview(this);
+    }
 
     builderMouseMove(cx, cy) { onBuilderMouseMove(this, cx, cy); }
     builderClick(cx, cy) { onBuilderClick(this, cx, cy); }

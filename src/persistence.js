@@ -50,7 +50,12 @@ export function initPersistence(game) {
         weatherPrefs: {
             lastWeather: 'clear',
             bias: {}
-        }
+        },
+        builderXP: 0,
+        builderLevel: 1,
+        totalTracksCreated: 0,
+        totalPartsPlaced: 0,
+        uniquePartTypesUsed: 0
     };
     try {
         const raw = localStorage.getItem('goingBallsData_v1');

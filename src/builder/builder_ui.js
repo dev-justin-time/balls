@@ -6,6 +6,7 @@
 */
 
 import { PART_CATEGORIES, getPartsByCategory } from './catalog.js';
+import { initBuilderXP, addBuilderXP, renderBuilderXPBar, calculateTrackBonusXP } from './builder_xp.js';
 
 /**
  * Render the full builder UI into the overlay.
@@ -39,20 +40,29 @@ export function renderBuilderUI(game) {
         box-shadow: -4px 0 24px rgba(0,0,0,0.5);
     `;
 
+    // Initialize builder XP data
+    initBuilderXP(game);
+
     // Header
     const header = document.createElement('div');
     header.style.cssText = `
         padding: 14px 16px;
         border-bottom: 1px solid rgba(255,255,255,0.08);
         display: flex;
-        justify-content: space-between;
-        align-items: center;
+        flex-direction: column;
+        gap: 8px;
     `;
     header.innerHTML = `
-        <span style="color:#fff;font-weight:700;font-size:16px;font-family:'5x5dots',monospace;">🔧 TRACK BUILDER</span>
-        <button id="builder-exit-btn" class="menu-btn" aria-label="Exit builder" style="font-size:11px;padding:4px 10px;">✕ EXIT</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:#fff;font-weight:700;font-size:16px;font-family:'5x5dots',monospace;">🔧 TRACK BUILDER</span>
+            <button id="builder-exit-btn" class="menu-btn" aria-label="Exit builder" style="font-size:11px;padding:4px 10px;">✕ EXIT</button>
+        </div>
+        <div id="builder-xp-bar"></div>
     `;
     sidebar.appendChild(header);
+
+    // Render XP bar after header is in DOM
+    requestAnimationFrame(() => renderBuilderXPBar(game));
 
     // Part count
     const countBar = document.createElement('div');
@@ -131,6 +141,7 @@ export function renderBuilderUI(game) {
         <button id="builder-share-btn" class="menu-btn" aria-label="Share to community" style="font-size:10px;padding:6px 10px;background:rgba(100,40,180,0.4);border-color:#9944ff;">🌐 SHARE</button>
         <button id="builder-community-btn" class="menu-btn" aria-label="Load from community" style="font-size:10px;padding:6px 10px;">🌍 COMMUNITY</button>
         <button id="builder-export-btn" class="menu-btn" aria-label="Export track" style="font-size:10px;padding:6px 10px;">📋 EXPORT</button>
+        <button id="builder-workshop-btn" class="menu-btn" aria-label="Open 3D Workshop" style="font-size:10px;padding:6px 10px;background:rgba(220,120,0,0.4);border-color:#ff8800;">🎨 WORKSHOP</button>
     `;
     sidebar.appendChild(actions);
 
@@ -345,6 +356,14 @@ function wireBuilderUIEvents(game) {
     if (communityBtn) {
         communityBtn.addEventListener('click', () => {
             if (typeof game._builderLoadCommunity === 'function') game._builderLoadCommunity();
+        });
+    }
+
+    // Workshop mode
+    const workshopBtn = document.getElementById('builder-workshop-btn');
+    if (workshopBtn) {
+        workshopBtn.addEventListener('click', () => {
+            if (typeof game._enterWorkshop === 'function') game._enterWorkshop();
         });
     }
 
