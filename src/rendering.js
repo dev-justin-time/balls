@@ -28,7 +28,29 @@ let _versionsLogged = false;
 function logEngineVersions() {
     if (_versionsLogged) return;
     _versionsLogged = true;
-    console.info(`[GoingBalls] THREE.js r${THREE.REVISION} · CANNON-es v${CANNON.version || '?'}`);
+    console.info(`[GoingBalls] THREE.js r${THREE.REVISION} · cannon-es ${CANNON.World ? '✓' : '✗'}`);
+}
+
+function updateDebugOverlay(game) {
+    if (!game._debugOverlayVisible) return;
+    const el = document.getElementById('debug-overlay');
+    if (!el) return;
+
+    const vel = game.ballBody ? game.ballBody.velocity : null;
+    if (!vel) {
+        el.textContent = 'waiting for ballBody...';
+        return;
+    }
+
+    const hSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+    const ji = game.joystickInput || { x: 0, y: 0 };
+    const groundedDot = `<span style="color:#${game.isGrounded ? '44ff44' : 'ff4444'}">●</span>`;
+
+    el.innerHTML =
+        `${groundedDot} G:${game.isGrounded ? 'Y' : 'N'}  ` +
+        `Vx:${vel.x.toFixed(1)} Vy:${vel.y.toFixed(1)} Vz:${vel.z.toFixed(1)}  ` +
+        `H:${hSpeed.toFixed(1)}  ` +
+        `J:${ji.x.toFixed(2)},${ji.y.toFixed(2)}`;
 }
 
 export function animate(game) {
@@ -183,6 +205,9 @@ export function animate(game) {
 
     // Camera follow
     updateCamera(game, dt);
+
+    // Debug overlay (grounded, velocity, joystick — toggled with F8)
+    updateDebugOverlay(game);
 
     // Speed lines (cosmetic — intensity tied to ball velocity)
     updateSpeedLines(game, dt);

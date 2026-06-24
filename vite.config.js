@@ -53,6 +53,12 @@ export default defineConfig({
     sourcemap: true,
     target: 'esnext',
     rollupOptions: {
+      onwarn(warning, warn) {
+        // wasmoon imports Node.js 'module' for Node.js detection —
+        // harmless in browser, Vite externalizes it automatically.
+        if (warning.message && warning.message.includes('wasmoon')) return;
+        warn(warning);
+      },
       output: {
         manualChunks: {
           three: ['three'],
@@ -63,11 +69,10 @@ export default defineConfig({
     },
   },
 
-  // Copy LumenShaders static files to dist during production build.
-  // LumenShaders uses non-module <script> tags that Vite's Rollup
-  // pipeline can't bundle; instead it's copied as a self-contained
-  // static directory preserving the original directory structure.
-  plugins: [{
+  // Copy static directories to dist during production build.
+  // These use non-module scripts that Vite's Rollup pipeline can't bundle.
+  plugins: [
+  {
     name: 'copy-lumenshaders',
     writeBundle() {
       const src = resolve(__dirname, 'src/lumenshaders');
@@ -77,7 +82,26 @@ export default defineConfig({
         fs.cpSync(src, dest, { recursive: true, dereference: true });
       }
     },
+  },
+  {
+    name: 'copy-wasm',
+    writeBundle() {
+      const src = resolve(__dirname, 'rust_core/pkg');
+      const dest = resolve(__dirname, 'dist/rust_wasm');
+      if (fs.existsSync(src)) {
+        const files = ['quad_core_physics_bg.wasm', 'quad_core_physics.js', 'quad_core_physics.d.ts'];
+        if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true });
+        fs.mkdirSync(dest, { recursive: true });
+        for (const file of files) {
+          const filePath = resolve(src, file);
+          if (fs.existsSync(filePath)) {
+            fs.copyFileSync(filePath, resolve(dest, file));
+          }
+        }
+      }
+    },
   }],
+  // Process any .wasm files as assets
 
   // Handle .lua files as raw text
   assetsInclude: ['**/*.lua', '**/*.wasm'],

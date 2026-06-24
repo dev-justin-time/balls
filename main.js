@@ -241,11 +241,24 @@ class Game {
 
     initControls() {
         this.keys = {};
+        this.joystickInverted = false; // Default: not inverted (push UP = forward)
         window.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
             if (e.code === 'Space') jump(this);
         });
         window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
+
+        // F8 = toggle debug overlay (grounded, velocity, joystick)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'F8') {
+                e.preventDefault();
+                this._debugOverlayVisible = !this._debugOverlayVisible;
+                const el = document.getElementById('debug-overlay');
+                if (el) {
+                    el.style.display = this._debugOverlayVisible ? 'block' : 'none';
+                }
+            }
+        });
 
         const joystickContainer = document.getElementById('joystick-container');
         if (joystickContainer) {
@@ -267,8 +280,9 @@ class Game {
                         this.joystickInput.x = 0;
                         this.joystickInput.y = 0;
                     } else {
+                        const invertY = this.joystickInverted ? 1 : -1;
                         this.joystickInput.x = Math.max(-1, Math.min(1, data.vector.x * power));
-                        this.joystickInput.y = Math.max(-1, Math.min(1, data.vector.y * power));
+                        this.joystickInput.y = Math.max(-1, Math.min(1, data.vector.y * power * invertY));
                     }
                 } catch (e) {
                     this.joystickInput.x = 0;
@@ -319,19 +333,17 @@ class Game {
         });
     }
 
-    // ---- UI (simplified for new architecture) ----
+    // ---- UI (full setup with shop, leaderboard, settings) ----
 
     _initUI() {
-        // Setup the overlay close handler
-        const overlay = document.getElementById('overlay');
-        if (overlay) {
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    overlay.style.display = 'none';
-                    overlay.innerHTML = '';
-                }
-            });
-        }
+        // Setup the full UI system (shop, leaderboard, settings, etc.)
+        import('./src/ui.js').then(mod => {
+            try {
+                mod.setupUI(this, null);
+            } catch (e) {
+                console.warn('UI setup error (non-critical):', e);
+            }
+        }).catch(e => console.warn('UI module load error:', e));
     }
 
     // ---- Quad-Core Physics Pipeline ----

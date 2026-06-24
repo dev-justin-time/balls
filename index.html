@@ -172,13 +172,50 @@
     <div id="ui">
         <div id="top-bar" style="display:flex;justify-content:space-between;align-items:center;font-family:'5x5dots',monospace;font-size:12px;letter-spacing:1px;">
             <div id="game-title" style="color:rgba(255,255,255,0.15);">GOING BALLS v2.0</div>
+            <span id="total-coins" style="position:static;font-size:13px;color:#ffd700;text-shadow:0 0 8px rgba(255,215,0,0.3);"></span>
             <div id="frame-info" style="color:rgba(255,255,255,0.15);font-size:9px;"></div>
         </div>
-        <div id="bottom-bar" style="display:flex;justify-content:space-between;align-items:flex-end;"></div>
+        <div id="bottom-bar" style="display:flex;justify-content:space-between;align-items:flex-end;">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <button id="shop-btn" class="menu-btn" aria-label="Shop" style="font-size:10px;padding:6px 10px;background:rgba(68,68,255,0.3);border-color:#6666ff;">🛒 Shop</button>
+                <button id="leaderboard-btn" class="menu-btn" aria-label="Leaderboard" style="font-size:10px;padding:6px 10px;">🏆 LBs</button>
+                <button id="settings-btn" class="menu-btn" aria-label="Settings" style="font-size:10px;padding:6px 10px;">⚙️</button>
+                <button id="help-btn" class="menu-btn" aria-label="Help" style="font-size:10px;padding:6px 10px;">❓</button>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <button id="gear-btn" class="menu-btn" aria-label="Menu" style="font-size:14px;padding:4px 8px;">☰</button>
+            </div>
+        </div>
+
+        <!-- Top Menu (gear dropdown) -->
+        <div id="top-menu" style="
+            position:fixed;top:50px;right:16px;z-index:11000;
+            display:none;flex-direction:column;gap:4px;padding:8px;
+            background:rgba(15,15,30,0.95);border:1px solid rgba(255,255,255,0.1);
+            border-radius:10px;min-width:140px;
+            pointer-events:auto;
+        ">
+            <button id="builder-btn" class="menu-btn" aria-label="Builder" style="font-size:10px;padding:5px 10px;text-align:left;width:100%;">🔧 Builder</button>
+            <button id="catalog-btn" class="menu-btn" aria-label="Catalog" style="font-size:10px;padding:5px 10px;text-align:left;width:100%;">📦 Catalog</button>
+            <button id="world-btn" class="menu-btn" aria-label="World Map" style="font-size:10px;padding:5px 10px;text-align:left;width:100%;">🌍 World Map</button>
+            <button id="community-btn" class="menu-btn" aria-label="Community" style="font-size:10px;padding:5px 10px;text-align:left;width:100%;">👥 Community</button>
+            <button id="survival-btn" class="menu-btn" aria-label="Survival mode" style="font-size:10px;padding:5px 10px;text-align:left;width:100%;background:rgba(180,30,30,0.6);border-color:#ff4444;">💀 SURVIVAL</button>
+        </div>
     </div>
 
-    <!-- Top Menu -->
-    <div id="top-menu"></div>
+    <!-- Debug Overlay (toggled with F8) -->
+    <div id="debug-overlay" style="
+        display:none;
+        position:fixed;top:42px;left:12px;z-index:10001;
+        background:rgba(0,0,0,0.65);
+        border:1px solid rgba(255,255,255,0.12);
+        border-radius:6px;padding:5px 9px;
+        font-family:'Courier New',monospace;font-size:10px;
+        line-height:1.5;color:#eee;
+        pointer-events:none;
+        backdrop-filter:blur(4px);
+        white-space:nowrap;
+    "></div>
 
     <!-- Overlay for modals -->
     <div id="overlay"></div>

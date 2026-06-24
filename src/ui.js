@@ -51,7 +51,8 @@ export function setupUI(game, room) {
     if (gearBtn && topMenu) {
         gearBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            topMenu.classList.toggle('visible');
+            const isVisible = topMenu.style.display === 'flex';
+            topMenu.style.display = isVisible ? 'none' : 'flex';
         });
     }
 
@@ -254,14 +255,23 @@ export function setupUI(game, room) {
                             <input type="range" id="joystick-power" min="50" max="200" value="${Math.round((game.joystickPower || 1.0) * 100)}" style="width:140px;">
                             <span id="jp-val">${Math.round((game.joystickPower || 1.0) * 100)}%</span>
                         </label>
+                        <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                            Invert Joystick Y
+                            <label style="position:relative;display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                                <input type="checkbox" id="joystick-invert" ${game.joystickInverted ? 'checked' : ''} style="width:18px;height:18px;accent-color:#9944ff;cursor:pointer;">
+                                <span style="font-size:11px;color:#aaa;">${game.joystickInverted ? 'ON (inverted)' : 'OFF (normal)'}</span>
+                            </label>
+                        </label>
                     </div>
                     <button class="menu-btn" id="settings-close-btn" aria-label="Close settings">Close</button>
                 </div>`;
 
             const dzSlider = document.getElementById('joystick-deadzone');
             const jpSlider = document.getElementById('joystick-power');
+            const invertCheck = document.getElementById('joystick-invert');
             const dzVal = document.getElementById('dz-val');
             const jpVal = document.getElementById('jp-val');
+            const invertLabel = invertCheck ? invertCheck.nextElementSibling : null;
             if (dzSlider) dzSlider.addEventListener('input', () => {
                 game.joystickDeadzone = parseInt(dzSlider.value) / 100;
                 dzVal.innerText = `${Math.round(game.joystickDeadzone * 100)}%`;
@@ -270,10 +280,17 @@ export function setupUI(game, room) {
                 game.joystickPower = parseInt(jpSlider.value) / 100;
                 jpVal.innerText = `${Math.round(game.joystickPower * 100)}%`;
             });
+            if (invertCheck) invertCheck.addEventListener('change', () => {
+                game.joystickInverted = invertCheck.checked;
+                if (invertLabel) invertLabel.innerText = game.joystickInverted ? 'ON (inverted)' : 'OFF (normal)';
+            });
             const closeBtn = document.getElementById('settings-close-btn');
             if (closeBtn) closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; overlay.innerHTML = ''; });
         });
     }
+
+    // Populate initial coin balance (element now exists in HTML)
+    updateWalletUI(game);
 
     // --- Remote subscriptions (best-effort, sanitized) ---
     if (room && room.isReady && typeof room.collection === 'function') {

@@ -26,7 +26,7 @@ export function initScene(game) {
     try { game.renderer.setPixelRatio(Math.min(1, window.devicePixelRatio || 1)); } catch (e) {}
     game.renderer.debug && (game.renderer.debug.checkShaderErrors = false);
     game.renderer.setSize(window.innerWidth, window.innerHeight);
-    try { game.renderer.outputEncoding = THREE.sRGBEncoding; } catch (e) {}
+    try { game.renderer.outputColorSpace = THREE.SRGBColorSpace; } catch (e) {}
     try {
         game.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         game.renderer.toneMappingExposure = 1.0;
@@ -271,7 +271,7 @@ export function applySkyConfig(game, sky) {
             const tex = loadTexture(game, sky.tex);
             try {
                 tex.mapping = THREE.EquirectangularReflectionMapping;
-                tex.encoding = THREE.sRGBEncoding;
+                tex.colorSpace = THREE.SRGBColorSpace;
                 tex.wrapS = THREE.ClampToEdgeWrapping;
                 tex.wrapT = THREE.ClampToEdgeWrapping;
                 tex.minFilter = tex.minFilter || THREE.LinearMipMapLinearFilter;
@@ -372,7 +372,7 @@ export function applySkyConfig(game, sky) {
                 game.scene.fog.color.setHex(targetFogHex);
             } catch (e) { game.scene.fog = new THREE.Fog(targetFogHex, 20, 150); }
 
-            try { tex.encoding = THREE.sRGBEncoding; } catch (e) {}
+            try { tex.colorSpace = THREE.SRGBColorSpace; } catch (e) {}
         } else {
             try { disposeMesh(previousSky); game.skyMesh = null; } catch (e) {}
             // Dispose old envMap when switching to color-only sky (no reflections)
@@ -442,7 +442,7 @@ function preloadTrailModels(game) {
     const createSpriteFromImage = (src, size = 0.8) => {
         try {
             const map = new THREE.TextureLoader().load(src);
-            map.encoding = THREE.sRGBEncoding;
+            map.colorSpace = THREE.SRGBColorSpace;
             const mat = new THREE.SpriteMaterial({ map: map, transparent: true, depthWrite: false });
             const spr = new THREE.Sprite(mat);
             spr.scale.set(size, size, 1);
@@ -488,7 +488,7 @@ export function getBallMaterial(game) {
             if (!game.groovyCanvasTex) {
                 createGroovyCanvas(game);
             }
-            try { game.groovyCanvasTex.encoding = THREE.sRGBEncoding; } catch (e) {}
+            try { game.groovyCanvasTex.colorSpace = THREE.SRGBColorSpace; } catch (e) {}
             game.groovyCanvasTex.needsUpdate = true;
             return new THREE.MeshPhongMaterial({
                 map: game.groovyCanvasTex,
@@ -504,7 +504,7 @@ export function getBallMaterial(game) {
                 tex.wrapS = tex.wrapS || THREE.RepeatWrapping;
                 tex.wrapT = tex.wrapT || THREE.RepeatWrapping;
                 tex.repeat.set(1, 1);
-                tex.encoding = THREE.sRGBEncoding;
+                tex.colorSpace = THREE.SRGBColorSpace;
                 tex.needsUpdate = true;
             } catch (e) {}
 
@@ -517,7 +517,7 @@ export function getBallMaterial(game) {
                     transparent: true,
                     opacity: 0.92,
                     envMap: game._lastEnvMap || null,
-                    reflectivity: 0.3
+                    envMapIntensity: 0.3
                 });
             }
 

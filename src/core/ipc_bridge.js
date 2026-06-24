@@ -77,7 +77,17 @@ export async function initializeQuadCore() {
       // Step 2: Initialize Rust WASM physics module
       console.info('[QuadCore] Loading Rust WASM physics solver...');
       try {
-        const wasmModule = await import('../../rust_core/pkg/quad_core_physics.js');
+        // Dynamic path prevents Vite/Rollup from statically resolving
+        // the import at build time. The WASM module is optional — if the
+        // file doesn't exist at runtime, the catch falls through to the
+        // JS physics integrator.
+        //   DEV:  Vite dev server serves the path relative to this source file
+        //   PROD: Plugin copies rust_core/pkg/ → dist/rust_wasm/
+        const wasmBase = import.meta.env.DEV
+          ? '../../rust_core/pkg'
+          : '/rust_wasm';
+        const wasmUrl = wasmBase + '/quad_core_physics.js';
+        const wasmModule = await import(wasmUrl);
         _wasmModule = wasmModule;
         await _wasmModule.default(); // Initialize the WASM module
 
@@ -96,7 +106,7 @@ export async function initializeQuadCore() {
       console.info('[QuadCore] Initializing Lua engine via lua_engine.js...');
       try {
         // Delegate Lua VM management to the standalone lua_engine.js module
-        const luaEngine = await import('./src/lua_engine.js');
+        const luaEngine = await import('../lua_engine.js');
         const ready = await luaEngine.initLuaEngine();
         if (ready) {
           // Store reference so shop functions can delegate to lua_engine.js
