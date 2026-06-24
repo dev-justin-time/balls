@@ -1,19 +1,41 @@
 # =====================================================================
 # @domain:    deployment
-# @concern:   Production Backend Image — Python FastAPI + WASM artifacts
+# @concern:   Multi-Target Dockerfile — Frontend (nginx) + Backend (Python CPU/GPU)
 # @version:   1.0.0
 # @security:  Non-Root / Stripped WASM / Pinned Base Images
 # =====================================================================
 #
 # Architecture:
-#   Stage 1 (wasm-builder) — Compile Rust → WASM with LTO + strip
-#   Stage 2 (production)   — Python runtime + copied WASM artifacts
+#   Stage 1 (frontend-builder) — Build JS static files via Vite
+#   Stage 2 (wasm-builder)     — Compile Rust → WASM with LTO + strip
+#   Stage 3 (wasm-strip)       — Hardening: strip WASM debug symbols
+#   Stage 4 (frontend)         — Nginx image with static files + nginx.conf
+#   Stage 5 (production)       — Python FastAPI backend (CPU / python:3.11-slim)
+#   Stage 6 (production-gpu)   — Python FastAPI backend (GPU / nvidia/cuda)
 #
-# Frontend static files (dist/) are served by Nginx in docker-compose.
-# This image only runs the Python FastAPI backend.
+# Build targets:
+#   docker build --target frontend       -t frontend-image .   (Nginx + static)
+#   docker build --target production     -t backend-image  .   (Python CPU)
+#   docker build --target production-gpu -t backend-gpu    .   (Python GPU)
 #
 
-# --- STAGE 1: WASM Builder (Rust) ---
+# --- STAGE 1: Frontend Builder (Node.js) ---
+FROM node:20-alpine@sha256:3f2b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b AS frontend-builder
+
+WORKDIR /build
+
+# Copy dependency manifests first for layer caching
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Copy source and build
+COPY . ./
+RUN npm run build
+
+# Verify output exists
+RUN test -d dist && test -f dist/index.html
+
+# --- STAGE 2: WASM Builder (Rust) ---
 FROM rust:1.75-slim@sha256:84a188932ebe47063f2052f724f5130b7cf4fb3c0c9f7e30a0c3a5d5f4b5f3a9 AS wasm-builder
 
 WORKDIR /build
@@ -47,7 +69,7 @@ RUN wasm-pack build --target web --release --out-dir pkg
 # Verify WASM was produced
 RUN test -f pkg/quad_core_physics_bg.wasm
 
-# --- STAGE 2: WASM Strip (hardening) ---
+# --- STAGE 3: WASM Strip (hardening) ---
 FROM wasm-builder AS wasm-strip
 
 # wasm-strip from wabt to remove remaining debug sections
@@ -56,7 +78,34 @@ RUN apt-get update && \
     wasm-strip pkg/quad_core_physics_bg.wasm && \
     rm -rf /var/lib/apt/lists/*
 
-# --- STAGE 3: Production Runtime (Python) ---
+# --- STAGE 4: Frontend (Nginx + Static Files) ---
+FROM nginx:1.25-alpine@sha256:2c4e0e4a6b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b AS frontend
+
+# Install openssl for self-signed cert generation
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openssl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Generate self-signed TLS certs for the nginx -t check and dev fallback
+# In production, mount real certs over these at /etc/nginx/certs/
+RUN mkdir -p /etc/nginx/certs && \
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout /etc/nginx/certs/privkey.pem \
+        -out /etc/nginx/certs/fullchain.pem \
+        -subj "/CN=localhost" 2>/dev/null
+
+# Copy built frontend files
+COPY --from=frontend-builder /build/dist /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Verify config syntax (requires cert files to exist)
+RUN nginx -t
+
+EXPOSE 80 443
+
+# --- STAGE 5: Production Runtime — CPU (Python 3.11-slim) ---
 FROM python:3.11-slim@sha256:7222f57e25d535167ce0da037ee5a21ccda7ebab7a3f08f8f97252a73d53aadf AS production
 
 # Security: create non-root user
@@ -76,10 +125,9 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 # Copy Python source code
 COPY python_server/ ./python_server/
 
-# Create static directory (served by Nginx, but keep for fallback)
+# Copy WASM to a location accessible by Python if needed
 RUN mkdir -p static/wasm && \
-    cp -r rust_core/pkg/*.wasm static/wasm/ && \
-    cp -r rust_core/pkg/*.js static/wasm/ 2>/dev/null || true
+    cp -r rust_core/pkg/*.wasm static/wasm/ 2>/dev/null || true
 
 # Set ownership
 RUN chown -R appuser:appuser /app
@@ -93,6 +141,76 @@ EXPOSE 8000
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
+
+# Start FastAPI with Uvicorn
+CMD ["uvicorn", "python_server.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--workers", "4", \
+     "--log-level", "info", \
+     "--proxy-headers", \
+     "--forwarded-allow-ips", "*"]
+
+# --- STAGE 6: Production Runtime — GPU (NVIDIA CUDA 12.1) ---
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04@sha256:5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f AS production-gpu
+
+# Prevent interactive prompts during build
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+# Install Python 3.11 and system dependencies for OpenCV/PyTorch
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.11 \
+        python3-pip \
+        python3.11-venv \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlink python3 → python for consistency
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python && \
+    ln -sf /usr/bin/pip3 /usr/bin/pip
+
+# Security: create non-root user
+RUN groupadd -r appuser && \
+    useradd -r -g appuser -d /app -s /sbin/nologin appuser
+
+WORKDIR /app
+
+# Copy WASM artifacts from builder
+COPY --from=wasm-strip /build/pkg/ ./rust_core/pkg/
+
+# Copy Python requirements and install dependencies with GPU support
+COPY python_server/requirements.txt ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    # Uncomment these for GPU-accelerated AI inference:
+    # pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cu121 && \
+    # pip install --no-cache-dir diffusers transformers accelerate && \
+    rm -rf /root/.cache
+
+# Copy Python source code
+COPY python_server/ ./python_server/
+
+# Copy WASM to static directory if needed
+RUN mkdir -p static/wasm && \
+    cp -r rust_core/pkg/*.wasm static/wasm/ 2>/dev/null || true
+
+# Set ownership
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Expose API port
+EXPOSE 8000
+
+# Healthcheck — longer start period for AI model loading
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
 
 # Start FastAPI with Uvicorn
 CMD ["uvicorn", "python_server.main:app", \

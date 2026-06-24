@@ -29,3 +29,10 @@ Pillow>=10.3.0
 
 # HAWP wireframe parsing (optional)
 # hawp>=0.1.0  # Install from: git+https://github.com/cherubicXN/hawp.git
+
+# === Voice-to-Text ===
+# OpenAI Whisper for server-side audio transcription (fallback when Web Speech API is unavailable)
+# Requires ~1.5GB VRAM for 'base' model, ~4GB for 'small'
+openai-whisper>=20240930
+# Required by whisper for audio file handling
+soundfile>=0.12.0

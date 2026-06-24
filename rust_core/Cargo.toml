@@ -26,6 +26,9 @@ vtracer = "0.6"
 # Parallelism
 rayon = "1.10"
 
+# SHA-256 hashing for fingerprint telemetry
+sha2 = "0.10"
+
 # Error handling
 console_error_panic_hook = "0.1"
 

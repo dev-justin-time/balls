@@ -1,0 +1,41 @@
+# =====================================================================
+# @domain:    infrastructure
+# @concern:   Development Override — CPU target, No TLS, Hot Reload
+# @version:   1.0.0
+# =====================================================================
+#
+# Usage:  docker compose up -d
+#         (automatically picks up docker-compose.override.yml)
+#
+# This override:
+#   - Uses CPU production target (no GPU required for local dev)
+#   - Removes HTTPS requirement (no certs needed)
+#   - Maps ports for local access
+#   - Mounts source code for backend hot reload
+#   - Sets development environment variables
+#
+
+services:
+  frontend:
+    ports:
+      - "8080:80"           # HTTP on port 8080 instead of 443
+    volumes: []
+    environment:
+      - NGINX_ENTRYPOINT_QUIET_LOGS=1
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production      # CPU target for local dev
+    ports:
+      - "8000:8000"           # Expose for direct API testing
+    volumes:
+      - ./python_server:/app/python_server:ro
+    environment:
+      - ENV=development
+      - CLIENT_ORIGIN=http://localhost:8080
+      - NVIDIA_VISIBLE_DEVICES=void  # Disable GPU in dev
+    # Allow writing in dev (relax read_only for hot reload)
+    read_only: false
+    deploy: {}                # Clear GPU device reservations for dev

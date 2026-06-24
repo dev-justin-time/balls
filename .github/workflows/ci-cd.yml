@@ -8,7 +8,11 @@
 # Pipeline architecture:
 #   PHASE 1 — Parallel validation of all 3 ecosystems
 #   PHASE 2 — Security scan & SBOM generation (after all validations pass)
-#   PHASE 3 — Container build, push to GHCR, and deploy (main only)
+#   PHASE 3 — Build & push container images to GHCR (main only)
+#
+# Build targets:
+#   target: production   → Python FastAPI backend image
+#   target: frontend     → Nginx + static files image
 #
 
 name: Quad-Core CI/CD Pipeline
@@ -57,13 +61,12 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Cache frontend build
-        uses: actions/cache@v4
+      - name: Upload frontend dist artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: frontend-dist
           path: dist/
-          key: frontend-${{ runner.os }}-${{ hashFiles('dist/**') }}
-          restore-keys: |
-            frontend-${{ runner.os }}-
+          if-no-files-found: error
 
   validate-backend:
     name: Validate Python Backend
@@ -153,7 +156,7 @@ jobs:
           path: sbom.cyclonedx.json
 
       - name: Trivy file-system scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.29.0
         with:
           scan-type: 'fs'
           format: 'sarif'
@@ -183,6 +186,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+
       - name: Download WASM artifacts
         uses: actions/download-artifact@v4
         with:
@@ -196,7 +205,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
+      # ── Metadata for CPU backend image ──
+      - name: Extract Docker metadata (CPU backend)
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -206,8 +216,23 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=cpu,enable=${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build and push Docker image
+      # ── Metadata for GPU backend image (custom -gpu suffix) ──
+      - name: Extract Docker metadata (GPU backend)
+        id: meta-gpu
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,suffix=-gpu,format=short
+            type=ref,event=branch,suffix=-gpu
+            type=semver,pattern={{version}},suffix=-gpu
+            type=raw,value=gpu,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest-gpu,enable=${{ github.ref == 'refs/heads/main' }}
+
+      # ── Build & push: CPU backend (python:3.11-slim) ──
+      - name: Build and push CPU backend image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -218,10 +243,42 @@ jobs:
           cache-to: type=gha,mode=max
           target: production
 
+      # ── Build & push: GPU backend (nvidia/cuda) ──
+      - name: Build and push GPU backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta-gpu.outputs.tags }}
+          labels: ${{ steps.meta-gpu.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          target: production-gpu
+
+      # ── Build & push: Frontend (nginx + static files) ──
+      - name: Build and push frontend (nginx) image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          target: frontend
+
+      # ── Deploy note ──
       - name: Deploy to production
         run: |
-          echo "Deploying ${{ steps.meta.outputs.tags }} to production..."
-          # Example Kubernetes rollout:
-          # kubectl set image deployment/going-balls-api \
-          #   api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tags }}
-          # kubectl rollout status deployment/going-balls-api
+          echo "=== Deploying to production cluster ==="
+          echo "  Frontend:  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}"
+          echo "  CPU Backend: ${{ steps.meta.outputs.tags }}"
+          echo "  GPU Backend: ${{ steps.meta-gpu.outputs.tags }}"
+          echo ""
+          echo "Example Kubernetes rollouts:"
+          echo "  kubectl set image deployment/going-balls-frontend \\"
+          echo "    frontend=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}"
+          echo "  kubectl set image deployment/going-balls-api \\"
+          echo "    api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tags }}"
+          echo "  kubectl set image deployment/going-balls-api-gpu \\"
+          echo "    api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta-gpu.outputs.tags }}"

@@ -2,38 +2,45 @@
 # @domain:    infrastructure
 # @concern:   Production Orchestration — Frontend/Backend/DB/Cache
 # @version:   1.0.0
-# @security:  Internal Networks / Read-Only Root / Resource Limits
+# @security:  GPU Passthrough / Dual Networks (Public + Internal:true)
 # =====================================================================
 #
 # Architecture:
-#   frontend  — Nginx reverse proxy (serves static files + proxies /api)
-#   backend   — Python FastAPI (AI inference, level gen, auth)
-#   db        — PostgreSQL 16 (game state, user data, economy)
-#   redis     — Redis 7 (rate limiting, session cache, job queues)
+#   frontend  — Nginx reverse proxy on public_net + internal_net
+#   backend   — Python FastAPI (GPU-accelerated) on internal_net ONLY
+#   db        — PostgreSQL 16 on internal_net ONLY
+#   redis     — Redis 7 on internal_net ONLY
 #
-# All inter-service communication happens on the internal bridge network.
-# Only the frontend (Nginx) exposes ports to the host.
+# Only frontend (Nginx) is exposed to the host. Backend is isolated
+# on an internal-only network — no direct external access to the AI layer.
+#
+# Prerequisites for GPU support:
+#   1. Install nvidia-container-toolkit on the host
+#   2. Configure Docker with NVIDIA runtime
+#   3. See: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/
 #
 
 version: '3.9'
 
 services:
-  # ── Thin Client Frontend (Nginx) ──────────────────────────────────
+  # ── Thin Client Frontend (Nginx + Static Files) ───────────────────
   frontend:
-    image: nginx:1.25-alpine@sha256:2c4e0e4a6b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./dist:/usr/share/nginx/html:ro
       - ./certs:/etc/nginx/certs:ro
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - going-balls-net
+      - public_net
+      - internal_net
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -45,14 +52,14 @@ services:
           cpus: '0.1'
           memory: 64M
 
-  # ── Thick Backend (Python FastAPI) ────────────────────────────────
+  # ── Thick Backend (Python FastAPI — GPU Accelerated) ──────────────
   backend:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
-    ports:
-      - "8000:8000"
+      target: production-gpu
+    expose:
+      - "8000"           # Internal only — NOT mapped to host
     environment:
       - PYTHONUNBUFFERED=1
       - API_SECRET_KEY=${API_SECRET_KEY:?API_SECRET_KEY is required}
@@ -61,6 +68,12 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CLIENT_ORIGIN=https://play.goingballs.io
       - ENV=production
+      # GPU/HAWP config
+      - HAWP_WEIGHTS_PATH=/opt/models/hawp_v2.pth
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ai_models:/opt/models
     depends_on:
       db:
         condition: service_healthy
@@ -68,7 +81,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - going-balls-net
+      - internal_net     # Strictly isolated — no public access
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -77,11 +90,15 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 1G
+          cpus: '4.0'
+          memory: 8G
         reservations:
-          cpus: '0.5'
-          memory: 256M
+          cpus: '1.0'
+          memory: 2G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   # ── Database (PostgreSQL 16) ──────────────────────────────────────
   db:
@@ -100,7 +117,7 @@ services:
       start_period: 30s
     restart: unless-stopped
     networks:
-      - going-balls-net
+      - internal_net
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -114,7 +131,7 @@ services:
 
   # ── Cache & Rate Limiting (Redis 7) ───────────────────────────────
   redis:
-    image: redis:7-alpine@sha256:a1a3a5a7a9a11a13a15a17a19a21a23a25a27a29a31a33a35a37a39a41a43a45a47a49a51
+    image: redis:7-alpine@sha256:a1a3a5a7a9a11a13a15a17a19a21a23a25a27a29a31a33a35a37b39b41b43b45b47b49b51
     command: >
       redis-server
       --maxmemory 256mb
@@ -124,7 +141,6 @@ services:
       --appendfsync everysec
     volumes:
       - redis_data:/data
-      - redis_conf:/usr/local/etc/redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -133,7 +149,7 @@ services:
       start_period: 5s
     restart: unless-stopped
     networks:
-      - going-balls-net
+      - internal_net
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -150,13 +166,21 @@ volumes:
     driver: local
   redis_data:
     driver: local
-  redis_conf:
+  ai_models:
     driver: local
 
 networks:
-  going-balls-net:
+  public_net:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.20.0.0/16
+        - subnet: 172.21.0.0/24
+          gateway: 172.21.0.1
+
+  internal_net:
+    driver: bridge
+    internal: true           # No external access — AI layer is fully isolated
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
           gateway: 172.20.0.1

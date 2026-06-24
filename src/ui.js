@@ -18,6 +18,7 @@ import { saveGame } from './persistence.js';
 import { playSound } from './audio.js';
 import { applySkyConfig, getBallMaterial, applyBallSkin } from '../engine/scene.js';
 import { createLevel, createInfiniteLevel } from './levelgen.js';
+import { initVoiceToText, createMicButton, showTranscriptionToast, startListening, stopListening } from './voice_to_text.js';
 
 // --- Remote data sanitization ---
 const REMOTE_MAX_STRING = 128;
@@ -152,6 +153,29 @@ export function setupUI(game, room) {
             e.stopPropagation();
             renderCatalogPanel(game);
         });
+    }
+
+    // --- Voice-to-Text: Add mic button to bottom bar ---
+    const bottomBar = document.getElementById('bottom-bar');
+    if (bottomBar) {
+        const vtt = game._voiceToText || initVoiceToText(game);
+        game._voiceToText = vtt;
+
+        const vttContainer = document.createElement('div');
+        vttContainer.style.cssText = 'display:flex;align-items:center;gap:6px;';
+
+        const micBtn = createMicButton(vtt, {
+            tooltip: vtt.isNative ? 'Voice input' : 'Voice input (server)',
+            onResult: (text) => {
+                showTranscriptionToast(text);
+                // Also fire a callback for other UI components to hook into
+                if (typeof game._onVoiceResult === 'function') {
+                    game._onVoiceResult(text);
+                }
+            }
+        });
+        vttContainer.appendChild(micBtn);
+        bottomBar.appendChild(vttContainer);
     }
 
     // --- World Map button ---

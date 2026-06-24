@@ -15,21 +15,19 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/ engine/ main.js",
     "lint:fix": "eslint src/ engine/ main.js --fix",
-
     "build:wasm": "cd rust_core && wasm-pack build --target web --out-dir pkg",
     "build:wasm:release": "cd rust_core && wasm-pack build --target web --out-dir pkg --release",
-
     "python:install": "cd python_server && pip install -r requirements.txt",
     "python:dev": "cd python_server && uvicorn main:app --reload --port 8000",
     "python:start": "cd python_server && uvicorn main:app --port 8000",
-
     "setup:all": "npm install && npm run python:install && npm run build:wasm"
   },
   "dependencies": {
-    "wasmoon": "^1.16.0",
-    "three": "^0.184.0",
+    "@heyputer/puter.js": "^2.5.4",
     "cannon-es": "^0.20.0",
-    "nipplejs": "^0.10.1"
+    "nipplejs": "^0.10.1",
+    "three": "^0.184.0",
+    "wasmoon": "^1.16.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

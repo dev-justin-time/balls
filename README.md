@@ -36,8 +36,12 @@ A 3D physics-based rolling platformer inspired by "Going Balls".
 - Condition skies modify gameplay with coin multipliers, speed boosts/debuffs, and unique weather effects.
 
 ## Multiplayer / Persistence
-- WebsimSocket is used for optional persistence: ball_stats and leaderboard collections are seeded and subscribed to when available so Ball Index and Leaderboard show aggregated data when online.
-- Leaderboard entries are stored locally and mirrored to the room collection on a best-effort basis.
+- **WebsimSocket** is used for optional persistence when running on websim.com: ball_stats and leaderboard collections are seeded and subscribed to when available.
+- **Puter** (self-hosted or puter.com) provides an alternative open-source backend with auth, KV storage, file storage, and peer-to-peer multiplayer networking.
+  - See [`puter/README.md`](./puter/README.md) for self-hosting setup.
+  - Integration module: [`src/puter_integration.js`](./src/puter_integration.js)
+- Leaderboard entries are stored locally and mirrored to remote on a best-effort basis.
+- Three-tier fallback: WebSimSocket → Puter → Offline (localStorage only).
 
 ## Technical Details
 - Rendering: Three.js (WebGLRenderer) with sRGB encoding and PMREM support for sky/environment maps.
@@ -52,3 +56,4 @@ A 3D physics-based rolling platformer inspired by "Going Balls".
 ## Development & Debugging
 - Use a static server (e.g., `npx http-server .`) to avoid CORS issues during local testing.
 - Key tuning constants (BALL_SPEED, GRAVITY, MAX_VELOCITY, JUMP_FORCE) are in main.js for quick playfeel adjustments.
+- Puter.js can be tested locally without a full self-hosted instance — the integration falls back gracefully.

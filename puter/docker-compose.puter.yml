@@ -1,0 +1,194 @@
+# =====================================================================
+# @domain:    infrastructure
+# @concern:   Puter Game Server — Self-Hosted Backend for Going Balls
+# @version:   1.0.0
+# @source:    https://github.com/HeyPuter/puter
+# =====================================================================
+#
+# This Docker Compose stack runs Puter as a self-hosted game server
+# backend for Going Balls. It provides auth, KV storage, file storage,
+# and real-time networking for multiplayer features.
+#
+# Usage:
+#   docker compose -f docker-compose.puter.yml up -d
+#
+# Prerequisites:
+#   - A domain with wildcard DNS (*.your-domain.com) pointing to this host
+#   - Ports 80 and 443 accessible
+#   - Docker with Compose plugin
+#
+# After starting:
+#   - Puter Dashboard: https://puter.your-domain.com
+#   - Puter API:      https://api.puter.your-domain.com
+#
+# Configure Going Balls:
+#   PUTER_API_ORIGIN=https://api.puter.your-domain.com
+#
+
+version: '3.9'
+
+services:
+  # ── Puter Database (MariaDB) ────────────────────────────────────────
+  puter-db:
+    image: mariadb:11.4
+    container_name: puter-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${PUTER_DB_ROOT_PASSWORD:?Puter DB root password required}
+      MYSQL_DATABASE: puter
+      MYSQL_USER: puter
+      MYSQL_PASSWORD: ${PUTER_DB_PASSWORD:?Puter DB password required}
+    volumes:
+      - puter_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - puter_internal
+
+  # ── Puter Cache (Valkey — Redis-compatible) ─────────────────────────
+  puter-cache:
+    image: valkey/valkey:7.2
+    container_name: puter-cache
+    restart: unless-stopped
+    command: valkey-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - puter_internal
+
+  # ── Puter KV Store (DynamoDB Local for development) ─────────────────
+  puter-kv:
+    image: amazon/dynamodb-local:2.0.0
+    container_name: puter-kv
+    restart: unless-stopped
+    command: -jar DynamoDBLocal.jar -sharedDb -dbPath /data
+    volumes:
+      - puter_kv_data:/data
+    networks:
+      - puter_internal
+
+  # ── Puter File Storage (RustFS — S3-compatible) ─────────────────────
+  puter-fs:
+    image: heyputer/rustfs:latest
+    container_name: puter-fs
+    restart: unless-stopped
+    environment:
+      RUSTFS_DATA_DIR: /data
+      RUSTFS_PORT: 7000
+    volumes:
+      - puter_fs_data:/data
+    networks:
+      - puter_internal
+
+  # ── Puter Backend API ───────────────────────────────────────────────
+  puter-api:
+    image: heyputer/puter:latest
+    container_name: puter-api
+    restart: unless-stopped
+    depends_on:
+      puter-db:
+        condition: service_healthy
+      puter-cache:
+        condition: service_healthy
+      puter-kv:
+        condition: service_started
+      puter-fs:
+        condition: service_started
+    environment:
+      # ── Domain Configuration ──
+      PUTER_DOMAIN: ${PUTER_DOMAIN:?Puter domain required (e.g. puter.example.com)}
+      PUTER_API_DOMAIN: api.${PUTER_DOMAIN}
+      PUTER_APPS_DOMAIN: app.${PUTER_DOMAIN}
+      PUTER_SITES_DOMAIN: site.${PUTER_DOMAIN}
+
+      # ── Database ──
+      PUTER_DB_HOST: puter-db
+      PUTER_DB_PORT: 3306
+      PUTER_DB_NAME: puter
+      PUTER_DB_USER: puter
+      PUTER_DB_PASSWORD: ${PUTER_DB_PASSWORD}
+
+      # ── Cache ──
+      PUTER_REDIS_HOST: puter-cache
+      PUTER_REDIS_PORT: 6379
+
+      # ── KV Store ──
+      PUTER_DYNAMODB_ENDPOINT: http://puter-kv:8000
+      PUTER_DYNAMODB_REGION: us-east-1
+      PUTER_AWS_ACCESS_KEY_ID: ${PUTER_AWS_KEY:-dummy}
+      PUTER_AWS_SECRET_ACCESS_KEY: ${PUTER_AWS_SECRET:-dummy}
+
+      # ── File Storage ──
+      PUTER_S3_ENDPOINT: http://puter-fs:7000
+      PUTER_S3_REGION: us-east-1
+      PUTER_S3_BUCKET: puter-files
+
+      # ── Auth ──
+      PUTER_JWT_SECRET: ${PUTER_JWT_SECRET:?JWT secret required}
+      PUTER_SESSION_SECRET: ${PUTER_SESSION_SECRET:?Session secret required}
+
+      # ── Email (optional — for password resets) ──
+      # PUTER_SMTP_HOST: smtp.example.com
+      # PUTER_SMTP_PORT: 587
+      # PUTER_SMTP_USER: noreply@example.com
+      # PUTER_SMTP_PASS: ${PUTER_SMTP_PASS}
+
+      # ── Rate Limiting ──
+      PUTER_RATE_LIMIT_WINDOW: 60
+      PUTER_RATE_LIMIT_MAX: 100
+    volumes:
+      - puter_uploads:/var/puter/uploads
+    expose:
+      - "4100"  # API port
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - puter_internal
+
+  # ── Puter Reverse Proxy (Nginx) ─────────────────────────────────────
+  puter-proxy:
+    image: nginx:1.25-alpine
+    container_name: puter-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      puter-api:
+        condition: service_healthy
+    volumes:
+      # Mount your TLS certs here (or let Puter auto-provision with Let's Encrypt)
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - puter_internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  puter_db_data:
+    driver: local
+  puter_kv_data:
+    driver: local
+  puter_fs_data:
+    driver: local
+  puter_uploads:
+    driver: local
+
+networks:
+  puter_internal:
+    driver: bridge
+    internal: true

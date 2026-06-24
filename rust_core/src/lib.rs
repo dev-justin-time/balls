@@ -28,6 +28,7 @@ pub mod physics_solver;
 pub mod vectorizer;
 pub mod image_processing;
 pub mod topology;
+pub mod fingerprint_hasher;
 
 use wasm_bindgen::prelude::*;
 use std::panic;
@@ -79,6 +80,15 @@ pub use topology::{
     cleanup_topology,
     quick_clean,
     get_topology_info,
+};
+
+// ---------------------------------------------------------------------------
+// Re-exports from fingerprint_hasher
+// ---------------------------------------------------------------------------
+pub use fingerprint_hasher::{
+    inject_security_salt,
+    hash_fingerprint,
+    verify_fingerprint,
 };
 
 // ---------------------------------------------------------------------------

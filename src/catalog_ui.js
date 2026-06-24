@@ -8,6 +8,7 @@
  difficulty tier usage badges.
 */
 import { PART_CATEGORIES, PART_CATALOG } from './builder/catalog.js';
+import { initVoiceToText, createMicButton } from './voice_to_text.js';
 
 /**
  * Render the track parts catalog panel in the overlay.
@@ -43,15 +44,19 @@ export function renderCatalogPanel(game) {
     `;
     modal.appendChild(header);
 
-    // --- Search input ---
+    // --- Search input + Voice search button ---
     let searchQuery = '';
     const searchWrap = document.createElement('div');
     searchWrap.style.cssText = 'padding:8px 12px 4px; flex-shrink:0;';
+
+    const searchRow = document.createElement('div');
+    searchRow.style.cssText = 'display:flex;align-items:center;gap:6px;';
+
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.placeholder = '🔍 Search parts by name, key, or description...';
     searchInput.style.cssText = `
-        width:100%; box-sizing:border-box; padding:7px 10px; border-radius:8px;
+        flex:1; box-sizing:border-box; padding:7px 10px; border-radius:8px;
         background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
         color:#ddd; font-size:12px; font-family:'Segoe UI',sans-serif;
         outline:none; transition:border-color 0.2s;
@@ -62,7 +67,23 @@ export function renderCatalogPanel(game) {
         searchQuery = e.target.value.trim().toLowerCase();
         renderPartsList();
     });
-    searchWrap.appendChild(searchInput);
+    searchRow.appendChild(searchInput);
+
+    // Voice search button (reuses the shared createMicButton component)
+    const vtt = game._voiceToText || initVoiceToText(game);
+    game._voiceToText = vtt;
+    const voiceBtn = createMicButton(vtt, {
+        tooltip: vtt.isNative ? 'Search by voice' : 'Search by voice (server)',
+        onResult: (text) => {
+            searchInput.value = text;
+            searchInput.dispatchEvent(new Event('input'));
+        }
+    });
+    voiceBtn.style.width = '32px';
+    voiceBtn.style.height = '32px';
+    searchRow.appendChild(voiceBtn);
+
+    searchWrap.appendChild(searchRow);
     modal.appendChild(searchWrap);
 
     // --- Scrollable parts list (defined before tabs so setActiveTab can reference it) ---

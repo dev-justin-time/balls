@@ -535,6 +535,7 @@ const quadCoreBridge = {
   getAllSharedState,
   get isInitialized() { return _isInitialized; },
   get wasmModule() { return _wasmModule; },
+  get pythonApiBase() { return PYTHON_API_BASE; },
 };
 
 export default quadCoreBridge;
