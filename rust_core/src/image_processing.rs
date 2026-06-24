@@ -65,7 +65,7 @@ pub fn detect_edges(
     let gray_img = image::GrayImage::from_raw(width, height, gray)
         .expect("Failed to create GrayImage");
 
-    let edges = imageproc::edges::canny(&gray_img, low_thresh as f64, high_thresh as f64);
+    let edges = imageproc::edges::canny(&gray_img, low_thresh, high_thresh);
 
     // Pack edge map back into RGBA format for canvas compatibility
     let edge_pixels = edges.into_raw();
@@ -100,7 +100,7 @@ pub fn gaussian_blur(image_data: &[u8], width: u32, height: u32, sigma: f32) -> 
     let gray_img = image::GrayImage::from_raw(width, height, gray)
         .expect("Failed to create GrayImage");
 
-    let blurred = imageproc::filter::gaussian_blur(&gray_img, sigma as f64);
+    let blurred = imageproc::filter::gaussian_blur_f32(&gray_img, sigma);
 
     // Pack back to RGBA
     let blurred_pixels = blurred.into_raw();
@@ -259,11 +259,11 @@ pub fn full_pipeline(
 
     // Step 1: Gaussian blur (if sigma > 0)
     if blur_sigma > 0.0 {
-        img = imageproc::filter::gaussian_blur(&img, blur_sigma as f64);
+        img = imageproc::filter::gaussian_blur_f32(&img, blur_sigma);
     }
 
     // Step 2: Canny edge detection
-    let edges = imageproc::edges::canny(&img, edge_low as f64, edge_high as f64);
+    let edges = imageproc::edges::canny(&img, edge_low, edge_high);
     let edges_raw = edges.as_raw();
 
     // Step 3: Binary threshold (if > 0)
@@ -377,8 +377,8 @@ mod tests {
     #[test]
     fn test_apply_threshold_invert() {
         let data = create_test_rgba(16, 16);
-        let normal = apply_threshold(&data, 16, 16, 128, false);
-        let inverted = apply_threshold(&data, 16, 16, 128, true);
+        let normal = apply_threshold(&data, 16, 16, 127, false);
+        let inverted = apply_threshold(&data, 16, 16, 127, true);
         // Pixels should be opposite
         for i in 0..(16 * 16) {
             assert_ne!(normal[i * 4], inverted[i * 4]);

@@ -26,17 +26,17 @@ Integration:
 -- Seeded PRNG (mulberry32)
 -- ============================================================================
 
-local function mulberry32(seed)
-    -- Lua 5.4 mulberry32 PRNG (native bitwise operators)
-    -- wasmoon runs Lua 5.4, so ~ | >> work natively
-    local state = seed % 2147483647
+-- Mulberry32 PRNG (Recycled for shop loot boxes and AI seeds)
+-- Global so other Lua scripts (shop_logic.lua, ai_prompts.lua) can reuse it.
+-- Pure function, no external state dependencies.
+function mulberry32(a)
+    a = a % 2147483647
     return function()
-        state = state + 0x6D2B79F5
-        local t = state
-        t = (t ~ (t >> 15)) * (t | 1)
-        t = (t ~ (t >> 7)) * (t | 61)
-        t = t ~ (t >> 14)
-        return (t % 0xFFFFFFFF) / 4294967296
+        a = a + 0x6D2B79F5
+        local t = a
+        t = math.floor((t ~ (t >> 15)) * (t + 1))
+        t = t ~ (t + math.floor((t ~ (t >> 7)) * (t + 61)))
+        return ((t ~ (t >> 14)) / 4294967296.0)
     end
 end
 
@@ -450,4 +450,80 @@ end
 --- Roll an integer from 1 to n using the seeded RNG.
 function rng_roll(rng, n)
     return math.floor(rng() * n) + 1
+end
+
+-- ============================================================================
+-- Weighted Segment Selection (Spec-compatible helper)
+-- ============================================================================
+
+-- Simplified segment definitions with weighted probabilities
+-- Used by _select_weighted_segment() for drop-weighted generation.
+local _WEIGHTED_SEGMENTS = {
+    { id = "straight", weight = 30, min_diff = 1, max_diff = 9 },
+    { id = "ramp",     weight = 20, min_diff = 1, max_diff = 5 },
+    { id = "spinner",  weight = 15, min_diff = 3, max_diff = 9 },
+    { id = "gap",      weight = 10, min_diff = 4, max_diff = 9 },
+    { id = "portal",   weight = 5,  min_diff = 6, max_diff = 9 }
+}
+
+--- Weighted random segment selection (spec-compatible pattern).
+-- Filters by difficulty tier, then rolls against weighted probabilities.
+-- @param rng (function) Seeded PRNG function
+-- @param difficulty_tier (number) Current difficulty (1-9 scale)
+-- @return (table) Selected segment definition
+function _select_weighted_segment(rng, difficulty_tier)
+    local valid_segments = {}
+    local total_weight = 0
+
+    for _, seg in ipairs(_WEIGHTED_SEGMENTS) do
+        if difficulty_tier >= seg.min_diff and difficulty_tier <= seg.max_diff then
+            table.insert(valid_segments, seg)
+            total_weight = total_weight + seg.weight
+        end
+    end
+
+    if #valid_segments == 0 then return _WEIGHTED_SEGMENTS[1] end -- Fallback
+
+    local roll = rng() * total_weight
+    local current_weight = 0
+
+    for _, seg in ipairs(valid_segments) do
+        current_weight = current_weight + seg.weight
+        if roll <= current_weight then
+            return seg
+        end
+    end
+    return valid_segments[#valid_segments]
+end
+
+--- Simple level generator using weighted segment selection (spec-compatible pattern).
+-- Generates a fixed-length level with hazard multipliers.
+-- @param seed (number) Deterministic seed
+-- @param difficulty_tier (number) 1-9 difficulty
+-- @param length (number) Number of segments to generate
+-- @return (table) Level data with segments array
+function generate_level_weighted(seed, difficulty_tier, length)
+    if difficulty_tier < 1 then difficulty_tier = 1 end
+    if difficulty_tier > 9 then difficulty_tier = 9 end
+
+    local rng = mulberry32(seed)
+    local level_data = {
+        seed = seed,
+        tier = difficulty_tier,
+        segments = {}
+    }
+
+    for i = 1, length do
+        local seg = _select_weighted_segment(rng, difficulty_tier)
+        local hazard_mult = 1.0 + (difficulty_tier * 0.15)
+
+        table.insert(level_data.segments, {
+            index = i,
+            type = seg.id,
+            hazard_speed = hazard_mult,
+            coin_count = math.floor(rng() * 3) + 1
+        })
+    end
+
+    return level_data
 end

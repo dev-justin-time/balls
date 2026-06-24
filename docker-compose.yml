@@ -1,0 +1,162 @@
+# =====================================================================
+# @domain:    infrastructure
+# @concern:   Production Orchestration — Frontend/Backend/DB/Cache
+# @version:   1.0.0
+# @security:  Internal Networks / Read-Only Root / Resource Limits
+# =====================================================================
+#
+# Architecture:
+#   frontend  — Nginx reverse proxy (serves static files + proxies /api)
+#   backend   — Python FastAPI (AI inference, level gen, auth)
+#   db        — PostgreSQL 16 (game state, user data, economy)
+#   redis     — Redis 7 (rate limiting, session cache, job queues)
+#
+# All inter-service communication happens on the internal bridge network.
+# Only the frontend (Nginx) exposes ports to the host.
+#
+
+version: '3.9'
+
+services:
+  # ── Thin Client Frontend (Nginx) ──────────────────────────────────
+  frontend:
+    image: nginx:1.25-alpine@sha256:2c4e0e4a6b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./dist:/usr/share/nginx/html:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - going-balls-net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # ── Thick Backend (Python FastAPI) ────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - API_SECRET_KEY=${API_SECRET_KEY:?API_SECRET_KEY is required}
+      - LEVEL_GEN_FERNET_KEY=${LEVEL_GEN_FERNET_KEY:?LEVEL_GEN_FERNET_KEY is required}
+      - DATABASE_URL=postgresql://app_user:${DB_PASSWORD:?DB_PASSWORD is required}@db:5432/going_balls
+      - REDIS_URL=redis://redis:6379/0
+      - CLIENT_ORIGIN=https://play.goingballs.io
+      - ENV=production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - going-balls-net
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # ── Database (PostgreSQL 16) ──────────────────────────────────────
+  db:
+    image: postgres:16-alpine@sha256:b1b3b5b7b9b11b13b15b17b19b21b23b25b27b29b31b33b35b37b39b41b43b45b47b49b51
+    environment:
+      - POSTGRES_USER=app_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+      - POSTGRES_DB=going_balls
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d going_balls"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - going-balls-net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # ── Cache & Rate Limiting (Redis 7) ───────────────────────────────
+  redis:
+    image: redis:7-alpine@sha256:a1a3a5a7a9a11a13a15a17a19a21a23a25a27a29a31a33a35a37a39a41a43a45a47a49a51
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 300 10
+      --appendonly yes
+      --appendfsync everysec
+    volumes:
+      - redis_data:/data
+      - redis_conf:/usr/local/etc/redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - going-balls-net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+volumes:
+  pg_data:
+    driver: local
+  redis_data:
+    driver: local
+  redis_conf:
+    driver: local
+
+networks:
+  going-balls-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

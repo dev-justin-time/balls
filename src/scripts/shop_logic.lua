@@ -125,6 +125,8 @@ function calculate_decoy_purchase(user_id, item_tier)
         upsell_tier = 3,
         upsell_price_diff = PRICING_TIERS[3].base_price - final_price,
         tier_name = tier_data.name,
+        localized_tier_name = "tier." .. string.lower(tier_data.name) .. ".name",
+        -- i18n key matches src/i18n.js keys: "tier.basic.name", "tier.pro.name", "tier.ultimate.name"
         perks = tier_data.perks
     }
 end
@@ -170,6 +172,55 @@ function get_all_tiers()
     -- Sort by tier ID
     table.sort(tiers, function(a, b) return a.id < b.id end)
     return tiers
+end
+
+-- ============================================================================
+-- Loot Box Probability Resolver (Spec-compatible)
+-- ============================================================================
+
+-- Recycles the mulberry32 PRNG from rules.lua (must be loaded first).
+-- If mulberry32 is not available, falls back to a local inline PRNG.
+
+--- Resolves a loot box drop based on a seed and user tier.
+-- Base rates: rare 10%, epic 3%, legendary 1%.
+-- Tier modifiers scale rates for paying users.
+-- @param seed (number) Deterministic seed
+-- @param user_tier (string) "free", "pro", or "ultimate"
+-- @return (string) "legendary", "epic", "rare", or "common"
+function resolve_loot_box(seed, user_tier)
+    local rng
+    if type(mulberry32) == "function" then
+        rng = mulberry32(seed)
+    else
+        -- Inline fallback PRNG
+        local _state = seed % 2147483647
+        rng = function()
+            _state = (_state * 1664525 + 1013904223) % 4294967296
+            return _state / 4294967296
+        end
+    end
+
+    local roll = rng()
+
+    -- Base rates
+    local rare_rate = 0.10
+    local epic_rate = 0.03
+    local legendary_rate = 0.01
+
+    -- Tier modifiers (Monetization hook)
+    if user_tier == "pro" then
+        rare_rate = rare_rate * 1.5
+        epic_rate = epic_rate * 2.0
+    elseif user_tier == "ultimate" then
+        rare_rate = rare_rate * 2.0
+        epic_rate = epic_rate * 3.0
+        legendary_rate = legendary_rate * 5.0
+    end
+
+    if roll < legendary_rate then return "legendary"
+    elseif roll < legendary_rate + epic_rate then return "epic"
+    elseif roll < legendary_rate + epic_rate + rare_rate then return "rare"
+    else return "common" end
 end
 
 -- ============================================================================

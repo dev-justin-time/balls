@@ -520,7 +520,7 @@ function _generateFallbackLevelSeed(levelIndex, difficultyTier) {
 // Singleton Export
 // ---------------------------------------------------------------------------
 
-export default {
+const quadCoreBridge = {
   initialize: initializeQuadCore,
   resolvePhysicsFrame,
   getValidationToken,
@@ -534,4 +534,10 @@ export default {
   getSharedState,
   getAllSharedState,
   get isInitialized() { return _isInitialized; },
+  get wasmModule() { return _wasmModule; },
 };
+
+export default quadCoreBridge;
+
+// Named export for destructured imports from wireframe_importer.js and mesh_operations.js
+export { quadCoreBridge as quadCore };

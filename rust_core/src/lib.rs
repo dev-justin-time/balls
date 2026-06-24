@@ -43,6 +43,10 @@ pub use physics_solver::{
     reset_collision_state,
     _debug_render_collision_mesh,
     _ai_path_prediction,
+    // 3D Mesh Operations
+    optimize_geometry,
+    merge_vertices,
+    boolean_cut,
 };
 
 // ---------------------------------------------------------------------------

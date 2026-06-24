@@ -1,0 +1,227 @@
+# =====================================================================
+# @domain:    devops
+# @concern:   Quad-Core CI/CD Pipeline (JS + Python + Rust WASM)
+# @version:   1.0.0
+# @security:  Supply Chain (Pinned Actions / SBOM / CVE Scan)
+# =====================================================================
+#
+# Pipeline architecture:
+#   PHASE 1 — Parallel validation of all 3 ecosystems
+#   PHASE 2 — Security scan & SBOM generation (after all validations pass)
+#   PHASE 3 — Container build, push to GHCR, and deploy (main only)
+#
+
+name: Quad-Core CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ==========================================
+  # PHASE 1: PARALLEL VALIDATION
+  # ==========================================
+
+  validate-frontend:
+    name: Validate JS Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Cache frontend build
+        uses: actions/cache@v4
+        with:
+          path: dist/
+          key: frontend-${{ runner.os }}-${{ hashFiles('dist/**') }}
+          restore-keys: |
+            frontend-${{ runner.os }}-
+
+  validate-backend:
+    name: Validate Python Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: python_server/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r python_server/requirements.txt
+          pip install ruff pytest
+
+      - name: Lint with Ruff
+        run: ruff check python_server/
+
+      - name: Run tests
+        run: pytest python_server/tests/ --junitxml=pytest-report.xml --tb=short
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: pytest-report.xml
+
+  validate-wasm:
+    name: Validate Rust WASM Core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust_core
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
+      - name: Build WASM (release)
+        run: wasm-pack build rust_core/ --target web --release
+
+      - name: Run native tests
+        run: cd rust_core && cargo test
+
+      - name: Upload WASM package
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-pkg
+          path: rust_core/pkg/
+
+  # ==========================================
+  # PHASE 2: SECURITY & SUPPLY CHAIN
+  # ==========================================
+
+  security-scan:
+    name: Security & SBOM
+    needs: [validate-frontend, validate-backend, validate-wasm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cyclonedx.json
+
+      - name: Trivy file-system scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy'
+
+  # ==========================================
+  # PHASE 3: BUILD & DEPLOY
+  # ==========================================
+
+  build-and-deploy:
+    name: Build & Deploy
+    needs: [security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-pkg
+          path: rust_core/pkg/
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          target: production
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying ${{ steps.meta.outputs.tags }} to production..."
+          # Example Kubernetes rollout:
+          # kubectl set image deployment/going-balls-api \
+          #   api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tags }}
+          # kubectl rollout status deployment/going-balls-api

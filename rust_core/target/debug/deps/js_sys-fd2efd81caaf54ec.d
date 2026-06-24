@@ -1,0 +1,10 @@
+C:\Users\dividicus\Documents\balls\rust_core\target\debug\deps\js_sys-fd2efd81caaf54ec.d: C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\lib.rs C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\mod.rs C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\queue.rs C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\task\singlethread.rs
+
+C:\Users\dividicus\Documents\balls\rust_core\target\debug\deps\libjs_sys-fd2efd81caaf54ec.rlib: C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\lib.rs C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\mod.rs C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\queue.rs C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\task\singlethread.rs
+
+C:\Users\dividicus\Documents\balls\rust_core\target\debug\deps\libjs_sys-fd2efd81caaf54ec.rmeta: C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\lib.rs C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\mod.rs C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\queue.rs C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\task\singlethread.rs
+
+C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\lib.rs:
+C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\mod.rs:
+C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\queue.rs:
+C:\Users\dividicus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\js-sys-0.3.102\src\futures\task\singlethread.rs:

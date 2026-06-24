@@ -7,6 +7,8 @@
 
 import { PART_CATEGORIES, getPartsByCategory } from './catalog.js';
 import { initBuilderXP, addBuilderXP, renderBuilderXPBar, calculateTrackBonusXP } from './builder_xp.js';
+import { WireframeImporter } from './wireframe_importer.js';
+import { setupBuilderShare } from './builder_networking.js';
 
 /**
  * Render the full builder UI into the overlay.
@@ -142,6 +144,7 @@ export function renderBuilderUI(game) {
         <button id="builder-community-btn" class="menu-btn" aria-label="Load from community" style="font-size:10px;padding:6px 10px;">🌍 COMMUNITY</button>
         <button id="builder-export-btn" class="menu-btn" aria-label="Export track" style="font-size:10px;padding:6px 10px;">📋 EXPORT</button>
         <button id="builder-workshop-btn" class="menu-btn" aria-label="Open 3D Workshop" style="font-size:10px;padding:6px 10px;background:rgba(220,120,0,0.4);border-color:#ff8800;">🎨 WORKSHOP</button>
+        <button id="builder-ai-import-btn" class="menu-btn" aria-label="Import from AI" style="font-size:10px;padding:6px 10px;background:rgba(0,120,220,0.4);border-color:#4488ff;">🤖 AI IMPORT</button>
     `;
     sidebar.appendChild(actions);
 
@@ -192,6 +195,9 @@ export function renderBuilderUI(game) {
 
     // Render first category
     renderPartGrid(game, 'surface');
+
+    // Wire the share button handler (Lua-validated)
+    setupBuilderShare(game);
 
     // Wire events after DOM is populated
     requestAnimationFrame(() => wireBuilderUIEvents(game));
@@ -378,6 +384,130 @@ function wireBuilderUIEvents(game) {
             }
         });
     }
+
+    // Import from AI
+    const aiImportBtn = document.getElementById('builder-ai-import-btn');
+    if (aiImportBtn) {
+        aiImportBtn.addEventListener('click', () => {
+            handleAIImport(game);
+        });
+    }
+}
+
+/**
+ * Handle the 'Import from AI' flow:
+ * 1. Open a file picker for the user to select a sketch image
+ * 2. Read the image as base64
+ * 3. Create a WireframeImporter and call importFromAI()
+ * 4. Show loading/success/error feedback in the status bar
+ */
+function handleAIImport(game) {
+    // Create a hidden file input for image selection
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/png,image/jpeg,image/webp,image/bmp';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+
+    fileInput.addEventListener('change', async () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+            fileInput.remove();
+            return;
+        }
+
+        // Show loading state in status bar
+        const statusEl = document.getElementById('builder-status');
+        if (statusEl) {
+            statusEl.innerHTML = `<span style="color:#4488ff;">⏳ Importing from AI...</span>`;
+        }
+
+        try {
+            // Read the image as base64
+            const base64 = await readFileAsBase64(file);
+
+            // Determine user tier for AI feature gating (Pro/Ultimate = advanced HAWP parsing)
+            const userTier = game.saveData && game.saveData.subscriptionTier || 'free';
+
+            // Use a shared WireframeImporter instance so undo/clear works across imports
+            if (!game._aiImporter) game._aiImporter = new WireframeImporter(game);
+            const result = await game._aiImporter.importFromAI(base64, userTier);
+
+            if (result.success) {
+                // Update status with success info
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <span style="color:#44ff88;">✅ AI Import: ${result.meshCount} mesh${result.meshCount !== 1 ? 'es' : ''} (${result.nodeCount} nodes)</span>
+                        <span style="color:#888;">✨ ${result.engineUsed}</span>
+                    `;
+                }
+
+                // Flash the import button to confirm completion
+                const btn = document.getElementById('builder-ai-import-btn');
+                if (btn) {
+                    btn.style.background = 'rgba(0,200,80,0.4)';
+                    btn.style.borderColor = '#44ff88';
+                    setTimeout(() => {
+                        btn.style.background = 'rgba(0,120,220,0.4)';
+                        btn.style.borderColor = '#4488ff';
+                    }, 1500);
+                }
+            } else {
+                // Show error in status bar
+                if (statusEl) {
+                    statusEl.innerHTML = `<span style="color:#ff6666;">❌ AI Import failed: ${result.error || 'Unknown error'}</span>`;
+                }
+            }
+        } catch (error) {
+            const statusEl = document.getElementById('builder-status');
+            if (statusEl) {
+                statusEl.innerHTML = `<span style="color:#ff6666;">❌ AI Import error: ${error.message}</span>`;
+            }
+            console.error('[BuilderUI] AI Import failed:', error);
+        } finally {
+            fileInput.remove();
+            // Reset status after a delay unless there's an active message
+            setTimeout(() => {
+                updateBuilderStatus(game);
+            }, 5000);
+        }
+    });
+
+    fileInput.click();
+
+    // Handle cancel — clean up if the user dismisses the file picker without selecting
+    const cancelCleanup = () => {
+        setTimeout(() => {
+            if (fileInput.parentNode && fileInput.files.length === 0) {
+                fileInput.remove();
+            }
+        }, 300);
+    };
+    window.addEventListener('focus', cancelCleanup, { once: true });
+}
+
+/**
+ * Read a File object as a base64 data URI string.
+ * @param {File} file
+ * @returns {Promise<string>}
+ */
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            // reader.result is a data: URI like "data:image/png;base64,..."
+            // The WireframeImporter expects just the base64 data portion
+            const dataUrl = reader.result;
+            const commaIndex = dataUrl.indexOf(',');
+            if (commaIndex !== -1) {
+                resolve(dataUrl.slice(commaIndex + 1));
+            } else {
+                resolve(dataUrl);
+            }
+        };
+        reader.onerror = () => reject(new Error('Failed to read image file'));
+        reader.readAsDataURL(file);
+    });
 }
 
 /**

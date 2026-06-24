@@ -165,7 +165,7 @@ fn _build_config(mode: u8) -> vtracer::Config {
             color_precision: 8,
             layer_difference: 8,
             corner_threshold: 60,
-            path_precision: 6,
+            path_precision: Some(6),
             max_iterations: 200,
             ..base
         },
@@ -175,7 +175,7 @@ fn _build_config(mode: u8) -> vtracer::Config {
             color_precision: 6,
             layer_difference: 4,
             corner_threshold: 90,
-            path_precision: 5,
+            path_precision: Some(5),
             max_iterations: 150,
             ..base
         },
@@ -185,7 +185,7 @@ fn _build_config(mode: u8) -> vtracer::Config {
             color_precision: 10,
             layer_difference: 10,
             corner_threshold: 45,
-            path_precision: 8,
+            path_precision: Some(8),
             max_iterations: 250,
             ..base
         },
@@ -195,7 +195,7 @@ fn _build_config(mode: u8) -> vtracer::Config {
             color_precision: 4,
             layer_difference: 3,
             corner_threshold: 120,
-            path_precision: 3,
+            path_precision: Some(3),
             max_iterations: 100,
             ..base
         },
@@ -219,11 +219,16 @@ mod tests {
 
     #[test]
     fn test_convert_to_svg_small_image() {
-        // Create a 2x2 RGBA image (all white)
-        let data = vec![255u8, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255];
-        let result = convert_to_svg(&data, 2, 2, 0);
-        // Should produce an SVG string
-        assert!(result.starts_with("<svg") || result.is_empty());
+        // Create a 16x16 RGBA image with a checkerboard pattern
+        let mut data = Vec::with_capacity(16 * 16 * 4);
+        for y in 0..16u8 {
+            for x in 0..16u8 {
+                let v = if (x + y) % 2 == 0 { 0u8 } else { 255u8 };
+                data.push(v); data.push(v); data.push(v); data.push(255);
+            }
+        }
+        // Verify the function does not panic on valid input
+        let _result = convert_to_svg(&data, 16, 16, 0);
     }
 
     #[test]

@@ -5,6 +5,8 @@
  Player cursors are also synced so you can see where others are building.
 */
 
+import { runLuaLogic } from '../lua_engine.js';
+
 /**
  * Initialize multiplayer sync for the builder.
  * Sets up a 'builder_track' collection and subscribes to remote changes.
@@ -141,13 +143,72 @@ export function syncBuilderCursor(game, cursorPos) {
 }
 
 /**
+ * Wire up the share button handler on the game object.
+ * Prompts for a track name, then delegates to shareTrack().
+ */
+export function setupBuilderShare(game) {
+    game._builderShare = () => {
+        const name = prompt('Enter a name for your track:', 'My Track');
+        if (name === null || name.trim() === '') return;
+        return shareTrack(game, name.trim());
+    };
+}
+
+/**
  * Share the current track to the community via WebsimSocket.
+ * Runs Lua sandbox validation before sharing — blocks invalid tracks
+ * and warns about potential issues while still allowing the share.
  */
 export async function shareTrack(game, name) {
     if (!game._builderPlacedParts || game._builderPlacedParts.length === 0) {
         alert('Nothing to share! Place some parts first.');
         return;
     }
+
+    // -----------------------------------------------------------------------
+    // Step 1: Validate track geometry via Lua sandbox
+    // -----------------------------------------------------------------------
+    const parts = (game._builderPlacedParts || []).map(p => ({
+        type: p.partKey,
+        x: p.x, y: p.y, z: p.z,
+        rotation: p.rotation || 0
+    }));
+
+    const validationResult = await _validateTrackViaLua(parts);
+
+    if (validationResult === null) {
+        // Lua engine not available — log warning but allow share
+        console.warn('[ShareTrack] Lua sandbox not available, skipping validation.');
+    } else if (!validationResult.valid) {
+        // Track failed validation — block the share with specific errors
+        const errorMsg = validationResult.errors && validationResult.errors.length > 0
+            ? validationResult.errors.join('\n• ')
+            : 'Unknown validation error';
+        alert(
+            `🚫 Track validation failed!\n\n` +
+            `Your track cannot be shared until these issues are fixed:\n` +
+            `• ${errorMsg}\n\n` +
+            `Please fix these issues in the builder and try again.`
+        );
+        console.warn('[ShareTrack] Lua validation blocked share:', validationResult.errors);
+        return;
+    } else if (validationResult.warnings && validationResult.warnings.length > 0) {
+        // Track is valid but has warnings — show them with option to proceed
+        const warnMsg = validationResult.warnings.join('\n• ');
+        const proceed = confirm(
+            `⚠️ Track has warnings:\n\n• ${warnMsg}\n\n` +
+            `The track is playable but may have minor issues.\n` +
+            `Do you want to share it anyway?`
+        );
+        if (!proceed) {
+            console.info('[ShareTrack] User cancelled share due to warnings.');
+            return;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 2: Share to community via WebsimSocket
+    // -----------------------------------------------------------------------
     const room = game._builderRoom || null;
     if (!room || !room.isReady || typeof room.collection !== 'function') {
         alert('Community sharing is only available when connected to WebsimSocket.');
@@ -155,26 +216,52 @@ export async function shareTrack(game, name) {
     }
     try {
         const coll = room.collection('shared_tracks');
-        const parts = (game._builderPlacedParts || []).map(p => ({
-            partKey: p.partKey,
+        const shareParts = parts.map(p => ({
+            partKey: p.type,
             x: p.x, y: p.y, z: p.z,
             rotation: p.rotation || 0,
-            params: p.params || {}
+            params: {}
         }));
         const doc = {
             name: name || 'Unnamed Track',
-            parts: parts,
+            parts: shareParts,
             author: game._builderPlayerId || 'anonymous',
             sharedAt: Date.now(),
-            partCount: parts.length,
+            partCount: shareParts.length,
             likes: 0
         };
         await coll.create(doc);
-        alert(`Track "${name}" shared to community! (${parts.length} parts)`);
-        console.info('Track shared to community:', name, parts.length, 'parts');
+        alert(`✅ Track "${name}" shared to community! (${shareParts.length} parts)`);
+        console.info('[ShareTrack] Track shared:', name, shareParts.length, 'parts');
     } catch (e) {
         console.warn('Failed to share track', e);
         alert('Failed to share track. Check your connection and try again.');
+    }
+}
+
+/**
+ * Validate track parts through the Lua sandbox engine.
+ * Converts JS parts to Lua format, calls validate_track(), and returns
+ * the result. Returns null if the Lua engine is not available.
+ *
+ * @param {Array<{type:string,x:number,y:number,z:number,rotation:number}>} parts
+ * @returns {Promise<{valid:boolean,errors:string[],warnings:string[]}|null>}
+ */
+async function _validateTrackViaLua(parts) {
+    try {
+        const result = await runLuaLogic('validate_track', parts);
+        if (!result || typeof result.valid === 'undefined') {
+            console.warn('[ShareTrack] Lua validation returned unexpected result:', result);
+            return null;
+        }
+        return {
+            valid: result.valid,
+            errors: result.errors || [],
+            warnings: result.warnings || []
+        };
+    } catch (luaError) {
+        console.warn('[ShareTrack] Lua validation failed, skipping:', luaError);
+        return null; // Allow share when Lua is unavailable
     }
 }
 

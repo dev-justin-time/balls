@@ -322,7 +322,11 @@ function generate_technical_prompt(concept, style, material, lighting, resolutio
     -- Build negative prompt
     local negative = _build_negative_prompt(style_def, concept)
 
-    -- Return structured result
+    -- Generate a deterministic backend seed string for the Python AI backend
+    -- This is consumed by wireframe_ai.py to seed its generation
+    local backend_seed = "seed_" .. tostring(concept) .. "_" .. style .. "_" .. tostring(#positive)
+
+    -- Return structured result matching the Python Pydantic model schema
     return {
         positive_prompt = positive,
         negative_prompt = negative,
@@ -332,7 +336,12 @@ function generate_technical_prompt(concept, style, material, lighting, resolutio
             num_steps = style_def.controlnet.steps
         },
         style_name = style_def.name,
-        artifact = style_def.artifact
+        artifact = style_def.artifact,
+        backend_seed = backend_seed,
+        aspect_ratio = "16:9",
+        steps = style_def.controlnet.steps,
+        cfg_scale = style_def.controlnet.guidance,
+        control_strength = style_def.controlnet.strength
     }
 end
 

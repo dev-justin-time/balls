@@ -136,6 +136,11 @@ export async function runLuaLogic(functionName, ...args) {
     }
 
     const result = await fn(...args);
+    // Clean up the Lua function reference to prevent memory leaks
+    // and WASM heap fragmentation (spec-compatible pattern)
+    if (typeof fn.close === 'function') {
+      fn.close();
+    }
     return result;
   } catch (error) {
     console.error(`[LuaEngine] Error calling "${functionName}":`, error);
@@ -231,6 +236,130 @@ async function _fetchLuaScript(path) {
 
 
 // ---------------------------------------------------------------------------
+// LuaHotLoader Class (Spec-compatible wrapper)
+// ---------------------------------------------------------------------------
+
+/**
+ * LuaHotLoader — WASM Lua initialization & hot-reloading class.
+ *
+ * Provides the spec-compatible API pattern with explicit class methods
+ * for loading, hot-reloading, and calling Lua functions. Wraps the
+ * existing module-level state for backward compatibility.
+ *
+ * @example
+ *   const loader = new LuaHotLoader();
+ *   await loader.init();
+ *   await loader.loadScript('rules', '/src/scripts/rules.lua');
+ *   const level = await loader.callFunction('generate_level', 42, 2);
+ */
+export class LuaHotLoader {
+  constructor() {
+    this.factory = null;
+    this.engine = null;
+    this.loadedScripts = new Map();
+    this.isInitialized = false;
+  }
+
+  /**
+   * Initialize the Lua 5.4 engine with sandboxed security.
+   * Disables os, io, package, and require to prevent
+   * filesystem access and OS command execution.
+   */
+  async init() {
+    if (this.isInitialized) return;
+
+    try {
+      const { LuaFactory } = await import('wasmoon');
+      this.factory = new LuaFactory();
+      this.engine = await this.factory.createEngine();
+
+      // Security Sandbox: Disable dangerous standard libraries
+      this.engine.global.set('os', undefined);
+      this.engine.global.set('io', undefined);
+      this.engine.global.set('package', undefined);
+      this.engine.global.set('require', undefined);
+
+      // Inject JS dependencies into Lua
+      this.engine.global.set('JS_MATH', Math);
+
+      this.isInitialized = true;
+      console.info('[LuaHotLoader] Engine initialized and sandboxed.');
+    } catch (error) {
+      console.error('[LuaHotLoader] Failed to initialize engine:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load a Lua script from a URL and cache it.
+   * In development, can be called repeatedly to hot-reload logic.
+   *
+   * @param {string} scriptName - Logical name for the script
+   * @param {string} scriptUrl - URL path to the .lua file
+   */
+  async loadScript(scriptName, scriptUrl) {
+    if (!this.isInitialized) await this.init();
+
+    try {
+      const response = await fetch(scriptUrl);
+      const code = await response.text();
+
+      // Execute the code in the sandboxed engine
+      await this.engine.doString(code);
+
+      this.loadedScripts.set(scriptName, { url: scriptUrl, lastLoaded: Date.now() });
+      console.info(`[LuaHotLoader] Loaded: ${scriptName}`);
+    } catch (error) {
+      console.error(`[LuaHotLoader] Failed to load ${scriptName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Hot-reload a specific script without restarting the engine.
+   * Preserves engine state but overwrites function definitions.
+   *
+   * @param {string} scriptName - Logical name of already-loaded script
+   */
+  async hotReload(scriptName) {
+    const scriptData = this.loadedScripts.get(scriptName);
+    if (!scriptData) throw new Error(`Script "${scriptName}" not loaded.`);
+
+    console.info(`[LuaHotLoader] Hot-reloading ${scriptName}...`);
+    await this.loadScript(scriptName, scriptData.url);
+  }
+
+  /**
+   * Call a global Lua function and return the result as a JS object.
+   * Automatically converts Lua tables to JS objects (handled by wasmoon).
+   * Cleans up Lua function references to prevent WASM heap fragmentation.
+   *
+   * @param {string} funcName - Lua global function name
+   * @param {...any} args - Arguments to pass to the function
+   * @returns {Promise<any>} Return value from Lua
+   */
+  async callFunction(funcName, ...args) {
+    if (!this.isInitialized) throw new Error('Lua engine not initialized.');
+
+    const func = this.engine.global.get(funcName);
+    if (typeof func !== 'function') {
+      throw new Error(`Lua function '${funcName}' not found.`);
+    }
+
+    try {
+      // wasmoon automatically converts Lua tables to JS objects
+      const result = await func(...args);
+      return result;
+    } finally {
+      // Clean up the Lua function reference to prevent memory leaks
+      if (typeof func.close === 'function') {
+        func.close();
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Singleton Default Export
 // ---------------------------------------------------------------------------
 
@@ -243,3 +372,5 @@ export default {
   reloadScript,
   destroy: destroyLuaEngine,
 };
+
+
