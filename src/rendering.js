@@ -13,11 +13,14 @@ import { updateGroovyCanvas } from '../engine/scene.js';
 import { saveGame } from './persistence.js';
 import { spawnInfiniteChunk } from './levelgen.js';
 import { updateNeighborPreview, animateNeighborPreview } from './world/world_minimap.js';
+import { updateSpeedLines } from './speed_lines.js';
+import { updateMotionBlur, finishMotionBlur, resizeMotionBlur } from './motion_blur.js';
 
 export function onWindowResize(game) {
     game.camera.aspect = window.innerWidth / window.innerHeight;
     game.camera.updateProjectionMatrix();
     game.renderer.setSize(window.innerWidth, window.innerHeight);
+    try { resizeMotionBlur(game); } catch (e) {}
 }
 
 // Log engine versions once on first render for debugging
@@ -181,8 +184,17 @@ export function animate(game) {
     // Camera follow
     updateCamera(game, dt);
 
+    // Speed lines (cosmetic — intensity tied to ball velocity)
+    updateSpeedLines(game, dt);
+
+    // Motion blur post-process (redirects render to off-screen RT)
+    updateMotionBlur(game);
+
     // Render
     try { game.renderer.render(game.scene, game.camera); } catch (e) {}
+
+    // Composite motion blur to screen
+    finishMotionBlur(game);
 
     // Auto-save periodically
     if (!game._lastSave || Date.now() - game._lastSave > 5000) {

@@ -18,12 +18,12 @@ import { playPortalSound } from './audio.js';
 
 // Physics constants (module-scoped for game feel tuning)
 const BALL_RADIUS = 0.5;
-const GRAVITY = -45;
+const GRAVITY = -48; // bumped from -45 to tighten jump arc after JUMP_FORCE/MAX_VELOCITY increases
 const BALL_SPEED = 5000;
 const STEER_SPEED = 22;
 const STEER_DAMPING = 0.92; // angular velocity decay factor applied per frame
-const MAX_VELOCITY = 22;
-const JUMP_FORCE = 25;
+export const MAX_VELOCITY = 22;
+const JUMP_FORCE = 28; // bumped from 25 to compensate for higher MAX_VELOCITY (22 vs 18)
 
 export function initPhysics(game) {
     game.world = new CANNON.World();
@@ -108,12 +108,17 @@ export function updatePhysics(game, dt) {
                 const padW = ((obj.width || 4) / 2) + BALL_RADIUS;
                 const padL = ((obj.length || 4) / 2) + BALL_RADIUS;
                 if (dx < padW && dz < padL && dy > BALL_RADIUS && dy < BALL_RADIUS + 1.2) {
-                    const bp = obj.bouncePower || 15;
-                    game.ballBody.velocity.y = bp;
+                    const bp = obj.bouncePower || 18;
+                    const levelMult = 1 + (game.currentLevel - 1) * 0.08;
+                    game.ballBody.velocity.y = bp * levelMult;
                     game.isGrounded = false;
                     game.jumpCount = 0;
                     obj._springCooldown = true;
                     setTimeout(() => { obj._springCooldown = false; }, 400);
+                    // Spawn spring trail afterimage effect
+                    try {
+                        spawnSpringTrail(game, obj.x || 0, (obj.y || 0) + 0.5, obj.z || 0);
+                    } catch (_e) {}
                 }
             });
         } catch (e) {}
@@ -429,6 +434,9 @@ export function updatePhysics(game, dt) {
 
         // Portal particle animation
         updatePortalParticles(game, dt);
+
+        // Spring pad trail animation
+        updateSpringTrail(game, dt);
     } catch (e) {
         console.warn('updatePhysics error', e);
     }
@@ -827,6 +835,79 @@ function updatePortalParticles(game, dt) {
                 vel[j].vy += 1.5 * dt; // floaty upward drift
             }
             pp.points.geometry.attributes.position.needsUpdate = true;
+        }
+    } catch (e) {}
+}
+
+// --- Spring pad trail / afterimage effect ---
+
+function spawnSpringTrail(game, x, y, z) {
+    try {
+        const count = 16;
+        const positions = new Float32Array(count * 3);
+        const velocities = [];
+        for (let i = 0; i < count; i++) {
+            const ix = i * 3;
+            positions[ix] = x + (Math.random() - 0.5) * 0.6;
+            positions[ix + 1] = y;
+            positions[ix + 2] = z + (Math.random() - 0.5) * 0.6;
+            velocities.push({
+                vx: (Math.random() - 0.5) * 3,
+                vy: 6 + Math.random() * 6,
+                vz: (Math.random() - 0.5) * 3
+            });
+        }
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const mat = new THREE.PointsMaterial({
+            color: 0xff8800,
+            size: 0.22,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        const points = new THREE.Points(geom, mat);
+        points.frustumCulled = false;
+        game.scene.add(points);
+
+        game._springTrail = game._springTrail || [];
+        game._springTrail.push({
+            points,
+            velocities,
+            born: Date.now(),
+            lifetime: 450
+        });
+    } catch (e) {}
+}
+
+function updateSpringTrail(game, dt) {
+    try {
+        if (!game._springTrail) return;
+        const now = Date.now();
+        for (let i = game._springTrail.length - 1; i >= 0; i--) {
+            const st = game._springTrail[i];
+            const age = now - st.born;
+            if (age > st.lifetime) {
+                game.scene.remove(st.points);
+                st.points.geometry.dispose();
+                st.points.material.dispose();
+                game._springTrail.splice(i, 1);
+                continue;
+            }
+            const pos = st.points.geometry.attributes.position.array;
+            const vel = st.velocities;
+            const fade = 1 - age / st.lifetime;
+            st.points.material.opacity = fade * 0.85;
+            st.points.material.size = 0.22 * (0.4 + fade * 0.6);
+            for (let j = 0; j < vel.length; j++) {
+                const ix = j * 3;
+                pos[ix] += vel[j].vx * dt;
+                pos[ix + 1] += vel[j].vy * dt;
+                pos[ix + 2] += vel[j].vz * dt;
+                vel[j].vy -= 6 * dt; // gravity slows the particles
+            }
+            st.points.geometry.attributes.position.needsUpdate = true;
         }
     } catch (e) {}
 }

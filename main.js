@@ -16,6 +16,8 @@ import { initAudio, registerSfx, playSound } from './src/audio.js';
 import { initScene, getBallMaterial, clearTextureCache } from './engine/scene.js';
 import { onWindowResize, animate } from './src/rendering.js';
 import { initPhysics, updatePhysics, jump, createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, updateFireSparks, createHeatShimmer, clearHeatShimmer, updateHeatShimmer, createMeteors, clearMeteors, updateMeteors, checkMeteorCollisions } from './src/physics.js';
+import { initSpeedLines } from './src/speed_lines.js';
+import { initMotionBlur } from './src/motion_blur.js';
 import { createLevel, createInfiniteLevel, clearLevel, addPlatform, addGlassPlatform, addTunnelWalls, addRamp, addPendulum, addSpinner, addHammer, addMover, addWall, addCoins, addCheckpoint, addBlade, placeFinishModel, triggerDropFromObstacle, spawnDroppedCoins, spawnInfiniteChunk, createShockwave, addLoopDeLoop, addSpiralTube, addSpringPad, addCurve, addStairs, addPortalRing, addHalfPipe, addCheckerboard, addGlassLoopDeLoop, addGlassStairs, addGlassCurve, playCommunityTrack } from './src/levelgen.js';
 import { setupUI, renderGrids, renderBallIndex, getLeaderboard, saveLeaderboard, addLeaderboardEntry, renderLeaderboard, handlePurchase, levelUpSkin, applySkinAbilities, updateWalletUI, checkGameState, gameOver, showTimeBonus, reset, showTestPlayHUD, removeTestPlayHUD } from './src/ui.js';
 import { initBuilderScene, onBuilderMouseMove, onBuilderClick, onBuilderWheel, onBuilderPanStart, onBuilderPanEnd, placePart, undoLastPlacement, clearBuilderScene, disposeBuilderScene, renderBuilder, loadPartsIntoBuilder } from './src/builder/builder_scene.js';
@@ -67,6 +69,12 @@ class Game {
 
         // --- Physics ---
         initPhysics(this);
+
+        // --- Speed lines (cosmetic VFX) ---
+        initSpeedLines(this);
+
+        // --- Motion blur post-processing ---
+        initMotionBlur(this);
 
         // --- Controls ---
         this.initControls();

@@ -276,7 +276,7 @@ export const PART_CATALOG = {
         name: 'Spring Pad',
         category: 'surface',
         icon: '🦘',
-        defaults: { width: 4, length: 4, bouncePower: 15 },
+        defaults: { width: 4, length: 4, bouncePower: 18 },
         connPts: [
             { x: 0, y: 0, z: -2, dir: 'front' },
             { x: 0, y: 0, z: 2, dir: 'back' }

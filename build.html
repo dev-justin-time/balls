@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Going Balls — Build Report &amp; Platform Vision</title>
+<style>
+  :root {
+    --bg: #0d1117; --fg: #c9d1d9; --accent: #58a6ff; --accent2: #e94560;
+    --code-bg: #161b22; --border: #30363d; --heading: #f0f6fc;
+    --card-bg: #161b22; --tag-bg: #1f6feb33; --tag-fg: #58a6ff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #ffffff; --fg: #24292f; --accent: #0969da; --accent2: #cf222e;
+      --code-bg: #f6f8fa; --border: #d0d7de; --heading: #1b1f24;
+      --card-bg: #f6f8fa; --tag-bg: #ddf4ff; --tag-fg: #0969da;
+    }
+  }
+  @media print {
+    :root { --bg: #fff; --fg: #000; --heading: #000; --code-bg: #f5f5f5; --border: #ccc; }
+    body { font-size: 11pt; }
+    .no-print { display: none !important; }
+    h1, h2, h3 { page-break-after: avoid; }
+    pre, table { page-break-inside: avoid; }
+    .page-break { page-break-before: always; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--fg); line-height: 1.6;
+    max-width: 960px; margin: 0 auto; padding: 40px 24px 80px;
+  }
+  h1 { color: var(--heading); font-size: 2.2em; margin-bottom: 4px; border-bottom: 3px solid var(--accent2); padding-bottom: 12px; }
+  h2 { color: var(--heading); font-size: 1.5em; margin: 36px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  h3 { color: var(--accent); font-size: 1.15em; margin: 24px 0 8px; }
+  h4 { color: var(--fg); font-size: 1em; margin: 16px 0 6px; }
+  p { margin: 8px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  blockquote {
+    background: var(--card-bg); border-left: 4px solid var(--accent); padding: 12px 16px;
+    margin: 16px 0; border-radius: 0 8px 8px 0; font-size: 0.92em; color: #8b949e;
+  }
+  code {
+    background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.88em;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; overflow-x: auto; margin: 12px 0; font-size: 0.85em; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 12px 0;
+    font-size: 0.92em;
+  }
+  th, td {
+    text-align: left; padding: 8px 12px; border: 1px solid var(--border);
+  }
+  th { background: var(--card-bg); color: var(--heading); font-weight: 600; }
+  tr:nth-child(even) { background: var(--code-bg); }
+  ul, ol { padding-left: 24px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+  strong { color: var(--heading); }
+  em { color: #8b949e; }
+  .tag {
+    display: inline-block; background: var(--tag-bg); color: var(--tag-fg);
+    padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: 500;
+    margin: 2px 4px 2px 0;
+  }
+  .toc {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px 24px; margin: 24px 0;
+  }
+  .toc h2 { border: none; margin: 0 0 12px; font-size: 1.2em; }
+  .toc ul { list-style: none; padding: 0; columns: 2; column-gap: 32px; }
+  .toc li { margin: 4px 0; }
+  .toc a { font-size: 0.92em; }
+  .prompt-box {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 20px; margin: 12px 0;
+  }
+  .prompt-box h4 { color: var(--accent2); margin-top: 0; }
+  .print-btn {
+    position: fixed; bottom: 24px; right: 24px; z-index: 100;
+    background: var(--accent2); color: #fff; border: none; padding: 12px 20px;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .print-btn:hover { opacity: 0.9; }
+  @media print { .print-btn { display: none; } }
+</style>
+</head>
+<body>
+
+<h1>Going Balls — Build Report &amp; Platform Vision</h1>
+<blockquote>
+  <strong>Generated:</strong> June 23, 2026 &nbsp;|&nbsp;
+  <strong>Version:</strong> 1.2.0+ &nbsp;|&nbsp;
+  <strong>Platform:</strong> Browser (ES Modules, zero-build-step, CDN-loaded dependencies)
+</blockquote>
+
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ul>
+    <li><a href="#vision">1. Platform Vision</a></li>
+    <li><a href="#prompts">2. Build Prompts (21)</a></li>
+    <li><a href="#constants">3. Key Tuning Constants</a></li>
+    <li><a href="#assets">4. Asset Inventory</a></li>
+    <li><a href="#files">5. File Structure</a></li>
+    <li><a href="#quickstart">6. Quick Start</a></li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="vision">Part 1: Overall Platform Vision</h2>
+
+<h3>What Going Balls Is</h3>
+<p>Going Balls — Web Edition is a <strong>3D physics-based rolling platformer</strong> that lives entirely in the browser. The player controls a ball that rolls through procedurally generated (or community-created) obstacle courses, collecting coins, avoiding hazards, and unlocking cosmetic skins — all rendered with Three.js and driven by cannon-es physics.</p>
+<p>It is designed as a <strong>mobile-first, installable PWA</strong> that works offline after first load, with optional real-time multiplayer features powered by WebsimSocket.</p>
+
+<h3>Core Design Pillars</h3>
+<ol>
+  <li><strong>Physics-First Gameplay</strong> — cannon-es handles gravity, friction, restitution, and collision. The player <em>steers</em> the ball, creating a momentum-based flow state.</li>
+  <li><strong>Procedural + Community Content</strong> — 40+ segment types, 9 difficulty tiers, seeded PRNG. Players build tracks with 25+ parts and share them.</li>
+  <li><strong>Deep Progression</strong> — 70+ skins with abilities, 12 skies with gameplay conditions, powerups, builder XP.</li>
+  <li><strong>Resilient &amp; Graceful</strong> — Fallback-everything. Degrades from multiplayer to fully offline.</li>
+</ol>
+
+<h3>Architecture Overview</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                         main.js                              │
+│              Thin DI bootstrap (Game class)                  │
+├─────────┬──────────┬──────────┬──────────┬──────────────────┤
+│ engine/ │  src/    │  src/    │  src/    │  src/            │
+│ scene.js│physics.js│ levelgen │  ui.js   │ rendering.js     │
+│ Three.js│ cannon-es│ 40+ types│  DOM UI  │  rAF loop        │
+│ Camera  │ Ball     │ 9 tiers  │ Shop     │ Speed lines      │
+│ Materials│Obstacles│ Builder  │ Leaderbr │ Motion blur      │
+│ Sky/PMREM│Weather │ playback │ Settings │                  │
+├─────────┴──────────┼──────────┴──────────┴──────────────────┤
+│ src/audio.js       │ src/persistence.js  │ src/networking.js│
+├────────────────────┴─────────────────────┴──────────────────┤
+│ src/builder/              │ src/world/                       │
+│ Track Builder (25+ parts) │ World Grid (shared universe)     │
+│ 3D Workshop (20+ modules) │ Marketplace + AR/VR + Minimap   │
+└───────────────────────────┴──────────────────────────────────┘</code></pre>
+
+<h3>Key Technical Decisions</h3>
+<table>
+  <tr><th>Decision</th><th>Rationale</th></tr>
+  <tr><td><strong>Zero build step</strong></td><td>ES modules via import map from esm.sh CDN. No bundler.</td></tr>
+  <tr><td><strong>DI via <code>game</code> object</strong></td><td>Every module function takes <code>game</code> as first arg. No globals.</td></tr>
+  <tr><td><strong>CDN dependencies</strong></td><td>Three.js r184, cannon-es, nipplejs from esm.sh. No node_modules in prod.</td></tr>
+  <tr><td><strong>SHA cache busting</strong></td><td>CI stamps git SHA into <code>sw.js</code> on deploy.</td></tr>
+  <tr><td><strong>Fallback-everything</strong></td><td>Textures→grey, GLTFs→geometry, sky→color, network→offline.</td></tr>
+</table>
+
+<h3>The Six Experiences</h3>
+<ol>
+  <li><strong>Core Game</strong> — Procedural levels, 9 difficulty tiers, coin collection</li>
+  <li><strong>Track Builder</strong> — 25+ part types, save/share/community, XP progression</li>
+  <li><strong>3D Workshop</strong> — Model editor (sculpt/paint/lasso/rig/export)</li>
+  <li><strong>Community Hub</strong> — Browse/rate/like/trending tracks</li>
+  <li><strong>World Grid</strong> — Shared persistent universe, site marketplace</li>
+  <li><strong>Survival Mode</strong> — Endless escalating difficulty</li>
+</ol>
+
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2 id="prompts">Part 2: Build Prompts</h2>
+<p><em>21 self-contained, copy-pasteable prompts to build every system from scratch.</em></p>
+
+<div class="prompt-box">
+<h4>Prompt 1: Project Scaffolding</h4>
+<pre><code>Create a zero-build-step browser game "going-balls" with:
+- package.json: devDeps only (three, eslint, vitest, lhci, serve)
+- Scripts: dev, start, test, lint, lint:fix
+- eslint.config.js (flat config), vitest.config.js (jsdom)
+- server.js (static on :3000), .gitignore
+No bundler. ES modules only.</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 2: HTML Shell &amp; Import Map</h4>
+<pre><code>Create index.html with:
+- Import map: three, cannon-es, nipplejs from esm.sh CDN
+- UI: loading overlay, top-menu (HELP/SHOP/LEADERBOARD/SURVIVAL/BUILDER/COMMUNITY/MUSIC),
+  joystick + jump button, #overlay, pointer lock hint
+- SEO: OG tags, Twitter Card, manifest.json link
+- Custom font (5x5dots.ttf), linked styles.css</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 3: Three.js Scene</h4>
+<pre><code>Create engine/scene.js exporting initScene(game):
+- WebGLRenderer (antialias, sRGB, ACES, PCFSoft shadows)
+- 11 shared materials (wood, finish, coin, pendulum, spinner, etc.)
+- Sky system: inverted sphere, PMREM, crossfade transitions
+- Ball skin: texture/color/emissive/gltf, GLB async swap
+- disposeMesh() utility, textureCache</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 4: Cannon-es Physics</h4>
+<pre><code>Create src/physics.js:
+- GRAVITY=-45, JUMP_FORCE=28, MAX_VELOCITY=22, STEER_SPEED=22
+- Ball: Sphere(0.5), mass=100, angDamp=0.95, linDamp=0.5
+- Input → steer force → velocity clamp
+- Obstacle collision (pendulums, spinners, movers, meteors)
+- Weather particles: rain, wind, fire sparks, heat shimmer, meteors
+- Portal teleportation with particle burst</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 5: Level Generation</h4>
+<pre><code>Create src/levelgen.js:
+- mulberry32 seeded PRNG, 9 difficulty tiers
+- 40+ segment types (platform, ramp, pendulum, spinner, loop, spiral, etc.)
+- createLevel(game, seed): segments = 15 + floor(level × 2.5)
+- Even levels mirrored horizontally
+- clearLevel(): dispose all geometry
+- playCommunityTrack(): deserialize saved parts</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 6: Ball Skin Database</h4>
+<pre><code>Create src/ball_db.js with BALL_DB (65+ skins):
+{ name, price, tex, type: 'texture'|'gltf'|'color'|'emissive',
+  ability: { key: 'speed'|'jump'|'coins', base, perLevel },
+  description }
+Price-based speed bias up to +12% at 12000 coins.</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 7: UI System</h4>
+<pre><code>Create src/ui.js:
+- Shop: tabbed grid (Skins, Skies, Powerups), buy/equip/level
+- Ball Index: remote stats merge, play/win/avg/best time
+- Leaderboard: local + remote, full-screen modal
+- Game state: timer, coin multiplier, magnet, game over
+- Focus trapping, ESC to close</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 8: Audio System</h4>
+<pre><code>Create src/audio.js:
+- Rolling SFX (volume by speed), background music (0.18 vol)
+- AudioContext visualizer (frequency bars on canvas)
+- Clone-based SFX pool (no cross-talk)
+- Portal whoosh: synthesized (noise → bandpass → gain)
+- Autoplay compliance, music toggle</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 9: Persistence &amp; Weather AI</h4>
+<pre><code>Create src/persistence.js:
+- localStorage save/load, mulberry32 RNG
+- 12 sky configs (4 condition-based: Storm/Inferno/Frost/Void)
+- Weather AI: weighted scoring + persistent bias learning
+- Particle count scaling by hardwareConcurrency/device/area</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 10: Animation Loop</h4>
+<pre><code>Create src/rendering.js:
+- rAF loop: physics → camera → speed lines → motion blur → weather → render
+- Builder/World mode switching
+- Camera orbit with lerp smoothing, pitch clamped [0.15, 1.2]</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 11: Speed Lines</h4>
+<pre><code>Create src/speed_lines.js:
+- 64 LineSegments, additive blending, renderOrder 999
+- Opacity: 0→0.45 as hSpeed goes 35%→100% of MAX_VELOCITY
+- Warm color tint above 80% speed
+- Module-pooled vectors (no per-frame GC)</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 12: Motion Blur</h4>
+<pre><code>Create src/motion_blur.js:
+- Two-pass: scene → WebGLRenderTarget → blur shader → fullscreen quad
+- 8 centre-weighted directional samples
+- Activates above 60% of MAX_VELOCITY
+- Half-float RT with fallback, resize handler</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 13: Networking</h4>
+<pre><code>Create src/networking.js:
+- WebsimSocket with retry (3 attempts, exponential backoff)
+- Loading manager (THREE.DefaultLoadingManager hooks)
+- Global error handlers (suppress network noise)
+- Safety timeout: dismiss loading after 6s</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 14: Notification Manager</h4>
+<pre><code>Create src/notification_manager.js:
+- DOM toast pool, maxConcurrent=3, minInterval=250ms
+- CSS transitions, auto-dismiss, persistent mode (15s max)</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 15: Track Builder</h4>
+<pre><code>Create src/builder/ (5 modules):
+- catalog.js: 25+ parts in 5 categories
+- builder_scene.js: 3D scene, grid, placement, undo/clear
+- builder_ui.js: sidebar, category tabs, XP bar, actions
+- builder_networking.js: multiplayer sync, community modal, likes/ratings/trending
+- builder_xp.js: XP sources, 9 rank titles, quadratic thresholds</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 16: 3D Workshop</h4>
+<pre><code>Create src/builder/ws_*.js (20+ modules):
+- Core: state, scene, controls (orbit + transform)
+- Features: loaders, operations, exporter, painter, selection
+- Advanced: lasso select, undo/redo, rigging, sculpting, wireframe
+- AI: agent hooks, gallery thumbnails, floating UI panels</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 17: World Grid</h4>
+<pre><code>Create src/world/ (6 modules):
+- WorldGrid class, terrain presets, site ownership
+- Real-time sync (sites, parts, presence, listings)
+- Marketplace: buy/sell sites, blueprints, transaction history
+- Neighbor 3D preview, AR/VR pointers</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 18: Service Worker &amp; PWA</h4>
+<pre><code>Create sw.js + manifest.json:
+- SHA-stamped cache, stale-while-revalidate assets
+- Network-first navigation, offline fallback
+- PWA: fullscreen, orientation any, maskable icon</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 19: CI/CD</h4>
+<pre><code>Create .github/workflows/ci.yml:
+- lint-and-test → lighthouse → deploy (GitHub Pages)
+- SHA-stamp sw.js on deploy
+- Lighthouse: perf≥0.5, a11y≥0.7</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 20: Test Suite</h4>
+<pre><code>Create tests/ (141+ tests):
+- persistence: RNG seeding, localStorage, corruption recovery
+- levelgen: fixed seeds, segment counts, tiers
+- asset_loading: path resolution, Three.js/CANNON mocks
+- ball_skin: getBallMaterial (7), applyBallSkin (8), levelUpSkin (7)</code></pre>
+</div>
+
+<div class="prompt-box">
+<h4>Prompt 21: Styles</h4>
+<pre><code>Create styles.css (mobile-first):
+- Glassmorphism buttons, dark gradients
+- Mobile: joystick + jump button
+- Modals: 480px max, scrollable
+- Builder sidebar: 340px right-fixed
+- Responsive breakpoints, accessibility, animations</code></pre>
+</div>
+
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2 id="constants">Part 3: Key Tuning Constants</h2>
+<p>All in <code>src/physics.js</code>:</p>
+<table>
+  <tr><th>Constant</th><th>Value</th><th>Purpose</th></tr>
+  <tr><td><code>MAX_VELOCITY</code></td><td><strong>22</strong></td><td>Horizontal speed cap</td></tr>
+  <tr><td><code>JUMP_FORCE</code></td><td><strong>28</strong></td><td>Vertical impulse</td></tr>
+  <tr><td><code>GRAVITY</code></td><td>-45</td><td>Downward acceleration</td></tr>
+  <tr><td><code>BALL_RADIUS</code></td><td>0.5</td><td>Ball size</td></tr>
+  <tr><td><code>STEER_SPEED</code></td><td>22</td><td>Lateral force</td></tr>
+  <tr><td>Mass</td><td>100</td><td>Heavy dense feel</td></tr>
+  <tr><td>Angular damping</td><td>0.95</td><td>Slow spin decay</td></tr>
+  <tr><td>Linear damping</td><td>0.5</td><td>Moderate drag</td></tr>
+  <tr><td>Friction</td><td>1.0</td><td>High ground grip</td></tr>
+  <tr><td>Restitution</td><td>0.1</td><td>Minimal bounce</td></tr>
+  <tr><td>Spring pad</td><td><strong>18</strong></td><td>Launch height</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="assets">Part 4: Asset Inventory</h2>
+<pre><code>assets/
+├── font/5x5dots.ttf              Custom pixel font
+├── image/
+│   ├── ball/*.webp,*.gif         65+ skin textures
+│   ├── sky/*.webp                4 sky environment maps
+│   └── raw/                      Source/unused assets
+├── model/
+│   ├── finish_gate.glb           Finish line model
+│   ├── eye_*.glb                 GLTF ball skin
+│   ├── scene_NEBULA.gltf         Nebula GLTF skin
+│   └── _halloween_*.glb          Zombie trail model
+└── sfx/
+    ├── elevator_music.mp3        Background music
+    ├── rolling_loop.mp3          Rolling (looped)
+    ├── coin_collect.mp3          Coin pickup
+    ├── jump.mp3                  Jump sound
+    ├── finish_line.mp3           Level complete
+    └── fall_off.mp3              Fall off edge</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="files">Part 5: File Structure</h2>
+<pre><code>going-balls/
+├── .github/workflows/ci.yml     CI/CD pipeline
+├── index.html                    App shell + import map
+├── main.js                       Bootstrap DI (~600 lines)
+├── styles.css                    All styles
+├── sw.js                         Service worker
+├── manifest.json                 PWA manifest
+├── package.json                  Dev dependencies only
+├── eslint.config.js              Flat config
+├── vitest.config.js              Test config
+├── lighthouserc.json             Lighthouse CI config
+│
+├── engine/scene.js               Three.js scene, materials, sky, ball skin
+│
+├── src/
+│   ├── physics.js                cannon-es, forces, collisions, weather
+│   ├── levelgen.js               Procedural levels (40+ types)
+│   ├── ui.js                     Shop, leaderboard, ball index
+│   ├── audio.js                  Music, SFX, visualizer
+│   ├── persistence.js            localStorage, RNG, weather AI
+│   ├── networking.js             WebsimSocket, loading, errors
+│   ├── rendering.js              rAF loop, camera, particles
+│   ├── ball_db.js                65+ skin definitions
+│   ├── ball_index_ui.js          Remote stats UI
+│   ├── notification_manager.js   Toast pool
+│   ├── speed_lines.js            Speed lines VFX
+│   ├── motion_blur.js            Motion blur shader
+│   ├── builder/ (10 files)       Track builder + 3D workshop (20+ ws_*.js)
+│   └── world/ (6 files)          World grid, marketplace, AR/VR
+│
+├── tests/ (4 files)              141 vitest tests
+└── assets/                       Fonts, images, models, audio</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="quickstart">Part 6: Quick Start</h2>
+<pre><code># Clone and install
+git clone &lt;repo&gt; &amp;&amp; cd going-balls &amp;&amp; npm ci
+
+# Development
+npm run dev              # http://localhost:3000
+
+# Quality
+npm run lint             # ESLint
+npm run lint:fix         # Auto-fix
+npm test                 # 141 tests
+npm run test:watch       # Watch mode
+
+# Production
+# Push to main → lint → test → Lighthouse → GitHub Pages</code></pre>
+
+<hr>
+<p style="text-align:center; color:#8b949e; font-size:0.85em;">
+  <em>Generated from Going Balls codebase v1.2.0. Covers all systems, build prompts, architecture, and assets.</em>
+</p>
+
+<button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+
+</body>
+</html>

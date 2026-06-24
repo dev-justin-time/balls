@@ -1140,7 +1140,7 @@ export function addSpiralTube(game, x, y, z, width = 6, radius = 8, turns = 2, s
     }
 }
 
-export function addSpringPad(game, x, y, z, width = 4, length = 4, bouncePower = 15) {
+export function addSpringPad(game, x, y, z, width = 4, length = 4, bouncePower = 18) {
     try {
         const w = Math.max(2, Math.min(8, width));
         const l = Math.max(2, Math.min(8, length));
@@ -1312,7 +1312,7 @@ export function playCommunityTrack(game, parts) {
                 case 'spiral_tube':
                     addSpiralTube(game, placed.x, placed.y, placed.z, p.width || 6, p.radius || 8, p.turns || 2, p.segments || 16); break;
                 case 'spring_pad':
-                    addSpringPad(game, placed.x, placed.y, placed.z, p.width || 4, p.length || 4, p.bouncePower ?? 15); break;
+                    addSpringPad(game, placed.x, placed.y, placed.z, p.width || 4, p.length || 4, p.bouncePower ?? 18); break;
                 case 'curve':
                     addCurve(game, placed.x, placed.y, placed.z, p.width || 6, p.arcLength || 8, p.segments || 8, p.direction ?? 1); break;
                 case 'stairs':
