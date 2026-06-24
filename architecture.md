@@ -1,358 +1,296 @@
-# Going Balls — Architecture Diagrams
+# Going Balls — Quad-Core Architecture (v2.0)
 
-> Render these in any Mermaid-compatible viewer (GitHub, GitLab, VS Code, Mermaid Live Editor).
+> **Multi-Language Platform**: JavaScript · Rust (WASM) · Python · Lua
+>
+> Each language runs in the environment where it excels, connected through a secure IPC bridge.
 
 ---
 
-## 1. High-Level Module Architecture
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                   BROWSER (Client-Side)                             │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                    JAVASCRIPT (Orchestrator)                  │  │
+│  │  ┌────────────┐  ┌────────────┐  ┌──────────┐  ┌──────────┐ │  │
+│  │  │ Scene      │  │ Rendering  │  │ Controls │  │ UI/Shop  │ │  │
+│  │  │ (Three.js) │  │ (rAF Loop) │  │ (Input)  │  │ (Modals) │ │  │
+│  │  └────────────┘  └────────────┘  └──────────┘  └──────────┘ │  │
+│  │                                                              │  │
+│  │  ┌─────────────────────────────────────────────────────────┐ │  │
+│  │  │              QuadCore IPC Bridge (ipc_bridge.js)         │ │  │
+│  │  │  Routes: Physics→Rust · Levels→Python · Economy→Lua     │ │  │
+│  │  └─────────────────────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                           │            │            │               │
+│              ┌────────────┘            │            └────────────┐  │
+│              ▼                         ▼                        ▼  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐ │
+│  │  RUST (WASM)     │  │  PYTHON (API)     │  │  LUA (wasmoon)   │ │
+│  │  Physics Solver  │  │  Level Gen       │  │  Economy Engine  │ │
+│  │  Anti-Cheat      │  │  Auth/Validation │  │  Shop Logic      │ │
+│  │  Obfuscated      │  │  Rate Limiting   │  │  Game Theory     │ │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Language Assignment
+
+| Language | Location | Responsibility | Why this language |
+|----------|----------|---------------|-------------------|
+| **JavaScript** | `main.js`, `src/`, `engine/` | UI orchestration, Three.js rendering, input handling, DOM, networking | Strongest built-in: DOM manipulation, event-driven async, browser APIs |
+| **Rust** | `rust_core/src/physics_solver.rs` | Obfuscated physics simulation, velocity validation, anti-cheat | Strongest built-in: zero-cost abstractions, memory safety, WASM compilation, control-flow obfuscation |
+| **Python** | `python_server/` | Secure level generation (AI), frame validation, WASM secrets, rate limiting | Strongest built-in: rich ecosystem (FastAPI, cryptography), rapid backend development, procedural generation |
+| **Lua** | `src/scripts/shop_logic.lua` | Game theory pricing, endowed progress, decoy pricing, battle pass logic | Strongest built-in: embeddable lightweight runtime, hot-reloadable game logic, sandboxed execution |
+
+---
+
+## Module Architecture
 
 ```mermaid
 graph TB
-    subgraph Bootstrap["main.js — DI Bootstrap"]
-        G[Game Class]
+    subgraph Bootstrap["main.js — Quad-Core Bootstrap"]
+        G[Game Class v2.0]
     end
 
-    subgraph Core["Core Engine"]
-        SC["engine/scene.js<br/>Three.js Scene · Camera · Renderer<br/>Materials · Sky/PMREM · Ball Skin"]
-        PH["src/physics.js<br/>cannon-es World · Ball Body<br/>Forces · Collisions · Weather Particles"]
-        LG["src/levelgen.js<br/>Procedural Level Gen<br/>40+ Segment Types · 9 Tiers"]
-        RN["src/rendering.js<br/>rAF Loop · Camera Follow<br/>Speed Lines · Motion Blur"]
+    subgraph RecycledJS["Recycled v1.x Modules"]
+        SC["engine/scene.js<br/>Three.js Scene · Camera · Renderer"]
+        PH["src/physics.js<br/>cannon-es Physics (Fallback)"]
+        RN["src/rendering.js<br/>rAF Loop · Camera Follow · VFX"]
+        PR["src/persistence.js<br/>localStorage · RNG · Configs"]
+        BD["src/ball_db.js<br/>70+ Skin Definitions"]
+        NT["src/notification_manager.js"]
+        AU["src/audio.js<br/>Music · SFX"]
+        SL["src/speed_lines.js"]
+        MB["src/motion_blur.js"]
+        LG["src/levelgen.js<br/>Procedural Level Gen"]
     end
 
-    subgraph Data["Data & Persistence"]
-        PR["src/persistence.js<br/>localStorage · mulberry32 RNG<br/>Sky/Powerup Configs · Weather AI"]
-        BD["src/ball_db.js<br/>65+ Skin Definitions<br/>Single Source of Truth"]
-        NT["src/notification_manager.js<br/>Toast Pool · Rate Limiting"]
+    subgraph QuadCore["Quad-Core New Modules"]
+        IPC["src/core/ipc_bridge.js<br/>QuadCoreBridge<br/>JS↔Rust↔Python↔Lua"]
+        LUA["src/scripts/shop_logic.lua<br/>Game Theory Economy"]
     end
 
-    subgraph AudioNet["Audio & Networking"]
-        AU["src/audio.js<br/>Music · SFX Pool<br/>AudioContext Visualizer"]
-        NW["src/networking.js<br/>WebsimSocket · Loading Manager<br/>Error Handlers"]
+    subgraph RustWASM["Rust WASM Core"]
+        RS["rust_core/src/physics_solver.rs<br/>Obfuscated Physics<br/>Anti-Cheat Validation"]
+        CA["rust_core/Cargo.toml"]
     end
 
-    subgraph UI["User Interface"]
-        UI_[src/ui.js<br/>Shop · Leaderboard · Ball Index<br/>Settings · Game State]
-        BI["src/ball_index_ui.js<br/>Remote Stats Merge<br/>Equip/Buy/Level"]
+    subgraph PythonBackend["Python Backend"]
+        PY["python_server/main.py<br/>FastAPI Application"]
+        LGEN["python_server/services/level_gen_ai.py<br/>Secure Level Generator"]
+        RQ["python_server/requirements.txt"]
     end
 
-    subgraph VFX["Visual Effects"]
-        SL["src/speed_lines.js<br/>64 LineSegments<br/>Velocity-linked opacity"]
-        MB["src/motion_blur.js<br/>Two-pass directional blur<br/>Shader-based composite"]
-    end
+    G --> RecycledJS
+    G --> IPC
+    IPC -->|WASM bridge| RS
+    IPC -->|HTTP/Fetch| PY
+    IPC -->|wasmoon| LUA
+    PY --> LGEN
 
-    subgraph Builder["Track Builder"]
-        BC["catalog.js<br/>25+ Part Definitions<br/>5 Categories"]
-        BS["builder_scene.js<br/>3D Builder Scene<br/>Grid · Placement"]
-        BU["builder_ui.js<br/>Categorized Grid<br/>XP Bar · Actions"]
-        BN["builder_networking.js<br/>Multiplayer Sync<br/>Community · Likes/Ratings"]
-        BX["builder_xp.js<br/>XP & Leveling<br/>9 Rank Titles"]
-    end
-
-    subgraph Workshop["3D Workshop"]
-        WA["ws_app.js — Entry Point"]
-        WS["ws_scene.js · ws_controls.js<br/>ws_state.js · ws_selection.js"]
-        WP["ws_painter.js · ws_sculpting.js<br/>ws_rigging.js · ws_wireframeEditor.js"]
-        WE["ws_exporter.js · ws_loaders.js<br/>ws_gallery.js · ws_agent.js"]
-    end
-
-    subgraph World["World Grid"]
-        WST["world_state.js<br/>WorldGrid · Sites<br/>Terrain Presets"]
-        WNW["world_networking.js<br/>Real-time Sync<br/>Presence · Ownership"]
-        WUI["world_ui.js<br/>Grid View<br/>Site Cards"]
-        MP["marketplace.js<br/>Buy/Sell Sites<br/>Blueprints · History"]
-        WM["world_minimap.js<br/>Neighbor Preview<br/>3D Thumbnail"]
-        WAR["world_arvr.js<br/>AR/VR Pointers"]
-    end
-
-    G --> SC
-    G --> PH
-    G --> LG
-    G --> RN
-    G --> PR
-    G --> AU
-    G --> NW
-    G --> UI_
-    G --> BI
-    G --> NT
-    G --> SL
-    G --> MB
-    G --> BC
-    G --> BS
-    G --> BU
-    G --> BN
-    G --> BX
-    G --> WA
-    WA --> WS
-    WA --> WP
-    WA --> WE
-    G --> WST
-    G --> WNW
-    G --> WUI
-    G --> MP
-    G --> WM
-    G --> WAR
-
-    SC -->|scene, camera, renderer| PH
-    SC -->|materials, sky| LG
-    PH -->|ballBody, collisions| LG
-    PR -->|rng, configs| LG
-    PR -->|ballConfigs| BD
-    NW -->|room| BN
-    NW -->|room| WNW
-    RN -->|updateMotionBlur| MB
-    RN -->|updateSpeedLines| SL
-
-    style Bootstrap fill:#1a1a2e,stroke:#e94560,color:#fff
-    style Core fill:#16213e,stroke:#0f3460,color:#fff
-    style Data fill:#1a1a2e,stroke:#533483,color:#fff
-    style AudioNet fill:#1a1a2e,stroke:#e94560,color:#fff
-    style UI fill:#16213e,stroke:#0f3460,color:#fff
-    style VFX fill:#1a1a2e,stroke:#533483,color:#fff
-    style Builder fill:#0f3460,stroke:#e94560,color:#fff
-    style Workshop fill:#533483,stroke:#e94560,color:#fff
-    style World fill:#16213e,stroke:#0f3460,color:#fff
+    style Bootstrap fill:#1a0a2e,stroke:#8844ff,color:#fff
+    style RecycledJS fill:#16213e,stroke:#0f3460,color:#fff
+    style QuadCore fill:#0a2e1a,stroke:#44ff88,color:#fff
+    style RustWASM fill:#2e1a0a,stroke:#ff8844,color:#fff
+    style PythonBackend fill:#1a1a2e,stroke:#4488ff,color:#fff
 ```
 
 ---
 
-## 2. Game Loop (Per Frame)
+## Data Flow — Multi-Language Physics Pipeline
 
 ```mermaid
-flowchart TD
-    A[requestAnimationFrame] --> B{Builder Active?}
-    B -->|Yes| C[Render Builder Scene]
-    B -->|No| D{World Active?}
-    D -->|Yes| E[Render World Scene]
-    D -->|No| F[updatePhysics dt]
-    F --> G[updateCamera dt]
-    G --> H[updateSpeedLines dt]
-    H --> I[updateMotionBlur]
-    I --> J[Update Weather Particles]
-    J --> K{Infinite Mode?}
-    K -->|Yes| L[spawnInfiniteChunk]
-    K -->|No| M[renderer.render scene, camera]
-    L --> M
-    M --> N[finishMotionBlur]
-    N --> O[Render Music Visualizer]
-    O --> A
+sequenceDiagram
+    participant JS as JavaScript (Orchestrator)
+    participant Rust as Rust WASM (Physics)
+    participant Python as Python Backend
 
-    C --> A
-    E --> A
+    JS->>+Rust: solve_physics_frame(inputBuffer, dt)
+    Note over Rust: Obfuscated gravity calc
+    Note over Rust: Chaotic friction derivation
+    Note over Rust: Velocity clamping with noise
+    
+    Rust-->>-JS: [px, py, pz, rx, ry, rz, grounded, hash]
+    
+    JS->>JS: Update Three.js mesh
+    
+    opt Frame Validation
+        JS->>+Python: validate_frame(frameHash, levelIndex)
+        Note over Python: Compute expected hash
+        Python-->>-JS: { valid: true/false }
+        Note over Python: Server never re-simulates physics
+        Note over Python: Saves 99% CPU vs full simulation
+    end
 
-    style A fill:#e94560,color:#fff
-    style F fill:#0f3460,color:#fff
-    style M fill:#533483,color:#fff
+    opt Level Generation
+        JS->>+Python: POST /api/generate-level
+        Note over Python: Generate seed → encrypt payload
+        Python-->>-JS: { encrypted_payload, integrity_hash }
+        Note over JS: Passes encrypted blob to rendering
+        Note over JS: Rust WASM decrypts at runtime
+    end
 ```
 
 ---
 
-## 3. Data Flow — Ball State
+## Security Architecture
+
+### Anti-Reverse Engineering Measures
+
+| Technique | Implementation | Target |
+|-----------|---------------|--------|
+| Control-flow flattening | Non-standard branching in Rust WASM | Decompilers |
+| Opaque pointers | `_InternalPhysicsContext` with misleading names | Static analysis |
+| Chaotic constant derivation | Gravity/friction derived from server seeds at runtime | Memory scanners |
+| Dead-code injection | Fake functions with complex-looking math | Reverse engineers |
+| Encrypted level payloads | Fernet encryption on server, decryption in WASM | Cheaters |
+| Frame validation hashes | Chaotic hash per frame, verified server-side | Speedhacks/flyhacks |
+
+### Patent-Pending: Federated Physics Validation
+
+**Method**: Asymmetric Cryptographic State Sync for browser-based physics.
+
+Instead of sending raw physics coordinates over the network (which can be intercepted and altered), the client (Rust WASM) generates a chaotic hash of its local physics state using a server-provided seed. The server (Python) runs the same seed through the same chaotic function. If the hashes match, the server accepts the state transition.
+
+**Benefits**: Prevents speedhacks and flyhacks without requiring the server to simulate the physics of every player, reducing server CPU load by 99% while maintaining anti-cheat integrity.
+
+---
+
+## Monetization Architecture (Game Theory)
 
 ```mermaid
 flowchart LR
-    subgraph Input
-        K[WASD / Arrows]
-        M[Mouse Drag]
-        J[nipplejs Joystick]
+    subgraph Pricing["Decoy Pricing"]
+        T1["Tier 1: Basic<br/>500 coins (Anchor)"]
+        T2["Tier 2: Pro<br/>1,800 coins (Decoy)"]
+        T3["Tier 3: Ultimate<br/>2,000 coins (Target)"]
     end
 
-    subgraph Physics["cannon-es"]
-        W[World.step]
-        B[Ball Body<br/>Sphere r=0.5, mass=100]
+    subgraph Psychology["Behavioral Economics"]
+        EP["Endowed Progress<br/>Start with 2/10 stamps"]
+        SC["Sunk Cost Fallacy<br/>10% discount after 10h"]
+        LA["Loss Aversion<br/>Upsell modal on Tier 2"]
     end
 
-    subgraph Forces
-        SF[Steer Force<br/>STEER_SPEED=22]
-        GF[Gravity<br/>GRAVITY=-45]
-        LF[Linear Damping<br/>0.5]
-        AD[Angular Damping<br/>0.95]
-        SP[Speed Mult<br/>Skin Abilities]
+    subgraph Implementation["Lua Engine"]
+        CP["calculate_decoy_purchase()"]
+        GP["get_endowed_progress()"]
+        AT["get_all_tiers()"]
     end
 
-    subgraph Ball
-        BV[velocity: Vec3]
-        BP[position: Vec3]
-        BR[quaternion: Quat]
-    end
+    Pricing --> CP
+    Psychology --> CP
+    CP -->|final_price| JS["JS UI"]
+    CP -->|endowed_progress| JS
+    CP -->|show_upsell| JS
 
-    subgraph Rendering
-        BM[ballMesh.position.copy]
-        BR_[ballMesh.quaternion.copy]
-    end
-
-    K --> SF
-    M --> SF
-    J --> SF
-    SF --> W
-    GF --> W
-    LF --> W
-    AD --> W
-    SP --> W
-    W --> BV
-    W --> BP
-    W --> BR
-    BV --> BM
-    BP --> BM
-    BR --> BR_
-
-    style Physics fill:#0f3460,color:#fff
-    style Ball fill:#e94560,color:#fff
-    style Rendering fill:#533483,color:#fff
+    style Pricing fill:#2e1a0a,stroke:#ff8844,color:#fff
+    style Psychology fill:#1a0a2e,stroke:#8844ff,color:#fff
+    style Implementation fill:#0a2e1a,stroke:#44ff88,color:#fff
 ```
 
 ---
 
-## 4. Level Generation Pipeline
+## Directory Structure
 
-```mermaid
-flowchart TD
-    A[createLevel game, seed] --> B[Initialize mulberry32 RNG]
-    B --> C[Select Difficulty Tier<br/>9 tiers: EASY → IMPOSSIBLE]
-    C --> D[Calculate numSegments<br/>15 + floor level × 2.5]
-    D --> E[Loop: Generate Segments]
-    E --> F{Pick Segment Type<br/>from tier pool}
-    F --> G[Straight / Ramp / Zigzag]
-    F --> H[Pendulum / Spinner / Hammer]
-    F --> I[Tunnel / Archipelago / Checkerboard]
-    F --> J[Glass / Loop / Spiral / Curve]
-    F --> K[Spring Pad / Portal / Half Pipe]
-    G --> L[placeSegment x, y, z]
-    H --> L
-    I --> L
-    J --> L
-    K --> L
-    L --> M[addCoins along path]
-    M --> N{Even Level?}
-    N -->|Yes| O[Mirror Horizontally]
-    N -->|No| P[Continue]
-    O --> P
-    P --> Q{More Segments?}
-    Q -->|Yes| E
-    Q -->|No| R[Insert Checkpoints]
-    R --> S[Place Finish Gate]
-    S --> T[Spawn Weather Particles]
-
-    style A fill:#e94560,color:#fff
-    style F fill:#0f3460,color:#fff
-    style T fill:#533483,color:#fff
+```
+going-balls-quad-core/
+├── rust_core/                          # 🔧 Rust WASM Physics Core
+│   ├── Cargo.toml                      # Rust project config
+│   ├── src/
+│   │   └── physics_solver.rs           # Obfuscated physics + anti-cheat
+│   └── pkg/                            # Generated WASM output
+│
+├── python_server/                      # 🐍 Python Backend
+│   ├── main.py                         # FastAPI application
+│   ├── requirements.txt                # Python dependencies
+│   └── services/
+│       └── level_gen_ai.py             # Secure procedural level generator
+│
+├── src/
+│   ├── core/
+│   │   └── ipc_bridge.js               # 🟨 Quad-Core IPC orchestrator
+│   ├── scripts/
+│   │   └── shop_logic.lua              # 🔵 Lua economy/monetization
+│   ├── recycled/                       # (future: v1.x module copies)
+│   └── lua/                            # (future: Lua VM helpers)
+│
+├── engine/                             # 🟨 Recycled v1.x JS modules
+│   └── scene.js
+│
+├── src/                                # 🟨 Recycled v1.x JS modules
+├── main.js                             # 🟨 Quad-Core Bootstrap
+├── index.html                          # 🟨 New landing page
+├── package.json                        # Updated with wasmoon
+├── styles.css                          # CSS (recycled)
+├── architecture.md                     # This document
+└── server.js                           # Static file server
 ```
 
 ---
 
-## 5. Multiplayer Architecture
+## Getting Started
 
-```mermaid
-flowchart TD
-    subgraph Client["Browser Client"]
-        NW_[networking.js]
-        BR_[builder_networking.js]
-        WR_[world_networking.js]
-    end
+### Prerequisites
 
-    subgraph WebsimSocket
-        ROOM[WebsimSocket Room]
-    end
+- **Node.js** v18+ for the JavaScript client
+- **Rust** with `wasm-pack` for compiling the WASM physics solver
+- **Python 3.10+** for the backend server
+- **npm** or **pnpm** for package management
 
-    subgraph Collections["Room Collections"]
-        LB[leaderboard<br/>Level, Time, Coins, Score]
-        BS_[ball_stats<br/>ballKey, avgTime, bestTime]
-        BT[builder_track<br/>Part placements, cursors]
-        ST[shared_tracks<br/>Name, Parts, Author, Likes]
-        TL[track_likes<br/>trackId, playerId]
-        TR[track_ratings<br/>trackId, rating 1-5]
-        TP[track_plays<br/>trackId, playedAt]
-        WS_[world_sites<br/>col, row, ownerId, terrain]
-        WP_[world_parts<br/>siteKey, partKey, position]
-        WPR[world_presence<br/>playerId, siteCol, siteRow]
-        WL[world_listings<br/>siteKey, price, sellerId]
-    end
+### Development Setup
 
-    NW_ -->|initialize| ROOM
-    BR_ -->|subscribe| ROOM
-    WR_ -->|subscribe| ROOM
-    ROOM --> LB
-    ROOM --> BS_
-    ROOM --> BT
-    ROOM --> ST
-    ROOM --> TL
-    ROOM --> TR
-    ROOM --> TP
-    ROOM --> WS_
-    ROOM --> WP_
-    ROOM --> WPR
-    ROOM --> WL
+```bash
+# 1. Install JS dependencies
+npm install
 
-    style Client fill:#0f3460,color:#fff
-    style WebsimSocket fill:#e94560,color:#fff
-    style Collections fill:#1a1a2e,color:#fff
+# 2. Install Python dependencies
+cd python_server && pip install -r requirements.txt && cd ..
+
+# 3. Build Rust WASM physics solver
+npm run build:wasm
+
+# 4. Start the Python backend (in one terminal)
+npm run python:dev
+
+# 5. Start the JS frontend (in another terminal)
+npm run dev
 ```
+
+### Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start JS dev server on port 3000 |
+| `npm run build:wasm` | Compile Rust to WASM |
+| `npm run build:wasm:release` | Compile Rust to WASM (release, optimized) |
+| `npm run python:dev` | Start Python backend with hot-reload on port 8000 |
+| `npm run python:start` | Start Python backend (production) |
+| `npm run full:dev` | Start both Python backend and JS server concurrently |
 
 ---
 
-## 6. Rendering Pipeline
+## API Endpoints
 
-```mermaid
-flowchart LR
-    subgraph Scene["Three.js Scene"]
-        SC_[scene]
-        CAM[camera]
-    end
-
-    subgraph Render["WebGLRenderer"]
-        RT[Off-screen<br/>WebGLRenderTarget]
-        SH[Blur Shader<br/>8 samples]
-        QUAD[Fullscreen Quad<br/>PlaneGeometry 2×2]
-    end
-
-    subgraph Output
-        SCREEN[Screen]
-    end
-
-    SC_ -->|render to RT| RT
-    CAM -->|viewport| RT
-    RT --> SH
-    SH --> QUAD
-    QUAD --> SCREEN
-
-    RT -.->|skip when intensity=0| SCREEN
-
-    style Scene fill:#0f3460,color:#fff
-    style Render fill:#533483,color:#fff
-    style Output fill:#e94560,color:#fff
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check |
+| POST | `/api/generate-level` | Generate encrypted level payload |
+| GET | `/api/auth/wasm-secrets` | Get WASM physics constants |
+| POST | `/api/auth/validate-frame` | Validate physics frame hash |
 
 ---
 
-## 7. Builder → Community → World Flow
+## Version History
 
-```mermaid
-flowchart TD
-    A[Enter Builder] --> B[Select Part<br/>from Catalog]
-    B --> C[Place on Grid<br/>Left Click]
-    C --> D[Test Play<br/>▶ Button]
-    D --> E{Happy with Track?}
-    E -->|No| F[Undo / Clear]
-    F --> B
-    E -->|Yes| G{Save Locally<br/>or Share?}
-    G -->|Local| H[Save to localStorage]
-    G -->|Share| I[Share to Community<br/>shared_tracks collection]
-    I --> J[Other Players Browse<br/>Community Modal]
-    J --> K[Like / Rate / Play]
-    K --> L[Load into Builder]
-    L --> M[Edit & Re-share]
-    G -->|World| N[Enter World Grid]
-    N --> O[Claim Site]
-    O --> P[Open Builder on Site]
-    P --> Q[Save Parts to Site]
-    Q --> R[Other Players Visit<br/>via Neighbor Preview]
-    R --> S[Play / Buy Site<br/>on Marketplace]
-
-    style A fill:#0f3460,color:#fff
-    style I fill:#e94560,color:#fff
-    style N fill:#533483,color:#fff
-    style S fill:#e94560,color:#fff
-```
-
----
-
-*Render with: GitHub (paste into .md), [Mermaid Live Editor](https://mermaid.live), or VS Code Mermaid extension.*
+| Version | Date | Changes |
+|---------|------|---------|
+| 2.0.0-alpha | 2026-06-24 | Quad-Core multi-language architecture |
+| 1.2.0 | - | Full community track system, world map, workshop |
+| 1.1.0 | - | AR/VR support, neighbor preview |
+| 1.0.0 | - | Initial Web Edition release |

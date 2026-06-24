@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monetization — Game Theory Economy</title>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #0a0a1a; color: #ddd; line-height: 1.6; }
+        h1 { color: #ffaa00; border-bottom: 2px solid #ffaa00; padding-bottom: 8px; }
+        h2 { color: #ff8844; margin-top: 32px; }
+        h3 { color: #ffcc00; }
+        code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 3px; }
+        pre { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; overflow-x: auto; }
+        .nav { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+        .nav a { color: #8844ff; text-decoration: none; padding: 6px 12px; border: 1px solid rgba(136,68,255,0.3); border-radius: 6px; font-size: 0.9em; }
+        .nav a:hover { background: rgba(136,68,255,0.1); }
+        .principle { background: rgba(255,170,0,0.04); border-left: 3px solid #ffaa00; padding: 12px 16px; margin: 12px 0; border-radius: 0 8px 8px 0; }
+        .tier-card { display: inline-block; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; margin: 6px; width: 200px; vertical-align: top; }
+        .tier-card h4 { margin: 0 0 8px 0; }
+        .tier-basic { border-color: #888; }
+        .tier-pro { border-color: #8844ff; }
+        .tier-ultimate { border-color: #ffaa00; }
+        .decoy-arrow { color: #ff4444; font-size: 1.5em; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="architecture.html">🏛️ Architecture</a>
+        <a href="api.html">🔌 API</a>
+        <a href="monetization.html">💰 Monetization</a>
+        <a href="security.html">🛡️ Security</a>
+    </div>
+
+    <h1>Game Theory Monetization Engine</h1>
+    <p><span class="lang-badge lang-lua">Lua</span> Implemented in Lua, executed via wasmoon in the browser.</p>
+
+    <p>The economy engine uses four behavioral economics principles to maximize conversion and ARPU (Average Revenue Per User).</p>
+
+    <h2>1. Decoy Pricing</h2>
+
+    <div class="principle">
+        <strong>The Decoy Effect:</strong> When presented with three options, users tend to compare similar ones. The Pro tier is priced to make the Ultimate tier look like an incredible deal.
+    </div>
+
+    <div style="text-align:center;margin:16px 0;">
+        <div class="tier-card tier-basic">
+            <h4>🟤 Basic</h4>
+            <div style="font-size:1.5em;font-weight:bold;">500 🪙</div>
+            <div style="color:#888;">Anchor price</div>
+            <div style="font-size:0.8em;margin-top:8px;">Basic ball skin<br>Ad-free play<br>Cloud saves</div>
+        </div>
+        <span class="decoy-arrow">→</span>
+        <div class="tier-card tier-pro" style="border-width:2px;">
+            <h4>🟣 Pro <span style="color:#ff4444;font-size:0.7em;">DECOY</span></h4>
+            <div style="font-size:1.5em;font-weight:bold;">1,800 🪙</div>
+            <div style="color:#ff8844;">+260% value vs Basic</div>
+            <div style="font-size:0.8em;margin-top:8px;">+3 premium skins<br>Double coin weekends<br>Pro badge</div>
+        </div>
+        <span class="decoy-arrow">→</span>
+        <div class="tier-card tier-ultimate" style="border-width:2px;">
+            <h4>⭐ Ultimate <span style="color:#44ff88;font-size:0.7em;">TARGET</span></h4>
+            <div style="font-size:1.5em;font-weight:bold;">2,000 🪙</div>
+            <div style="color:#44ff88;">Only +200 more than Pro!</div>
+            <div style="font-size:0.8em;margin-top:8px;">ALL 70+ skins<br>ALL sky themes<br>Unlimited building<br>VIP badge</div>
+        </div>
+    </div>
+
+    <p><strong>Why it works:</strong> The Pro tier (1,800) and Ultimate tier (2,000) are only 200 coins apart, but the Pro tier's value_mult (2.8x) is much worse than Ultimate's (5.0x). Users perceive Ultimate as the "smart choice" and upgrade.</p>
+
+    <h2>2. Endowed Progress Effect</h2>
+
+    <div class="principle">
+        <strong>Endowed Progress:</strong> Users start with 2 of 10 battle pass stamps already completed. This leverages the <em>Goal Gradient Effect</em> — people work harder toward a goal the closer they get to completing it.
+    </div>
+
+    <p><strong>Implementation:</strong> <code>get_endowed_progress(user_id)</code> returns the current stamp count. New users start at <strong>2/10 (20%)</strong>. Purchasing tiers awards additional stamps:</p>
+    <ul>
+        <li><strong>Basic:</strong> +0 stamps</li>
+        <li><strong>Pro:</strong> +1 stamp (now at 3/10 = 30%)</li>
+        <li><strong>Ultimate:</strong> +3 stamps (now at 5/10 = 50%)</li>
+    </ul>
+
+    <h2>3. Sunk Cost Fallacy (Dynamic Discounting)</h2>
+
+    <div class="principle">
+        <strong>Sunk Cost:</strong> Players who have invested significant playtime receive a price discount. The more they've played, the more they've "invested" — and the more likely they are to convert.
+    </div>
+
+    <table>
+        <tr><th>Playtime</th><th>Discount</th></tr>
+        <tr><td>&lt; 5 hours</td><td>0%</td></tr>
+        <tr><td>5-10 hours</td><td>5%</td></tr>
+        <tr><td>&gt; 10 hours</td><td>10%</td></tr>
+    </table>
+
+    <h2>4. Loss Aversion (Upsell Modal)</h2>
+
+    <div class="principle">
+        <strong>Loss Aversion:</strong> Users feel losses more acutely than equivalent gains. After purchasing Pro, the upsell modal highlights how little extra they'd pay for Ultimate.
+    </div>
+
+    <p>When a user buys the Pro (Decoy) tier, the Lua engine sets <code>show_upsell = true</code>. The JS UI displays a modal emphasizing the <strong>marginal cost difference</strong> (only +200 coins), making the upgrade feel urgent.</p>
+
+    <h2>Lua Engine API</h2>
+    <pre>-- Called from JavaScript
+calculate_decoy_purchase(user_id, item_tier)
+  → { final_price, endowed_progress, show_upsell, upsell_tier, perks }
+
+get_endowed_progress(user_id)
+  → { current, total, completed, progress_pct }
+
+get_all_tiers()
+  → [{ id, name, base_price, value_mult, perks, value_score }]
+
+get_upsell_price_diff(from_tier, to_tier)
+  → number</pre>
+
+    <h2>i18n Support</h2>
+    <p>All user-facing strings are externalized via the <code>i18n.js</code> module. Supported locales:</p>
+    <table>
+        <tr><th>Locale</th><th>Language</th><th>Code</th></tr>
+        <tr><td>🇺🇸 EN</td><td>English</td><td><code>en</code></td></tr>
+        <tr><td>🇪🇸 ES</td><td>Español</td><td><code>es</code></td></tr>
+        <tr><td>🇨🇳 ZH</td><td>中文</td><td><code>zh</code></td></tr>
+        <tr><td>🇮🇳 HI</td><td>हिन्दी</td><td><code>hi</code></td></tr>
+    </table>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quad-Core Architecture — Going Balls v2.0</title>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #0a0a1a; color: #ddd; line-height: 1.6; }
+        h1 { color: #44ff88; border-bottom: 2px solid #44ff88; padding-bottom: 8px; }
+        h2 { color: #8844ff; margin-top: 32px; }
+        h3 { color: #44ccff; }
+        code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+        pre { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; overflow-x: auto; }
+        .lang-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; margin-right: 4px; }
+        .lang-js { background: #f7df1e; color: #000; }
+        .lang-rs { background: #dea584; color: #000; }
+        .lang-py { background: #3776ab; color: #fff; }
+        .lang-lua { background: #000080; color: #fff; }
+        .diagram { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 16px; margin: 16px 0; font-family: monospace; white-space: pre; line-height: 1.4; font-size: 13px; }
+        .nav { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+        .nav a { color: #8844ff; text-decoration: none; padding: 6px 12px; border: 1px solid rgba(136,68,255,0.3); border-radius: 6px; font-size: 0.9em; }
+        .nav a:hover { background: rgba(136,68,255,0.1); }
+        .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75em; margin-left: 4px; }
+        .badge-core { background: #44ff88; color: #000; }
+        .badge-sec { background: #ff4444; color: #fff; }
+        .badge-eco { background: #ffaa00; color: #000; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="architecture.html">🏛️ Architecture</a>
+        <a href="api.html">🔌 API</a>
+        <a href="monetization.html">💰 Monetization</a>
+        <a href="security.html">🛡️ Security</a>
+    </div>
+
+    <h1>Going Balls — Quad-Core Architecture</h1>
+    <p><strong>Version 2.0.0-alpha</strong> — Multi-Language Physics Platform</p>
+
+    <p>Four languages, each running in its strongest environment, connected through a secure IPC bridge:</p>
+
+    <ul>
+        <li><span class="lang-badge lang-js">JS</span> <strong>JavaScript</strong> — Thin client orchestrator, Three.js rendering, DOM UI, input handling</li>
+        <li><span class="lang-badge lang-rs">Rust</span> <strong>Rust (WASM)</strong> — Obfuscated physics solver, anti-cheat velocity validation, chaotic constant derivation</li>
+        <li><span class="lang-badge lang-py">Python</span> <strong>Python (FastAPI)</strong> — Secure level generation, WASM secrets, frame validation, rate limiting</li>
+        <li><span class="lang-badge lang-lua">Lua</span> <strong>Lua (wasmoon)</strong> — Game theory economy, decoy pricing, endowed progress, battle pass rules</li>
+    </ul>
+
+    <h2>Architecture Overview</h2>
+
+    <div class="diagram">
+┌──────────────────────────────────────────────────────────────┐
+│                      BROWSER (Client)                         │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │  JavaScript (Orchestrator)                           │    │
+│  │  ┌─────────┐  ┌──────────┐  ┌───────┐  ┌────────┐  │    │
+│  │  │ Three.js│  │ Rendering│  │Controls│  │  UI    │  │    │
+│  │  └─────────┘  └──────────┘  └───────┘  └────────┘  │    │
+│  │  ┌──────────────────────────────────────────────┐   │    │
+│  │  │     QuadCore IPC Bridge (ipc_bridge.js)       │   │    │
+│  │  └──────────────────────────────────────────────┘   │    │
+│  └──────────────────────────────────────────────────────┘    │
+│           │                │                  │               │
+│     ┌─────┘                │                  └─────┐         │
+│     ▼                      ▼                        ▼         │
+│  ┌──────────┐    ┌───────────────┐    ┌──────────────────┐    │
+│  │Rust/WASM │    │Python Backend │    │Lua (wasmoon)     │    │
+│  │Physics   │    │Level Gen/Auth │    │Economy Engine    │    │
+│  └──────────┘    └───────────────┘    └──────────────────┘    │
+└──────────────────────────────────────────────────────────────┘
+    </div>
+
+    <h2>Language Strengths</h2>
+
+    <h3><span class="lang-badge lang-js">JS</span> JavaScript — Orchestrator</h3>
+    <p><strong>Built-in strength:</strong> DOM manipulation, event-driven async, browser APIs, Three.js integration.</p>
+    <p>The JavaScript layer owns the <code>Game</code> class, initializes all sub-systems, manages user input, renders with Three.js, handles DOM updates, and routes requests to the other three language runtimes via the <code>QuadCoreBridge</code>.</p>
+
+    <h3><span class="lang-badge lang-rs">Rust</span> Rust (WASM) — Compute Muscle</h3>
+    <p><strong>Built-in strength:</strong> Zero-cost abstractions, memory safety, WASM compilation, control-flow obfuscation.</p>
+    <p>Compiles to WebAssembly and runs inside the browser. Handles all physics computation — velocity integration, gravity, friction, collision response — using server-injected chaotic constants that prevent memory scraping. Includes dead-code injection and opaque pointer structures to frustrate reverse engineering.</p>
+
+    <h3><span class="lang-badge lang-py">Python</span> Python (FastAPI) — Secure Backend</h3>
+    <p><strong>Built-in strength:</strong> Rich ecosystem (FastAPI, cryptography, numpy), rapid backend development, procedural generation.</p>
+    <p>Runs as a separate server process. Generates level layouts server-side with deterministic RNG, encrypts them with Fernet, and serves them to the client. Provides WASM physics secrets, validates frame hashes, and enforces rate limiting.</p>
+
+    <h3><span class="lang-badge lang-lua">Lua</span> Lua (wasmoon) — Economy Engine</h3>
+    <p><strong>Built-in strength:</strong> Embeddable lightweight runtime, hot-reloadable game logic, sandboxed execution.</p>
+    <p>Runs inside the browser via wasmoon (Lua 5.4 VM compiled to WASM). Handles all monetization logic — decoy pricing calculation, endowed progress tracking, battle pass stamp math. Game logic can be updated without recompiling the JS application.</p>
+
+    <h2>Recycled JavaScript Modules</h2>
+    <p>The following modules from v1.x are reused directly without modification:</p>
+    <ul>
+        <li><code>engine/scene.js</code> — Three.js scene, camera, renderer, materials, sky</li>
+        <li><code>src/physics.js</code> — cannon-es physics world (used as fallback)</li>
+        <li><code>src/rendering.js</code> — rAF loop, camera follow, speed lines, motion blur</li>
+        <li><code>src/audio.js</code> — Music, SFX, audio context, visualizer</li>
+        <li><code>src/persistence.js</code> — localStorage save/load, RNG seeding, configs</li>
+        <li><code>src/ball_db.js</code> — 70+ skin definitions</li>
+        <li><code>src/levelgen.js</code> — Procedural level generation</li>
+        <li><code>src/speed_lines.js</code> — Speed line VFX</li>
+        <li><code>src/motion_blur.js</code> — Motion blur post-processing</li>
+        <li><code>src/notification_manager.js</code> — Toast notification system</li>
+    </ul>
+
+    <h2>Project Structure</h2>
+    <pre>going-balls-quad-core/
+├── rust_core/                   # Rust WASM physics
+│   ├── Cargo.toml
+│   └── src/physics_solver.rs
+├── python_server/               # Python FastAPI backend
+│   ├── main.py
+│   ├── requirements.txt
+│   └── services/level_gen_ai.py
+├── src/
+│   ├── core/ipc_bridge.js       # Quad-Core IPC bridge
+│   └── scripts/shop_logic.lua   # Lua economy engine
+├── docs/                        # Documentation
+│   ├── architecture.html
+│   ├── api.html
+│   ├── monetization.html
+│   └── security.html
+├── engine/                      # Recycled v1.x JS
+├── main.js                      # Bootstrap
+├── index.html                   # Landing page
+└── package.json                 # Dependencies</pre>
+
+    <p><em>See also: <a href="api.html">API Documentation</a>, <a href="monetization.html">Monetization Strategy</a>, <a href="security.html">Security Architecture</a></em></p>
+</body>
+</html>

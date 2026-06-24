@@ -3,23 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Going Balls - Web Edition</title>
-    <meta name="description" content="Roll through procedurally generated levels, collect coins, avoid hazards, and unlock 70+ ball skins in this 3D browser game built with Three.js.">
-    <meta name="theme-color" content="#87ceeb">
-    <link rel="manifest" href="manifest.json">
+    <title>Going Balls — Quad-Core Edition</title>
+    <meta name="description" content="Quad-Core multi-language physics platform: JavaScript orchestrator, Rust WASM physics, Python backend, Lua economy.">
+    <meta name="theme-color" content="#1a0a2e">
+    <meta name="version" content="2.0.0-alpha">
     <link rel="icon" href="assets/image/ball.webp" type="image/webp">
-    <link rel="apple-touch-icon" href="assets/image/ball.webp">
-    <!-- Open Graph (update absolute URLs below if deploying to a different domain) -->
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Going Balls - Web Edition">
-    <meta property="og:description" content="Roll through procedurally generated levels, collect coins, avoid hazards, and unlock 70+ ball skins in this 3D browser game.">
-    <meta property="og:image" content="https://dividicus.github.io/balls/assets/image/ball.webp">
-    <meta property="og:image:alt" content="Going Balls game preview">
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Going Balls - Web Edition">
-    <meta name="twitter:description" content="Roll through procedurally generated levels, collect coins, avoid hazards, and unlock 70+ ball skins in this 3D browser game.">
-    <meta name="twitter:image" content="https://github.com/dev-justin-time/balls/blob/main/assets/image/dancing-groovy.webp">
+    <link rel="stylesheet" href="styles.css">
     <style>
         @font-face {
             font-family: '5x5dots';
@@ -32,11 +21,111 @@
         body {
             margin: 0;
             overflow: hidden;
-            background: #87ceeb;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 50%, #0a1a2e 100%);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             user-select: none;
             touch-action: none;
+            color: #fff;
         }
+
+        /* Quad-Core Status Overlay */
+        #core-status {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 10000;
+            display: flex;
+            gap: 6px;
+            font-family: '5x5dots', monospace;
+            font-size: 9px;
+            letter-spacing: 1px;
+            pointer-events: none;
+        }
+        .core-chip {
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: rgba(255,255,255,0.4);
+            transition: all 0.3s ease;
+        }
+        .core-chip.active {
+            color: #44ff88;
+            border-color: #44ff88;
+            background: rgba(68,255,136,0.08);
+        }
+        .core-chip.warn {
+            color: #ffaa44;
+            border-color: #ffaa44;
+            background: rgba(255,170,68,0.08);
+        }
+
+        /* Loading screen */
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, rgba(10,10,26,0.95), rgba(26,10,46,0.9));
+            z-index: 99999;
+            color: white;
+            flex-direction: column;
+            gap: 16px;
+            pointer-events: auto;
+            font-family: '5x5dots', monospace;
+        }
+        #loading-overlay h1 {
+            font-size: 22px;
+            letter-spacing: 3px;
+            background: linear-gradient(90deg, #44ff88, #8844ff, #44ccff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        #loading-sub {
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            letter-spacing: 2px;
+        }
+        #loading-bar-container {
+            width: 60%;
+            max-width: 400px;
+            height: 3px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        #loading-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #44ff88, #8844ff);
+            transition: width 0.3s ease;
+        }
+        #loading-text {
+            font-size: 10px;
+            color: rgba(255,255,255,0.3);
+        }
+
+        /* Core architecture animation dots */
+        .core-dots {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .core-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            transition: all 0.3s ease;
+        }
+        .core-dot.active {
+            background: #44ff88;
+            box-shadow: 0 0 8px rgba(68,255,136,0.4);
+        }
+
+        /* UI containers */
         #ui {
             position: absolute;
             top: 0;
@@ -49,391 +138,58 @@
             justify-content: space-between;
             padding: 20px;
             box-sizing: border-box;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-        .stats {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 20px;
-            font-weight: bold;
-            font-family: '5x5dots', monospace;
-            letter-spacing: -1px;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        #difficulty-label {
-            font-size: 10px;
-            padding: 3px 10px;
-            border-radius: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-shadow: none;
-            transition: background-color 0.6s ease, color 0.6s ease;
-            white-space: nowrap;
-        }
-        #time-display {
-            font-size: 16px;
-            color: #ffdd66;
-            white-space: nowrap;
-            min-width: 90px;
-            text-align: right;
-        }
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.4);
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            pointer-events: auto;
-        }
-        #overlay h1 {
-            font-size: 28px;
-            margin-bottom: 20px;
-            font-family: '5x5dots', monospace;
-            line-height: 1.6;
-        }
-        #overlay button {
-            padding: 15px 40px;
-            font-size: 14px;
-            background: #ffcc00;
-            border: none;
-            border-radius: 30px;
-            cursor: pointer;
-            font-weight: bold;
-            color: #333;
-            box-shadow: 0 4px 0 #ccaa00;
-            transition: transform 0.1s;
-            font-family: '5x5dots', monospace;
-        }
-        #overlay button:active {
-            transform: translateY(4px);
-            box-shadow: 0 0 0 #ccaa00;
-        }
-        /* Top UI for Menu/Shop */
-        #top-menu {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-            pointer-events: none;
-            z-index: 200;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        #top-menu.visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .menu-btn {
-            background: rgba(0,0,0,0.5);
-            border: 2px solid white;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 10px;
-            font-family: '5x5dots', monospace;
-        }
-        .modal {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9);
-            border: 3px solid #ffcc00;
-            border-radius: 20px;
-            padding: 20px;
-            width: 80%;
-            max-width: 400px;
-            display: none;
-            flex-direction: column;
-            color: white;
-            z-index: 1000;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        .modal h2 { margin-top: 0; color: #ffcc00; text-align: center; font-family: '5x5dots', monospace; font-size: 16px; }
-        /* Reset modal body text to system font for readability */
-        .modal p,
-        .modal div,
-        .item-card-front,
-        .item-card-back,
-        .item-card-inner {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        /* Keep pixel font on price badges and card title text */
-        .item-card .price,
-        .item-card-front > div:first-of-type {
-            font-family: '5x5dots', monospace;
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        .item-card {
-            background: #333;
-            border: 2px solid #555;
-            padding: 0;
-            border-radius: 12px;
-            text-align: center;
-            cursor: pointer;
-            width: 100%;
-            min-height: 280px; /* doubled height for larger preview / full ball view */
-            display: block;
-            perspective: 900px; /* enable 3D space for children */
-        }
-        .item-card:hover { }
-        .item-card-inner {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            min-height: 280px; /* match doubled card height for inner content */
-            transform-style: preserve-3d;
-            transition: transform 420ms cubic-bezier(.2,.9,.25,1);
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.35);
-        }
-        /* flip on hover (desktop) and on touch via .flipped class (JS will toggle if needed) */
-        .item-card:hover .item-card-inner,
-        .item-card.flipped .item-card-inner {
-            transform: rotateY(180deg);
-        }
-        .item-card-front,
-        .item-card-back {
-            position: absolute;
-            inset: 0;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 6px;
-            padding: 12px;
-            box-sizing: border-box;
-        }
-        .item-card-front {
-            background: linear-gradient(180deg, #2e2e2e, #252525);
-            color: #fff;
-        }
-        .item-card-back {
-            background: linear-gradient(180deg, rgba(10,10,10,0.95), rgba(30,30,30,0.95));
-            color: #e6f7ff;
-            transform: rotateY(180deg);
-            font-size: 13px;
-            justify-content: center;
-            padding: 12px;
-        }
-        .item-card.selected .item-card-front {
-            border: 2px solid #ffcc00;
-        }
-        .item-card.locked { opacity: 0.92; }
-        .item-card .price { font-size: 10px; color: #ffcc00; font-weight: bold; font-family: '5x5dots', monospace; }
-        .item-preview {
-            width: 128px; /* enlarged preview to show full ball */
-            height: 128px;
-            background-size: cover;
-            background-position: center;
-            border: 2px solid rgba(255,255,255,0.08);
-            box-shadow: 0 6px 14px rgba(0,0,0,0.35);
-            border-radius: 50%;
-            margin-top: 14px;
-            margin-bottom: 8px;
-            align-self: center;
-        }
-        .ball-preview { border-radius: 50%; width:128px; height:128px; }
-        .sky-preview { border-radius: 8px; width: 140px; height: 88px; }
-#total-coins {
-            position: absolute;
-            top: 60px;
-            left: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            color: #ffd700;
-            font-family: '5x5dots', monospace;
-        }
-        #joystick-container {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            width: 180px;
-            height: 180px;
-            pointer-events: auto;
-            z-index: 100;
-        }
-        /* Roblox-style joystick overrides */
-        .nipple .back {
-            background: rgba(255, 255, 255, 0.1) !important;
-            border: 2px solid rgba(255, 255, 255, 0.3) !important;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
-        }
-        .nipple .front {
-            background: rgba(255, 255, 255, 0.4) !important;
-            box-shadow: 0 0 5px rgba(0,0,0,0.3);
-        }
-        #jump-btn {
-            position: absolute;
-            bottom: 60px;
-            right: 30px;
-            width: 70px;
-            height: 70px;
-            background: rgba(255, 255, 255, 0.3);
-            border: 3px solid white;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            font-size: 11px;
-            pointer-events: auto;
-            touch-action: none;
-            color: white;
-            text-shadow: 1px 1px 2px black;
-            font-family: '5x5dots', monospace;
-        }
-        #jump-btn:active {
-            background: rgba(255, 255, 255, 0.6);
-            transform: scale(0.9);
-        }
-        #loading-overlay {
-            font-family: '5x5dots', monospace;
-        }
-        /* Pointer lock hint pulse animation */
-        @keyframes hint-pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.25); }
-            50% { box-shadow: 0 0 0 8px rgba(255,255,255,0); }
-        }
-        #pointerlock-hint.visible {
-            opacity: 1;
-            animation: hint-pulse 2.4s ease-in-out infinite;
         }
 
-        /* Desktop font scale: bump pixel-font sizes on larger screens */
-        @media (min-width: 1024px) {
-            .stats {
-                font-size: 26px;
-            }
-            #time-display {
-                font-size: 20px;
-            }
-            #difficulty-label {
-                font-size: 13px;
-                padding: 4px 14px;
-            }
-            .menu-btn {
-                font-size: 12px;
-                padding: 10px 16px;
-            }
-            #total-coins {
-                font-size: 15px;
-                top: 64px;
-            }
-            #overlay h1 {
-                font-size: 38px;
-            }
-            #overlay button {
-                font-size: 18px;
-                padding: 18px 48px;
-            }
-            #jump-btn {
-                font-size: 14px;
-                width: 80px;
-                height: 80px;
-            }
-            #pointerlock-hint {
-                font-size: 13px;
-            }
-            #loading-overlay > div:first-child {
-                font-size: 24px;
-            }
-            #loading-text {
-                font-size: 15px;
-            }
-        }
-
+        /* Rest of the styles are imported from styles.css */
     </style>
 </head>
 <body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <h1>⟐ QUAD CORE</h1>
+        <div id="loading-sub">INITIALIZING MULTI-LANGUAGE ARCHITECTURE</div>
+        <div id="loading-bar-container">
+            <div id="loading-bar"></div>
+        </div>
+        <div id="loading-text">Booting sub-systems...</div>
+        <div class="core-dots">
+            <div class="core-dot" id="dot-js"></div>
+            <div class="core-dot" id="dot-wasm"></div>
+            <div class="core-dot" id="dot-py"></div>
+            <div class="core-dot" id="dot-lua"></div>
+        </div>
+    </div>
+
+    <!-- Core Status Chips -->
+    <div id="core-status">
+        <span class="core-chip" id="chip-js">JS</span>
+        <span class="core-chip" id="chip-wasm">WASM</span>
+        <span class="core-chip" id="chip-py">PY</span>
+        <span class="core-chip" id="chip-lua">LUA</span>
+    </div>
+
+    <!-- Game UI -->
     <div id="ui">
-        <div class="stats">
-            <div id="difficulty-label" style="background:#7cfc00;color:#000;">EASY</div>
-            <div id="coin-display">Session: 0</div>
-            <div id="distance-display">Progress: 0%</div>
-            <div id="time-display">⏱ --:--</div>
+        <div id="top-bar" style="display:flex;justify-content:space-between;align-items:center;font-family:'5x5dots',monospace;font-size:12px;letter-spacing:1px;">
+            <div id="game-title" style="color:rgba(255,255,255,0.15);">GOING BALLS v2.0</div>
+            <div id="frame-info" style="color:rgba(255,255,255,0.15);font-size:9px;"></div>
         </div>
+        <div id="bottom-bar" style="display:flex;justify-content:space-between;align-items:flex-end;"></div>
     </div>
 
-    <!-- Loading overlay shown while textures / models load -->
-    <div id="loading-overlay" style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, rgba(0,0,0,0.85), rgba(0,0,0,0.6)); z-index:99999; color:white; flex-direction:column; gap:12px; pointer-events:auto;">
-        <div style="font-size:20px; font-weight:700;">Loading assets...</div>
-        <div id="loading-progress" style="width:60%; max-width:420px; height:14px; background:rgba(255,255,255,0.08); border-radius:8px; overflow:hidden;">
-            <div id="loading-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#ffcc00,#ffd86b);"></div>
-        </div>
-        <div id="loading-text" style="font-size:13px; opacity:0.9;">Initializing...</div>
-    </div>
+    <!-- Top Menu -->
+    <div id="top-menu"></div>
 
-    <div id="total-coins">Wallet: 0</div>
+    <!-- Overlay for modals -->
+    <div id="overlay"></div>
 
-    <div id="top-menu">
-        <button class="menu-btn" id="help-btn" aria-label="How to play">?</button>
-        <button class="menu-btn" id="shop-btn" aria-label="Open shop">SHOP</button>
-        <button class="menu-btn" id="leaderboard-btn" aria-label="Open leaderboard">LEADERBOARD</button>
-        <button class="menu-btn" id="survival-btn" aria-label="Start survival mode" style="background:rgba(180,30,30,0.6);border-color:#ff4444;">SURVIVAL</button>
-        <button class="menu-btn" id="builder-btn" aria-label="Open track builder" style="background:rgba(30,80,180,0.6);border-color:#4488ff;">BUILDER</button>
-        <button class="menu-btn" id="community-btn" aria-label="Browse community tracks" style="background:rgba(100,40,180,0.6);border-color:#9944ff;">COMMUNITY</button>
-        <button class="menu-btn" id="world-btn" aria-label="Open world map" style="background:rgba(0,120,180,0.6);border-color:#44ccff;">🌍 WORLD</button>
-        <button class="menu-btn" id="catalog-btn" aria-label="Track parts catalog" style="background:rgba(40,120,80,0.6);border-color:#44cc88;">CATALOG</button>
-        <button class="menu-btn" id="music-toggle" aria-label="Toggle music">MUSIC</button>
-        <button class="menu-btn" id="settings-btn" title="Settings" aria-label="Settings">⚙️</button>
-        <button class="menu-btn" id="pointerlock-btn" title="Toggle free-look camera" aria-label="Toggle free-look camera">🖱️</button>
-        <button class="menu-btn" id="neighbor-preview-btn" title="Toggle neighbor preview" aria-label="Toggle 3D neighbor site preview" style="background:rgba(136,68,255,0.4);border-color:#9944ff;">👁️</button>
-    </div>
-
-    <div id="overlay">
-        <h1 id="overlay-title">LEVEL COMPLETE!</h1>
-        <button id="next-btn" aria-label="Continue to next level">CONTINUE</button>
-    </div>
-
+    <!-- Joystick Controls -->
     <div id="joystick-container"></div>
     <div id="jump-btn" role="button" tabindex="0" aria-label="Jump">JUMP</div>
 
-    <!-- Pointer lock hint overlay (shown once, dismissible) -->
-    <div id="pointerlock-hint" style="position:fixed; right:68px; bottom:18px; background:rgba(0,0,0,0.82); color:#fff; padding:8px 12px; border-radius:8px; font-size:11px; z-index:1199; pointer-events:auto; opacity:0; transition:opacity 0.4s; white-space:nowrap; font-family:'Segoe UI',sans-serif;">
-        🖱️ Free-look &nbsp;|&nbsp; Esc to release
-        <button id="pointerlock-hint-dismiss" aria-label="Dismiss hint" style="margin-left:8px;background:none;border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:4px;cursor:pointer;font-size:10px;">✕</button>
-    </div>
-
-    <!-- Mini gear quick-access (bottom-right) -->
-    <button id="gear-btn" aria-label="Menu" title="Menu" style="position:fixed; right:12px; bottom:12px; width:44px; height:44px; border-radius:50%; background:rgba(0,0,0,0.45); border:2px solid rgba(255,255,255,0.12); color:#fff; display:flex; align-items:center; justify-content:center; z-index:1200; pointer-events:auto; font-size:18px;">⚙️</button>
-
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://esm.sh/three@0.160.0",
-            "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/",
-            "cannon-es": "https://esm.sh/cannon-es@0.20.0",
-            "nipplejs": "https://esm.sh/nipplejs@0.10.1"
-        }
-    }
-    </script>
-    <script type="module" src="networking.js"></script>
-    <script type="module" src="main.js"></script>
-    <script>
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
-    }
-    </script>
+    <!-- Vite dev server handles module resolution for npm packages.
+         Import maps are provided as fallback for production builds.
+         Packages: three@0.184, cannon-es@0.20, wasmoon@1.16, nipplejs@0.10 -->
+    <script type="module" src="/main.js"></script>
 </body>
 </html>

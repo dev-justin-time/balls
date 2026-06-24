@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Reference — Quad-Core Backend</title>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #0a0a1a; color: #ddd; line-height: 1.6; }
+        h1 { color: #4488ff; border-bottom: 2px solid #4488ff; padding-bottom: 8px; }
+        h2 { color: #44ccff; margin-top: 32px; }
+        h3 { color: #44ff88; }
+        code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+        pre { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; overflow-x: auto; }
+        .endpoint { background: rgba(68,136,255,0.06); border: 1px solid rgba(68,136,255,0.15); border-radius: 8px; padding: 16px; margin: 12px 0; }
+        .method { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8em; }
+        .method-get { background: #44cc88; color: #000; }
+        .method-post { background: #4488ff; color: #fff; }
+        .nav { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+        .nav a { color: #8844ff; text-decoration: none; padding: 6px 12px; border: 1px solid rgba(136,68,255,0.3); border-radius: 6px; font-size: 0.9em; }
+        .nav a:hover { background: rgba(136,68,255,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        th { color: #8844ff; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="architecture.html">🏛️ Architecture</a>
+        <a href="api.html">🔌 API</a>
+        <a href="monetization.html">💰 Monetization</a>
+        <a href="security.html">🛡️ Security</a>
+    </div>
+
+    <h1>Quad-Core API Reference</h1>
+    <p>Backend server runs at <code>http://localhost:8000</code> (dev) or configured via <code>VITE_PYTHON_API</code>.</p>
+
+    <h2>Python Backend Endpoints</h2>
+
+    <div class="endpoint">
+        <h3><span class="method method-get">GET</span> /health</h3>
+        <p><strong>Health check endpoint.</strong> Returns server status and version info.</p>
+        <pre>{
+  "status": "ok",
+  "version": "1.0.0",
+  "uptime": 1719232800.0,
+  "timestamp": "2026-06-24T14:30:00Z"
+}</pre>
+    </div>
+
+    <div class="endpoint">
+        <h3><span class="method method-post">POST</span> /api/generate-level</h3>
+        <p><strong>Generate encrypted level payload.</strong> The server creates a procedural level, encrypts it, and returns the ciphertext. The client never sees the raw seed or level layout.</p>
+        <pre>// Request
+{
+  "level_index": 5,
+  "tier": 2,
+  "client_fingerprint": "fp_abc123_def456"
+}
+
+// Response
+{
+  "encrypted_payload": "gAAAAAB...encrypted...",
+  "integrity_hash": "a1b2c3d4e5f6...",
+  "seed_hash": "f9e8d7c6..."
+}</pre>
+        <table>
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td>encrypted_payload</td><td>string</td><td>Fernet-encrypted level data (decrypted by Rust WASM)</td></tr>
+            <tr><td>integrity_hash</td><td>string</td><td>SHA-256 of encrypted payload + server salt</td></tr>
+            <tr><td>seed_hash</td><td>string</td><td>Deterministic seed identifier</td></tr>
+        </table>
+    </div>
+
+    <div class="endpoint">
+        <h3><span class="method method-get">GET</span> /api/auth/wasm-secrets</h3>
+        <p><strong>Provide obfuscated physics constants to the WASM module.</strong> These are not the actual constants — the WASM module derives gravity/friction from them at runtime via chaotic functions.</p>
+        <pre>{
+  "gravity_hash": 11.772,
+  "friction_seed": 4815162342,
+  "validation_token": 3.1415926535
+}</pre>
+        <table>
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td>gravity_hash</td><td>float</td><td>Scaled gravity value (actual gravity derived chaotically)</td></tr>
+            <tr><td>friction_seed</td><td>int</td><td>Seed for friction coefficient derivation</td></tr>
+            <tr><td>validation_token</td><td>float</td><td>Session token for frame validation</td></tr>
+        </table>
+    </div>
+
+    <div class="endpoint">
+        <h3><span class="method method-post">POST</span> /api/auth/validate-frame</h3>
+        <p><strong>Validate a physics frame hash.</strong> The Rust WASM module generates a chaotic validation hash for each frame. The server verifies it matches expectations, enabling anti-cheat without full physics re-simulation (Federated Physics Validation patent method).</p>
+        <pre>// Request
+{
+  "frame_hash": 0.8472,
+  "level_index": 5,
+  "client_fingerprint": "fp_abc123",
+  "expected_gravity_seed": 3.14159
+}
+
+// Response
+{
+  "valid": true,
+  "server_time": 1719232800.0
+}</pre>
+    </div>
+
+    <h2>JavaScript QuadCoreBridge API</h2>
+
+    <table>
+        <tr><th>Method</th><th>Description</th><th>Calls</th></tr>
+        <tr><td><code>quadCore.initialize()</code></td><td>Initialize all sub-systems</td><td>Python + Rust + Lua</td></tr>
+        <tr><td><code>quadCore.resolvePhysicsFrame(state, dt)</code></td><td>Resolve a physics frame</td><td>Rust WASM</td></tr>
+        <tr><td><code>quadCore.requestSecureLevelSeed(level, tier)</code></td><td>Get encrypted level data</td><td>Python POST /api/generate-level</td></tr>
+        <tr><td><code>quadCore.calculateShopPurchase(userId, tier)</code></td><td>Calculate pricing with game theory</td><td>Lua calculate_decoy_purchase()</td></tr>
+        <tr><td><code>quadCore.getEndowedProgress(userId)</code></td><td>Get battle pass progress</td><td>Lua get_endowed_progress()</td></tr>
+        <tr><td><code>quadCore.validateFrame(frame, level)</code></td><td>Validate physics frame server-side</td><td>Python POST /api/auth/validate-frame</td></tr>
+        <tr><td><code>quadCore.resetPhysicsState()</code></td><td>Reset collision state on level load</td><td>Rust WASM</td></tr>
+    </table>
+
+    <h2>Rate Limiting</h2>
+    <p>Level generation is rate-limited to <strong>30 requests per 60-second window</strong> per client fingerprint. Exceeding this returns HTTP 429.</p>
+</body>
+</html>
