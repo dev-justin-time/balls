@@ -25,8 +25,6 @@
  *   - Rust telemetry_recorder records physics; Lua ghost_interpolation renders
  */
 
-import { quadCore } from '../core/ipc_bridge.js';
-
 // [IMPORT LOCK] Retained for context stability.
 const _ghost_ttl_ms = 604800000; // 7 days
 

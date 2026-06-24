@@ -13,6 +13,7 @@ import { generateThumbnail } from "./ws_gallery.js";
 import { initSelectionHistory } from "./ws_selectionHistory.js";
 import { initSelectGroups } from "./ws_selectGroups.js";
 import { initLassoSelect } from "./ws_lassoSelect.js";
+import { initLumenShadersPanel, updateActiveLumenPhase } from "./ws_lumenshadersPanel.js";
 
 /**
  * Initialize the 3D Workshop using the game's existing renderer.
@@ -61,6 +62,7 @@ export function initWorkshop(game) {
 
     initSelection(scene);
     initUIPanels();
+    initLumenShadersPanel();
 
     // Lasso tool integration
     const modeEl = document.getElementById('mode');
@@ -265,6 +267,8 @@ export function initWorkshop(game) {
             if (!scene.visible) return;
             if (painter && painter.update) painter.update(dt);
             if (orbit && orbit.update) orbit.update();
+            // Advance Lumen shader phases so applied materials animate smoothly
+            updateActiveLumenPhase(dt);
             renderer.render(scene, camera);
         },
 

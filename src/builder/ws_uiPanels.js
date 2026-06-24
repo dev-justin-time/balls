@@ -85,6 +85,29 @@ export function initUIPanels() {
     });
 
     document.getElementById('rig-generate').onclick = startGenerativeTask;
+
+    // 5. Lumen Shaders Panel (button to open it)
+    const shaderPanel = createPanel("Shader Effects");
+    shaderPanel.innerHTML += `
+        <button id="btn-lumen-shaders" style="
+            width:100%; padding:10px; border-radius:8px; cursor:pointer;
+            background:linear-gradient(135deg,#1a1a2e,#2a1a3e);
+            border:1px solid rgba(168,139,255,0.3); color:#c8b8ff;
+            font-size:12px; font-weight:500; letter-spacing:0.3px;
+            transition:all 0.2s;
+        ">
+            ✨ Lumen Shaders
+            <span style="display:block;font-size:8px;color:#8877aa;margin-top:2px;">
+                Generative GPU shaders for your mesh
+            </span>
+        </button>
+    `;
+    container.appendChild(shaderPanel);
+
+    document.getElementById('btn-lumen-shaders').onclick = async () => {
+        const { isShadersPanelOpen, openPanel } = await import('./ws_lumenshadersPanel.js');
+        if (!isShadersPanelOpen()) openPanel();
+    };
 }
 
 function createPanel(title) {

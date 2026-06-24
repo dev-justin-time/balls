@@ -29,6 +29,7 @@ pub mod vectorizer;
 pub mod image_processing;
 pub mod topology;
 pub mod fingerprint_hasher;
+pub mod telemetry_recorder;
 
 use wasm_bindgen::prelude::*;
 use std::panic;
@@ -89,6 +90,19 @@ pub use fingerprint_hasher::{
     inject_security_salt,
     hash_fingerprint,
     verify_fingerprint,
+};
+
+// ---------------------------------------------------------------------------
+// Re-exports from telemetry_recorder
+// ---------------------------------------------------------------------------
+pub use telemetry_recorder::{
+    init_telemetry_recorder,
+    start_recording,
+    stop_recording,
+    record_physics_frame,
+    is_recording,
+    get_recorded_frame_count,
+    get_current_hash,
 };
 
 // ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ from cryptography.fernet import Fernet
 
 from python_server.services.wireframe_ai import parse_wireframe_topology, generate_level_payload
 from python_server.services.security_engine import security_engine
+from python_server.services.ghost_verifier import router as ghost_verifier_router
 from pydantic import Field as PydanticField
 
 # === Voice-to-Text (optional) ===
@@ -352,6 +353,10 @@ async def _process_telemetry_background(
 
     except Exception as e:
         print(f"[Security] Telemetry processing error: {e}")
+
+
+# === Ghost Verification Router ===
+app.include_router(ghost_verifier_router)
 
 
 # ---------------------------------------------------------------------------

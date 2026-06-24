@@ -130,45 +130,6 @@ def _verify_hash_chain(
     return computed_hex == final_hash
 
 
-def _partially_verify_hash_chain(
-    telemetry_bytes: bytes,
-    known_good_chunks: list,
-) -> float:
-    """
-    Partial verification: check specific frames without recalculating
-    the entire chain. Uses the zero-knowledge sampling property:
-    verifying the final hash is sufficient, but this method exists
-    for incremental validation during streaming.
-
-    Args:
-        telemetry_bytes: Full telemetry data
-        known_good_chunks: List of (start_frame, end_frame, chunk_hash) tuples
-
-    Returns:
-        Integrity percentage (0.0-1.0) based on verified chunks
-    """
-    if not known_good_chunks:
-        return 0.0
-
-    verified_frames = 0
-    total_frames = len(telemetry_bytes) // FRAME_BYTE_SIZE
-
-    for start_frame, end_frame, chunk_hash in known_good_chunks:
-        start_byte = start_frame * FRAME_BYTE_SIZE
-        end_byte = end_frame * FRAME_BYTE_SIZE
-
-        if end_byte > len(telemetry_bytes):
-            continue
-
-        chunk_data = telemetry_bytes[start_byte:end_byte]
-        computed_hash = hashlib.sha256(chunk_data).hexdigest()
-
-        if computed_hash == chunk_hash:
-            verified_frames += (end_frame - start_frame)
-
-    return verified_frames / max(total_frames, 1)
-
-
 def _extract_velocity_profile(telemetry_bytes: bytes) -> list:
     """
     Extract velocity values from the telemetry for analytics.

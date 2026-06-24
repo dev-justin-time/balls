@@ -20,6 +20,7 @@
 
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import fs from 'fs';
 
 export default defineConfig({
   root: '.',
@@ -51,7 +52,6 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: true,
     target: 'esnext',
-    // Optimize WASM chunks
     rollupOptions: {
       output: {
         manualChunks: {
@@ -62,6 +62,22 @@ export default defineConfig({
       },
     },
   },
+
+  // Copy LumenShaders static files to dist during production build.
+  // LumenShaders uses non-module <script> tags that Vite's Rollup
+  // pipeline can't bundle; instead it's copied as a self-contained
+  // static directory preserving the original directory structure.
+  plugins: [{
+    name: 'copy-lumenshaders',
+    writeBundle() {
+      const src = resolve(__dirname, 'src/lumenshaders');
+      const dest = resolve(__dirname, 'dist/lumenshaders');
+      if (fs.existsSync(src)) {
+        if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true });
+        fs.cpSync(src, dest, { recursive: true, dereference: true });
+      }
+    },
+  }],
 
   // Handle .lua files as raw text
   assetsInclude: ['**/*.lua', '**/*.wasm'],
