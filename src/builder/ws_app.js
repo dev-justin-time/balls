@@ -8,7 +8,7 @@ import { setupExporter } from "./ws_exporter.js";
 import { setupAgent } from "./ws_agent.js";
 import { initPainter } from "./ws_painter.js";
 import { initSelection } from "./ws_selection.js";
-import { initUIPanels } from "./ws_uiPanels.js";
+import { initBuilderPanels } from "./panels/ws_panels.js";
 import { generateThumbnail } from "./ws_gallery.js";
 import { initSelectionHistory } from "./ws_selectionHistory.js";
 import { initSelectGroups } from "./ws_selectGroups.js";
@@ -61,7 +61,11 @@ export function initWorkshop(game) {
     game._traverseMeshes = traverseMeshes;
 
     initSelection(scene);
-    initUIPanels();
+    // Floating tool panels via PanelWindowManager (ported from Web Cloud OS)
+    const builderPanelsContainer = document.getElementById('builder-panels-container') || document.body;
+    const panelWM = initBuilderPanels(builderPanelsContainer);
+    game._panelWM = panelWM;
+
     initLumenShadersPanel();
 
     // Lasso tool integration
@@ -231,9 +235,8 @@ export function initWorkshop(game) {
             if (game.scene) game.scene.visible = false;
             scene.visible = true;
 
-            // Show workshop UI panels
-            const panelsContainer = document.getElementById('ui-panels-container');
-            if (panelsContainer) panelsContainer.style.display = '';
+            // Show floating tool panels
+            if (game._panelWM) game._panelWM.showAll();
 
             // Attach controls
             orbit.enabled = true;
@@ -248,9 +251,8 @@ export function initWorkshop(game) {
             scene.visible = false;
             if (game.scene) game.scene.visible = true;
 
-            // Hide workshop UI panels
-            const panelsContainer = document.getElementById('ui-panels-container');
-            if (panelsContainer) panelsContainer.style.display = 'none';
+            // Hide floating tool panels
+            if (game._panelWM) game._panelWM.hideAll();
 
             // Detach transform controls
             transform.detach();
@@ -278,6 +280,12 @@ export function initWorkshop(game) {
         dispose() {
             window.removeEventListener('keydown', keyHandler);
             if (lassoOverlay.parentNode) lassoOverlay.parentNode.removeChild(lassoOverlay);
+
+            // Dispose floating panel window manager (removes global listener & panel elements)
+            if (game._panelWM) {
+                game._panelWM.dispose();
+                game._panelWM = null;
+            }
 
             // Dispose all scene objects (meshes, groups, lights, etc.)
             scene.traverse((c) => {

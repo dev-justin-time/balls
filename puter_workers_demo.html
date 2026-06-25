@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Going Balls — Puter Workers Playground</title>
+    <script src="https://js.puter.com/v2/"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        @font-face {
+            font-family: '5x5dots';
+            src: url('assets/font/5x5dots.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 50%, #0a1a2e 100%);
+            color: #ddd;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 960px; margin: 0 auto; }
+
+        .header {
+            text-align: center;
+            padding: 24px 20px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-family: '5x5dots', monospace;
+            font-size: 26px;
+            letter-spacing: 3px;
+            background: linear-gradient(90deg, #44ff88, #8844ff, #44ccff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header .subtitle {
+            font-size: 12px;
+            color: rgba(255,255,255,0.35);
+            letter-spacing: 2px;
+            margin-top: 4px;
+        }
+
+        .card {
+            background: rgba(20,20,40,0.85);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 14px;
+            backdrop-filter: blur(8px);
+        }
+        .card-title {
+            font-family: '5x5dots', monospace;
+            font-size: 13px;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-title .badge {
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            letter-spacing: 0;
+        }
+        .badge-ready { background: rgba(68,255,136,0.15); color: #44ff88; border: 1px solid rgba(68,255,136,0.3); }
+        .badge-pending { background: rgba(255,170,68,0.15); color: #ffaa44; border: 1px solid rgba(255,170,68,0.3); }
+        .badge-error { background: rgba(255,68,68,0.15); color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.06);
+            color: #ddd;
+            font-size: 11px;
+            font-family: 'Segoe UI', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .btn:hover { background: rgba(255,255,255,0.12); }
+        .btn:active { transform: scale(0.96); }
+        .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+        .btn-primary { background: rgba(136,68,255,0.2); border-color: rgba(136,68,255,0.4); color: #ccc; }
+        .btn-primary:hover { background: rgba(136,68,255,0.35); border-color: rgba(136,68,255,0.6); color: #fff; }
+        .btn-primary:disabled { background: rgba(136,68,255,0.08); border-color: rgba(136,68,255,0.15); color: #666; }
+
+        .btn-accent { background: rgba(68,204,255,0.15); border-color: rgba(68,204,255,0.3); color: #88ddff; }
+        .btn-accent:hover { background: rgba(68,204,255,0.25); border-color: rgba(68,204,255,0.5); color: #bbeeff; }
+
+        .btn-success { background: rgba(68,255,136,0.15); border-color: rgba(68,255,136,0.3); color: #88ffaa; }
+        .btn-success:hover { background: rgba(68,255,136,0.25); border-color: rgba(68,255,136,0.5); color: #ccffdd; }
+
+        .btn-danger { background: rgba(255,68,68,0.15); border-color: rgba(255,68,68,0.3); color: #ff8888; }
+        .btn-danger:hover { background: rgba(255,68,68,0.25); border-color: rgba(255,68,68,0.5); color: #ffaaaa; }
+
+        .btn-sm { padding: 5px 10px; font-size: 10px; }
+        .btn-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+        input, select {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            padding: 6px 10px;
+            color: #ddd;
+            font-size: 11px;
+            font-family: 'Segoe UI', sans-serif;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        input:focus, select:focus { border-color: rgba(136,68,255,0.5); }
+        input::placeholder { color: rgba(255,255,255,0.2); }
+        .input-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .input-group label { font-size: 10px; color: #888; min-width: 70px; }
+        .input-group input { flex: 1; min-width: 80px; }
+        .form-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+        .form-row .field { flex: 1; min-width: 120px; }
+        .form-row .field label { display: block; font-size: 9px; color: #888; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-row .field input { width: 100%; }
+
+        .status-bar {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            padding: 10px 16px;
+            background: rgba(0,0,0,0.25);
+            border-radius: 8px;
+            margin-bottom: 14px;
+            font-size: 10px;
+            font-family: monospace;
+        }
+        .status-item { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .status-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: #444;
+            transition: background 0.3s;
+            flex-shrink: 0;
+        }
+        .status-dot.on { background: #44ff88; box-shadow: 0 0 6px rgba(68,255,136,0.4); }
+        .status-dot.off { background: #ff4444; }
+        .status-dot.pending { background: #ffaa44; animation: pulse 1.2s ease-in-out infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .log-container {
+            background: rgba(0,0,0,0.35);
+            border-radius: 8px;
+            padding: 10px;
+            max-height: 240px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            line-height: 1.6;
+        }
+        .log-container .log-entry { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .log-container .log-entry:last-child { border-bottom: none; }
+        .log-container .log-time { color: rgba(255,255,255,0.25); margin-right: 8px; }
+        .log-container .log-info { color: #88ccff; }
+        .log-container .log-success { color: #88ff88; }
+        .log-container .log-warn { color: #ffaa44; }
+        .log-container .log-error { color: #ff5555; }
+        .log-container .log-data { color: #ffdd88; }
+
+        .lb-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .lb-table th {
+            text-align: left;
+            padding: 6px 8px;
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+            color: #888;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .lb-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .lb-table tr:hover td { background: rgba(255,255,255,0.03); }
+        .lb-rank { color: #ffdd66; font-weight: 700; width: 32px; }
+        .lb-medal { font-size: 14px; }
+        .lb-score { color: #88ff88; font-weight: 600; }
+        .lb-level { color: #88ccff; }
+        .lb-time { color: #ffdd66; }
+        .lb-player { color: #fff; font-weight: 600; }
+        .lb-empty { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+
+        .response-panel {
+            background: rgba(0,0,0,0.25);
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        .response-panel.visible { display: block; }
+
+        .section-divider {
+            text-align: center;
+            padding: 20px 0 14px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.15);
+            letter-spacing: 3px;
+            font-family: '5x5dots', monospace;
+        }
+        .section-divider::before, .section-divider::after {
+            content: '';
+            display: inline-block;
+            width: 40px;
+            height: 1px;
+            background: rgba(255,255,255,0.08);
+            margin: 0 12px;
+            vertical-align: middle;
+        }
+
+        .worker-tag {
+            display: inline-block;
+            font-size: 8px;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .worker-tag-score { background: rgba(68,204,255,0.15); color: #44ddff; border: 1px solid rgba(68,204,255,0.3); }
+        .worker-tag-lb { background: rgba(136,68,255,0.15); color: #aa66ff; border: 1px solid rgba(136,68,255,0.3); }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- ============ HEADER ============ -->
+        <div class="header">
+            <h1>⟐ PUTER WORKERS</h1>
+            <div class="subtitle">Going Balls — Serverless Game API Playground</div>
+        </div>
+
+        <!-- ============ STATUS BAR ============ -->
+        <div class="status-bar" id="status-bar">
+            <div class="status-item">
+                <span class="status-dot" id="puter-status-dot"></span>
+                <span id="puter-status-text">Puter: Not connected</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot" id="score-worker-status-dot"></span>
+                <span id="score-worker-status-text">Score: Not deployed</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot" id="lb-worker-status-dot"></span>
+                <span id="lb-worker-status-text">Leaderboard: Not deployed</span>
+            </div>
+        </div>
+
+        <!-- ============ WORKER URL BAR (hidden until deployed) ============ -->
+        <div id="worker-urls-bar" style="display:none;margin-bottom:14px;">
+            <div class="status-bar" style="flex-direction:column;gap:6px;padding:8px 16px;">
+                <div class="status-item" id="score-worker-url-item" style="display:none;">
+                    <span class="worker-tag worker-tag-score">SCORE</span>
+                    <span style="color:#888;">URL:</span>
+                    <a id="score-worker-url-link" href="#" target="_blank" style="color:#44ddff;font-size:10px;"></a>
+                </div>
+                <div class="status-item" id="lb-worker-url-item" style="display:none;">
+                    <span class="worker-tag worker-tag-lb">LB</span>
+                    <span style="color:#888;">URL:</span>
+                    <a id="lb-worker-url-link" href="#" target="_blank" style="color:#aa66ff;font-size:10px;"></a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ STEP 1: CONNECT ============ -->
+        <div class="card">
+            <div class="card-title">
+                <span>📡 1. Connect to Puter</span>
+                <span class="badge badge-pending" id="puter-badge">Pending</span>
+            </div>
+            <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5;">
+                Initialize the Puter.js SDK. You'll be prompted to sign in with your Puter account
+                (or create one for free). This grants access to Workers, KV Store, and File System APIs.
+            </p>
+            <div class="btn-group">
+                <button class="btn btn-primary" id="btn-init-puter">🔌 Initialize Puter</button>
+                <button class="btn btn-sm" id="btn-list-workers" disabled>📋 List Workers</button>
+            </div>
+        </div>
+
+        <!-- ============ STEP 2a: DEPLOY SCORE VERIFICATION WORKER ============ -->
+        <div class="card">
+            <div class="card-title">
+                <span class="worker-tag worker-tag-score" style="font-size:10px;padding:2px 8px;">SCORE</span>
+                <span>2a. Deploy Score Verification</span>
+                <span class="badge badge-pending" id="score-deploy-badge">Pending</span>
+            </div>
+            <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5;">
+                Deploys a focused worker with <code style="color:#44ddff;">POST /api/scores/verify</code>
+                and <code style="color:#44ddff;">GET /api/health</code>.
+                Uses <code style="color:#44ddff;">puter.kv</code> for optional score audit logging.
+                <span style="color:#888;font-size:10px;">(Matches the <code style="color:#ffdd66;">deployScoreVerificationWorker()</code> pattern.)</span>
+            </p>
+            <div class="form-row">
+                <div class="field">
+                    <label>Worker Name</label>
+                    <input type="text" id="score-worker-name" value="going-balls-score-verify" style="font-family:monospace;">
+                </div>
+                <div class="field">
+                    <label>Score Secret</label>
+                    <input type="text" id="score-secret" value="going-balls-secret-2026" style="font-family:monospace;">
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-accent" id="btn-deploy-score-worker" disabled>🔐 Deploy Score Worker</button>
+                <button class="btn btn-sm" id="btn-delete-score-worker" disabled>🗑 Delete</button>
+                <button class="btn btn-sm" id="btn-get-score-worker" disabled>🔍 Info</button>
+            </div>
+        </div>
+
+        <!-- ============ STEP 2b: DEPLOY LEADERBOARD PROXY WORKER ============ -->
+        <div class="card">
+            <div class="card-title">
+                <span class="worker-tag worker-tag-lb" style="font-size:10px;padding:2px 8px;">LB</span>
+                <span>2b. Deploy Leaderboard Proxy</span>
+                <span class="badge badge-pending" id="lb-deploy-badge">Pending</span>
+            </div>
+            <p style="font-size:11px;color:#aaa;margin-bottom:10px;line-height:1.5;">
+                Deploys a leaderboard worker with <code style="color:#aa66ff;">GET/POST /api/leaderboard/:id</code>
+                and <code style="color:#aa66ff;">GET /api/health</code>.
+                Entries are stored in <code style="color:#aa66ff;">puter.kv</code> and sorted by score.
+                <span style="color:#888;font-size:10px;">(Matches the <code style="color:#ffdd66;">deployLeaderboardProxy()</code> pattern.)</span>
+            </p>
+            <div class="form-row">
+                <div class="field">
+                    <label>Worker Name</label>
+                    <input type="text" id="lb-worker-name" value="going-balls-leaderboard" style="font-family:monospace;">
+                </div>
+                <div class="field">
+                    <label>Score Secret</label>
+                    <input type="text" id="lb-score-secret" value="going-balls-secret-2026" style="font-family:monospace;">
+                </div>
+                <div class="field">
+                    <label>Max Entries</label>
+                    <input type="number" id="max-entries" value="100" min="10" max="500">
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-success" id="btn-deploy-lb-worker" disabled>🏆 Deploy LB Worker</button>
+                <button class="btn btn-sm" id="btn-delete-lb-worker" disabled>🗑 Delete</button>
+                <button class="btn btn-sm" id="btn-get-lb-worker" disabled>🔍 Info</button>
+            </div>
+        </div>
+
+        <!-- ============ STEP 3: TEST ============ -->
+        <div class="section-divider">TEST ENDPOINTS</div>
+
+        <!-- ── 3a: Health Check ── -->
+        <div class="card">
+            <div class="card-title">
+                <span>💚 Health Checks</span>
+            </div>
+            <div class="btn-group" style="gap:8px;">
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <span class="worker-tag worker-tag-score">SCORE</span>
+                    <button class="btn btn-sm" id="btn-score-health" disabled>🏓 GET /api/health</button>
+                    <button class="btn btn-sm" id="btn-score-root" disabled>📖 GET /</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <span class="worker-tag worker-tag-lb">LB</span>
+                    <button class="btn btn-sm" id="btn-lb-health" disabled>🏓 GET /api/health</button>
+                    <button class="btn btn-sm" id="btn-lb-root" disabled>📖 GET /</button>
+                </div>
+            </div>
+            <div class="response-panel" id="health-response"></div>
+        </div>
+
+        <!-- ── 3b: Score Verification ── -->
+        <div class="card">
+            <div class="card-title">
+                <span class="worker-tag worker-tag-score" style="font-size:10px;padding:2px 8px;">SCORE</span>
+                <span>🔐 Score Verification</span>
+                <span class="badge badge-pending" id="verify-badge">Untested</span>
+            </div>
+            <p style="font-size:10px;color:#888;margin-bottom:8px;line-height:1.4;">
+                The worker verifies scores using a shared secret. The client computes
+                <code style="color:#ffdd66;">btoa(score + ":" + secret + ":" + playerId)</code> and sends the proof
+                along with the score. The worker recomputes and rejects tampered scores.
+            </p>
+            <div class="form-row">
+                <div class="field">
+                    <label>Player ID</label>
+                    <input type="text" id="verify-player-id" value="player_demo_1">
+                </div>
+                <div class="field">
+                    <label>Score</label>
+                    <input type="number" id="verify-score" value="4200">
+                </div>
+                <div class="field" style="flex:2;">
+                    <label>Proof (auto-computed)</label>
+                    <input type="text" id="verify-proof" readonly style="font-family:monospace;color:#ffdd88;">
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-sm" id="btn-compute-proof">🧮 Compute Proof</button>
+                <button class="btn btn-sm btn-primary" id="btn-verify-score" disabled>✅ POST /api/scores/verify</button>
+            </div>
+            <div class="response-panel" id="verify-response"></div>
+        </div>
+
+        <!-- ── 3c: Leaderboard ── -->
+        <div class="card">
+            <div class="card-title">
+                <span class="worker-tag worker-tag-lb" style="font-size:10px;padding:2px 8px;">LB</span>
+                <span>🏆 Leaderboard Proxy</span>
+                <span class="badge badge-pending" id="leaderboard-badge">Untested</span>
+            </div>
+            <p style="font-size:10px;color:#888;margin-bottom:8px;line-height:1.4;">
+                Submit scores to the leaderboard (automatically verified first), then fetch
+                the top entries sorted by score descending.
+            </p>
+
+            <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;">
+                    <div style="font-size:10px;color:#88ff88;font-weight:600;margin-bottom:6px;">📤 Submit Score</div>
+                    <div class="form-row">
+                        <div class="field"><label>Player ID</label><input type="text" id="lb-player-id" value="player_demo_1"></div>
+                        <div class="field"><label>Player Name</label><input type="text" id="lb-player-name" value="NeonBouncer"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="field"><label>Score</label><input type="number" id="lb-score" value="4200"></div>
+                        <div class="field"><label>Level</label><input type="number" id="lb-level" value="12"></div>
+                        <div class="field"><label>Time (s)</label><input type="text" id="lb-time" value="45.2"></div>
+                    </div>
+                    <button class="btn btn-sm btn-success" id="btn-lb-submit" disabled>📮 POST /api/leaderboard/global</button>
+                </div>
+
+                <div style="flex:1;min-width:200px;">
+                    <div style="font-size:10px;color:#88ccff;font-weight:600;margin-bottom:6px;">📥 Fetch Leaderboard</div>
+                    <div class="form-row">
+                        <div class="field">
+                            <label>Leaderboard ID</label>
+                            <input type="text" id="lb-fetch-id" value="global" style="font-family:monospace;">
+                        </div>
+                        <div class="field">
+                            <label>Limit</label>
+                            <input type="number" id="lb-fetch-limit" value="10" min="1" max="100">
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" id="btn-lb-fetch" disabled>📊 GET /api/leaderboard/global</button>
+                </div>
+            </div>
+
+            <div id="lb-results" style="margin-top:10px;display:none;">
+                <div style="font-size:10px;color:#aaa;margin-bottom:6px;">Results</div>
+                <table class="lb-table" id="lb-table">
+                    <thead>
+                        <tr><th>Rank</th><th>Player</th><th>Score</th><th>Level</th><th>Time</th></tr>
+                    </thead>
+                    <tbody id="lb-tbody"></tbody>
+                </table>
+            </div>
+            <div class="response-panel" id="lb-response"></div>
+        </div>
+
+        <!-- ============ LOG ============ -->
+        <div class="card">
+            <div class="card-title">
+                <span>📝 Activity Log</span>
+                <button class="btn btn-sm" id="btn-clear-log" style="margin-left:auto;">Clear</button>
+            </div>
+            <div class="log-container" id="log-container">
+                <div class="log-entry"><span class="log-time">[--:--:--]</span> <span class="log-info">Ready. Initialize Puter to begin.</span></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+    // ═══════════════════════════════════════════════════════════════════════
+    // Demo State — tracks both workers independently
+    // ═══════════════════════════════════════════════════════════════════════
+    const state = {
+        puter: null,
+
+        // Score Verification Worker
+        scoreWorker: null,
+        scoreWorkerUrl: null,
+        scoreWorkerName: 'going-balls-score-verify',
+        scoreSecret: 'going-balls-secret-2026',
+
+        // Leaderboard Proxy Worker
+        lbWorker: null,
+        lbWorkerUrl: null,
+        lbWorkerName: 'going-balls-leaderboard',
+        lbScoreSecret: 'going-balls-secret-2026',
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Logger
+    // ═══════════════════════════════════════════════════════════════════════
+    function log(message, type = 'info') {
+        const container = document.getElementById('log-container');
+        const now = new Date();
+        const time = now.toTimeString().slice(0, 8);
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${message}</span>`;
+        container.appendChild(entry);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function logData(label, data) {
+        const str = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+        log(`${label}\n${str}`, 'data');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // UI Helpers
+    // ═══════════════════════════════════════════════════════════════════════
+    function setDot(id, dotClass) {
+        const el = document.getElementById(id);
+        if (el) el.className = 'status-dot ' + dotClass;
+    }
+
+    function setBadge(id, text, className) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'badge ' + className;
+    }
+
+    function showResponse(panelId, data) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        panel.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+        panel.classList.add('visible');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Worker Code Generators (matching deployScoreVerificationWorker & deployLeaderboardProxy)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Score Verification Worker Code
+     * Matches the pattern from deployScoreVerificationWorker() in puter_integration.js.
+     * Endpoints: POST /api/scores/verify, GET /api/health, GET /
+     */
+    function generateScoreWorkerCode(secret) {
+        const escaped = JSON.stringify(secret);
+        return `\n// ═══════════════════════════════════════════════════════════════════════════\n// Going Balls — Score Verification Worker\n// Deployed by Puter Workers Playground\n// ═══════════════════════════════════════════════════════════════════════════\n\nconst SCORE_SECRET = ${escaped};\n\n// ── POST /api/scores/verify ───────────────────────────────────────────────\n// Verifies a score proof. Body: { playerId, score, proof }\n// Proof = btoa(score + ":" + secret + ":" + playerId)\nrouter.post('/api/scores/verify', async (event) => {\n    let body;\n    try {\n        body = await event.request.json();\n    } catch {\n        return { valid: false, error: 'Invalid JSON body', status: 400 };\n    }\n\n    const { playerId, score, proof } = body;\n\n    if (!playerId || score === undefined || score === null || !proof) {\n        return { valid: false, error: 'Missing required fields: playerId, score, proof', status: 400 };\n    }\n\n    const safePlayerId = String(playerId).slice(0, 64);\n    const safeScore = Math.max(0, Math.min(999999999, parseInt(score, 10) || 0));\n\n    try {\n        const expected = btoa(safeScore + ':' + SCORE_SECRET + ':' + safePlayerId);\n\n        if (proof !== expected) {\n            return {\n                valid: false,\n                reason: 'proof_mismatch',\n                status: 403,\n                message: 'Score proof does not match — possible tampering detected'\n            };\n        }\n\n        return { valid: true, playerId: safePlayerId, score: safeScore };\n    } catch (error) {\n        return { valid: false, error: 'Verification failed', details: error.message, status: 500 };\n    }\n});\n\n// ── GET /api/health ────────────────────────────────────────────────────────\nrouter.get('/api/health', async () => {\n    return {\n        status: 'ok',\n        service: 'going-balls-score-verification',\n        timestamp: new Date().toISOString()\n    };\n});\n\n// ── Root — API index ─────────────────────────────────────────────────────\nrouter.get('/', async () => {\n    return {\n        service: 'Going Balls Score Verification',\n        description: 'Verifies score proofs to prevent leaderboard tampering',\n        endpoints: {\n            'POST /api/scores/verify': 'Verify a score proof (body: playerId, score, proof)',\n            'GET  /api/health': 'Health check'\n        },\n        version: '1.0.0'\n    };\n});\n`;
+    }
+
+    /**
+     * Leaderboard Proxy Worker Code
+     * Matches the pattern from deployLeaderboardProxy() in puter_integration.js.
+     * Endpoints: GET/POST /api/leaderboard/:id, GET /api/health, GET /
+     * Includes score verification on POST /api/leaderboard/:id submissions.
+     */
+    function generateLBWorkerCode(secret, maxEntries) {
+        return `\n// ═══════════════════════════════════════════════════════════════════════════\n// Going Balls — Leaderboard Proxy Worker\n// Deployed by Puter Workers Playground\n// ═══════════════════════════════════════════════════════════════════════════\n\nconst LEADERBOARD_PREFIX = 'lb:';\nconst SCORE_SECRET = ${JSON.stringify(secret)};\nconst MAX_ENTRIES = ${maxEntries};\n\n// ── Helper: parse a JSON value from puter.kv ─────────────────────────────\nasync function kvGetParsed(key) {\n    try {\n        const raw = await puter.kv.get(key);\n        if (raw === undefined || raw === null) return null;\n        try { return JSON.parse(raw); } catch { return raw; }\n    } catch { return null; }\n}\n\n// ── GET /api/leaderboard/:id ──────────────────────────────────────────────\nrouter.get('/api/leaderboard/:id', async (event) => {\n    const lbId = event.params && event.params.id;\n    if (!lbId) return { error: 'Missing leaderboard ID', status: 400 };\n\n    const url = new URL(event.request.url);\n    const limit = Math.min(parseInt(url.searchParams.get('limit') || '10', 10) || 10, MAX_ENTRIES);\n    const offset = parseInt(url.searchParams.get('offset') || '0', 10) || 0;\n\n    try {\n        const entries = await puter.kv.list({\n            pattern: LEADERBOARD_PREFIX + lbId + ':',\n            returnValues: true\n        });\n\n        if (!Array.isArray(entries)) {\n            return { entries: [], total: 0, limit, offset, leaderboardId: lbId };\n        }\n\n        const parsed = entries\n            .map(e => {\n                try {\n                    if (typeof e === 'object' && e.value) {\n                        const val = JSON.parse(e.value);\n                        return {\n                            playerName: val.playerName || 'Unknown',\n                            score: val.score || 0,\n                            level: val.level || 0,\n                            time: val.time || null,\n                            ball: val.ball || null,\n                            submittedAt: val.submittedAt || e.timestamp || null\n                        };\n                    }\n                } catch { /* skip malformed */ }\n                return null;\n            })\n            .filter(Boolean)\n            .sort((a, b) => (b.score || 0) - (a.score || 0));\n\n        const total = parsed.length;\n        const page = parsed.slice(offset, offset + limit);\n\n        return { entries: page, total, limit, offset, leaderboardId: lbId };\n    } catch (error) {\n        return { error: 'Failed to fetch leaderboard', details: error.message, status: 500 };\n    }\n});\n\n// ── POST /api/leaderboard/:id ─────────────────────────────────────────────\n// Verifies proof before saving. Rejects tampered scores with 403.\nrouter.post('/api/leaderboard/:id', async (event) => {\n    const lbId = event.params && event.params.id;\n    if (!lbId) return { error: 'Missing leaderboard ID', status: 400 };\n\n    let body;\n    try { body = await event.request.json(); } catch {\n        return { error: 'Invalid JSON body', status: 400 };\n    }\n\n    const playerId = body.playerId || body.player_id;\n    if (!playerId) return { error: 'Missing playerId', status: 400 };\n\n    // Verify score proof before accepting\n    const score = Math.max(0, parseInt(body.score, 10) || 0);\n    const proof = body.proof || '';\n    const expectedProof = btoa(score + ':' + SCORE_SECRET + ':' + playerId);\n    if (proof !== expectedProof) {\n        return { error: 'Score verification failed — tampered score', status: 403 };\n    }\n\n    const entry = {\n        playerId,\n        playerName: body.playerName || 'Unknown',\n        score,\n        level: Math.max(0, parseInt(body.level, 10) || 0),\n        time: body.time ? String(body.time) : null,\n        ball: body.ball || null,\n        submittedAt: new Date().toISOString()\n    };\n\n    try {\n        const key = LEADERBOARD_PREFIX + lbId + ':' + playerId;\n        await puter.kv.set(key, JSON.stringify(entry));\n        return { success: true, entry, leaderboardId: lbId };\n    } catch (error) {\n        return { error: 'Failed to save entry', details: error.message, status: 500 };\n    }\n});\n\n// ── GET /api/health ────────────────────────────────────────────────────────\nrouter.get('/api/health', async () => {\n    return {\n        status: 'ok',\n        service: 'going-balls-leaderboard',\n        timestamp: new Date().toISOString(),\n        maxEntries: MAX_ENTRIES\n    };\n});\n\n// ── Root — API index ─────────────────────────────────────────────────────\nrouter.get('/', async () => {\n    return {\n        service: 'Going Balls Leaderboard Proxy',\n        endpoints: {\n            'GET  /api/leaderboard/:id': 'Fetch top entries (query: limit, offset)',\n            'POST /api/leaderboard/:id': 'Submit a verified score (body: playerId, playerName, score, level, time, proof)',\n            'GET  /api/health': 'Health check'\n        },\n        version: '1.0.0'\n    };\n});\n`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // UI Event Wiring
+    // ═══════════════════════════════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // ── Live update inputs ──
+        document.getElementById('score-worker-name').addEventListener('input', (e) => {
+            state.scoreWorkerName = e.target.value || 'going-balls-score-verify';
+        });
+        document.getElementById('score-secret').addEventListener('input', (e) => {
+            state.scoreSecret = e.target.value || 'going-balls-secret-2026';
+        });
+        document.getElementById('lb-worker-name').addEventListener('input', (e) => {
+            state.lbWorkerName = e.target.value || 'going-balls-leaderboard';
+        });
+        document.getElementById('lb-score-secret').addEventListener('input', (e) => {
+            state.lbScoreSecret = e.target.value || 'going-balls-secret-2026';
+        });
+
+        // ── Live compute proof ──
+        function updateProof() {
+            const pid = document.getElementById('verify-player-id').value;
+            const score = document.getElementById('verify-score').value;
+            const proof = btoa(score + ':' + state.scoreSecret + ':' + pid);
+            document.getElementById('verify-proof').value = proof;
+        }
+        document.getElementById('verify-player-id').addEventListener('input', updateProof);
+        document.getElementById('verify-score').addEventListener('input', updateProof);
+        document.getElementById('btn-compute-proof').addEventListener('click', updateProof);
+
+        // ── Clear Log ──
+        document.getElementById('btn-clear-log').addEventListener('click', () => {
+            document.getElementById('log-container').innerHTML = '';
+        });
+
+        // ── Init Puter ──
+        document.getElementById('btn-init-puter').addEventListener('click', initPuter);
+
+        // ── List Workers ──
+        document.getElementById('btn-list-workers').addEventListener('click', listWorkers);
+
+        // ── Score Worker buttons ──
+        document.getElementById('btn-deploy-score-worker').addEventListener('click', () => deployScoreWorker());
+        document.getElementById('btn-delete-score-worker').addEventListener('click', () => deleteWorker('score'));
+        document.getElementById('btn-get-score-worker').addEventListener('click', () => getWorker('score'));
+
+        // ── LB Worker buttons ──
+        document.getElementById('btn-deploy-lb-worker').addEventListener('click', () => deployLBWorker());
+        document.getElementById('btn-delete-lb-worker').addEventListener('click', () => deleteWorker('lb'));
+        document.getElementById('btn-get-lb-worker').addEventListener('click', () => getWorker('lb'));
+
+        // ── Health buttons ──
+        document.getElementById('btn-score-health').addEventListener('click', () => testEndpoint('health', '/api/health', 'score'));
+        document.getElementById('btn-score-root').addEventListener('click', () => testEndpoint('health', '/', 'score'));
+        document.getElementById('btn-lb-health').addEventListener('click', () => testEndpoint('health', '/api/health', 'lb'));
+        document.getElementById('btn-lb-root').addEventListener('click', () => testEndpoint('health', '/', 'lb'));
+
+        // ── Verify Score ──
+        document.getElementById('btn-verify-score').addEventListener('click', verifyScore);
+
+        // ── Leaderboard ──
+        document.getElementById('btn-lb-submit').addEventListener('click', submitLeaderboardEntry);
+        document.getElementById('btn-lb-fetch').addEventListener('click', fetchLeaderboard);
+
+        // ── Compute initial proof ──
+        updateProof();
+    });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Puter Initialization
+    // ═══════════════════════════════════════════════════════════════════════
+    async function initPuter() {
+        const btn = document.getElementById('btn-init-puter');
+        btn.disabled = true;
+        btn.textContent = '⏳ Connecting...';
+        log('Initializing Puter.js SDK...', 'info');
+
+        try {
+            if (typeof window !== 'undefined' && window.puter) {
+                state.puter = window.puter;
+                log('Puter found in window (ecosystem mode)', 'success');
+            } else {
+                log('Waiting for Puter SDK to load...', 'info');
+                await new Promise((resolve, reject) => {
+                    const check = (attempts) => {
+                        if (window.puter) {
+                            state.puter = window.puter;
+                            resolve();
+                        } else if (attempts <= 0) {
+                            reject(new Error('Puter SDK failed to initialize'));
+                        } else {
+                            setTimeout(() => check(attempts - 1), 500);
+                        }
+                    };
+                    check(20);
+                });
+            }
+
+            log(`Puter SDK initialized. API Origin: ${state.puter?.APIOrigin || 'puter.com'}`, 'success');
+            setDot('puter-status-dot', 'on');
+            document.getElementById('puter-status-text').textContent = 'Puter: Connected';
+            setBadge('puter-badge', 'Connected', 'badge-ready');
+
+            // Enable both deploy buttons
+            document.getElementById('btn-deploy-score-worker').disabled = false;
+            document.getElementById('btn-deploy-lb-worker').disabled = false;
+            document.getElementById('btn-list-workers').disabled = false;
+
+            btn.textContent = '✅ Connected';
+            btn.style.borderColor = 'rgba(68,255,136,0.4)';
+            log('Ready to deploy workers.', 'success');
+
+        } catch (error) {
+            log('Puter initialization failed: ' + error.message, 'error');
+            setDot('puter-status-dot', 'off');
+            document.getElementById('puter-status-text').textContent = 'Puter: Error';
+            setBadge('puter-badge', 'Error', 'badge-error');
+            btn.disabled = false;
+            btn.textContent = '🔌 Retry Connection';
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Common Worker Deploy Helpers
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Core deploy logic shared by both worker types.
+     * @param {string} which - 'score' or 'lb'
+     * @param {string} name - worker name
+     * @param {string} code - worker JS source
+     * @param {object} refs - { deployBtn, deployBadge, statusText, statusDot, urlItemId, urlLinkId }
+     */
+    async function deployWorkerCore(which, name, code, refs) {
+        const btn = refs.deployBtn;
+        btn.disabled = true;
+        btn.textContent = '⏳ Deploying...';
+        setBadge(refs.deployBadge, 'Deploying', 'badge-pending');
+        log(`[${which.toUpperCase()}] Deploying worker: ${name}...`, 'info');
+
+        try {
+            const fileName = 'workers/' + name + '.js';
+            await state.puter.fs.write(fileName, code);
+            log(`[${which.toUpperCase()}] Code saved to: ${fileName}`, 'success');
+
+            const result = await state.puter.workers.create(name, fileName, { sandbox: true });
+
+            // Store in state
+            if (which === 'score') {
+                state.scoreWorker = result;
+                state.scoreWorkerUrl = result.url || null;
+            } else {
+                state.lbWorker = result;
+                state.lbWorkerUrl = result.url || null;
+            }
+
+            log(`[${which.toUpperCase()}] Worker deployed successfully!`, 'success');
+            logData(`[${which.toUpperCase()}] Result`, {
+                name: result.name || name,
+                url: result.url || '(pending propagation)',
+                status: result.status || 'deploying'
+            });
+
+            refs.statusText.textContent = name + ': Deployed';
+            setDot(refs.statusDot, 'pending');
+            setBadge(refs.deployBadge, 'Deployed', 'badge-ready');
+            btn.textContent = '✅ Deployed';
+            btn.style.borderColor = 'rgba(68,255,136,0.4)';
+
+            // Enable delete/info buttons
+            document.getElementById('btn-delete-' + which + '-worker').disabled = false;
+            document.getElementById('btn-get-' + which + '-worker').disabled = false;
+
+            // Show URL
+            if (result.url) {
+                showWorkerUrl(which, result.url);
+                refs.statusText.textContent = name + ': Live';
+                setDot(refs.statusDot, 'on');
+                log(`[${which.toUpperCase()}] URL: ${result.url}`, 'success');
+            } else {
+                log(`[${which.toUpperCase()}] URL pending propagation, polling...`, 'warn');
+                pollWorkerUrl(which, name);
+            }
+
+            // Enable test buttons if both workers are live
+            updateTestButtons();
+
+        } catch (error) {
+            log(`[${which.toUpperCase()}] Deploy failed: ${error.message}`, 'error');
+            setBadge(refs.deployBadge, 'Failed', 'badge-error');
+            btn.disabled = false;
+            btn.textContent = '⚡ Retry';
+            updateTestButtons();
+        }
+    }
+
+    function showWorkerUrl(which, url) {
+        const item = document.getElementById(which + '-worker-url-item');
+        const link = document.getElementById(which + '-worker-url-link');
+        if (item) item.style.display = 'flex';
+        if (link) { link.textContent = url; link.href = url; }
+        document.getElementById('worker-urls-bar').style.display = 'block';
+    }
+
+    async function pollWorkerUrl(which, name) {
+        for (let i = 0; i < 12; i++) {
+            await new Promise(r => setTimeout(r, 5000));
+            try {
+                const worker = await state.puter.workers.get(name);
+                if (worker && worker.url) {
+                    if (which === 'score') state.scoreWorkerUrl = worker.url;
+                    else state.lbWorkerUrl = worker.url;
+                    showWorkerUrl(which, worker.url);
+                    const statusText = document.getElementById(which + '-worker-status-text');
+                    if (statusText) statusText.textContent = name + ': Live';
+                    setDot(which + '-worker-status-dot', 'on');
+                    log(`[${which.toUpperCase()}] URL resolved: ${worker.url}`, 'success');
+                    updateTestButtons();
+                    return;
+                }
+            } catch (e) { /* continue polling */ }
+        }
+        log(`[${which.toUpperCase()}] URL did not resolve within 60s.`, 'warn');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Score Verification Worker Deploy
+    // ═══════════════════════════════════════════════════════════════════════
+    async function deployScoreWorker() {
+        const code = generateScoreWorkerCode(state.scoreSecret);
+        await deployWorkerCore('score', state.scoreWorkerName, code, {
+            deployBtn: document.getElementById('btn-deploy-score-worker'),
+            deployBadge: 'score-deploy-badge',
+            statusText: document.getElementById('score-worker-status-text'),
+            statusDot: 'score-worker-status-dot',
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Leaderboard Proxy Worker Deploy
+    // ═══════════════════════════════════════════════════════════════════════
+    async function deployLBWorker() {
+        const maxEntries = parseInt(document.getElementById('max-entries').value) || 100;
+        const code = generateLBWorkerCode(state.lbScoreSecret, maxEntries);
+        await deployWorkerCore('lb', state.lbWorkerName, code, {
+            deployBtn: document.getElementById('btn-deploy-lb-worker'),
+            deployBadge: 'lb-deploy-badge',
+            statusText: document.getElementById('lb-worker-status-text'),
+            statusDot: 'lb-worker-status-dot',
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Delete / Get Worker
+    // ═══════════════════════════════════════════════════════════════════════
+    async function deleteWorker(which) {
+        const name = which === 'score' ? state.scoreWorkerName : state.lbWorkerName;
+        if (!confirm(`Delete ${which.toUpperCase()} worker "${name}"?`)) return;
+        log(`[${which.toUpperCase()}] Deleting worker: ${name}...`, 'info');
+
+        try {
+            await state.puter.workers.delete(name);
+            log(`[${which.toUpperCase()}] Worker deleted.`, 'success');
+
+            if (which === 'score') {
+                state.scoreWorker = null;
+                state.scoreWorkerUrl = null;
+            } else {
+                state.lbWorker = null;
+                state.lbWorkerUrl = null;
+            }
+
+            // Reset UI
+            const statusText = document.getElementById(which + '-worker-status-text');
+            if (statusText) statusText.textContent = which === 'score' ? 'Score: Not deployed' : 'Leaderboard: Not deployed';
+            setDot(which + '-worker-status-dot', 'off');
+            setBadge(which + '-deploy-badge', 'Deleted', 'badge-pending');
+
+            document.getElementById('btn-deploy-' + which + '-worker').disabled = false;
+            document.getElementById('btn-deploy-' + which + '-worker').textContent = which === 'score' ? '🔐 Deploy Score Worker' : '🏆 Deploy LB Worker';
+            document.getElementById('btn-deploy-' + which + '-worker').style.borderColor = '';
+            document.getElementById('btn-delete-' + which + '-worker').disabled = true;
+            document.getElementById('btn-get-' + which + '-worker').disabled = true;
+            document.getElementById(which + '-worker-url-item').style.display = 'none';
+
+            // Hide URLs bar if both hidden
+            const scoreItem = document.getElementById('score-worker-url-item');
+            const lbItem = document.getElementById('lb-worker-url-item');
+            if (scoreItem.style.display !== 'flex' && lbItem.style.display !== 'flex') {
+                document.getElementById('worker-urls-bar').style.display = 'none';
+            }
+
+            updateTestButtons();
+        } catch (error) {
+            log(`[${which.toUpperCase()}] Delete failed: ${error.message}`, 'error');
+        }
+    }
+
+    async function getWorker(which) {
+        const name = which === 'score' ? state.scoreWorkerName : state.lbWorkerName;
+        log(`[${which.toUpperCase()}] Fetching worker info: ${name}`, 'info');
+        try {
+            const worker = await state.puter.workers.get(name);
+            if (worker) {
+                logData(`[${which.toUpperCase()}] Worker info`, {
+                    name: worker.name,
+                    url: worker.url || 'pending',
+                    status: worker.status || 'unknown',
+                    filePath: worker.file_path || '?',
+                    createdAt: worker.created_at || worker.createdAt || '?'
+                });
+            } else {
+                log(`[${which.toUpperCase()}] Worker not found.`, 'warn');
+            }
+        } catch (error) {
+            log(`[${which.toUpperCase()}] Get worker failed: ${error.message}`, 'error');
+        }
+    }
+
+    async function listWorkers() {
+        log('Fetching worker list...', 'info');
+        try {
+            const workers = await state.puter.workers.list();
+            const list = Array.isArray(workers) ? workers : [];
+            if (list.length === 0) {
+                log('No workers deployed.', 'warn');
+            } else {
+                log(`Workers: ${list.length} deployed`, 'success');
+                list.forEach(w => {
+                    logData(`  Worker: ${w.name || 'unknown'}`, {
+                        url: w.url || 'pending',
+                        status: w.status || 'unknown',
+                        created: w.created_at || w.createdAt || '?'
+                    });
+                });
+            }
+        } catch (error) {
+            log('List workers failed: ' + error.message, 'error');
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Test Buttons
+    // ═══════════════════════════════════════════════════════════════════════
+    function updateTestButtons() {
+        const scoreLive = !!state.scoreWorkerUrl;
+        const lbLive = !!state.lbWorkerUrl;
+
+        document.getElementById('btn-score-health').disabled = !scoreLive;
+        document.getElementById('btn-score-root').disabled = !scoreLive;
+        document.getElementById('btn-verify-score').disabled = !scoreLive;
+        document.getElementById('btn-lb-health').disabled = !lbLive;
+        document.getElementById('btn-lb-root').disabled = !lbLive;
+        document.getElementById('btn-lb-submit').disabled = !lbLive;
+        document.getElementById('btn-lb-fetch').disabled = !lbLive;
+    }
+
+    async function testEndpoint(responsePanelId, path, which) {
+        const url = which === 'score' ? state.scoreWorkerUrl : state.lbWorkerUrl;
+        if (!url) {
+            log(`[${which.toUpperCase()}] No worker URL available.`, 'warn');
+            return;
+        }
+
+        const fullUrl = url.replace(/\/$/, '') + path;
+        log(`[${which.toUpperCase()}] GET ${fullUrl}`, 'info');
+
+        try {
+            const resp = await fetch(fullUrl);
+            const data = await resp.json();
+            showResponse(responsePanelId + '-response', data);
+            logData(`[${which.toUpperCase()}] Response (${resp.status})`, data);
+        } catch (error) {
+            log(`[${which.toUpperCase()}] Request failed: ${error.message}`, 'error');
+        }
+    }
+
+    async function verifyScore() {
+        if (!state.scoreWorkerUrl) { log('[SCORE] No worker URL.', 'warn'); return; }
+
+        const playerId = document.getElementById('verify-player-id').value;
+        const score = parseInt(document.getElementById('verify-score').value) || 0;
+        const proof = document.getElementById('verify-proof').value;
+
+        const body = { playerId, score, proof };
+        const url = state.scoreWorkerUrl.replace(/\/$/, '') + '/api/scores/verify';
+
+        log('[SCORE] POST /api/scores/verify', 'info');
+        logData('Request body', body);
+
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await resp.json();
+            showResponse('verify-response', data);
+            logData(`Response (${resp.status})`, data);
+
+            if (data.valid) {
+                setBadge('verify-badge', '✓ Verified', 'badge-ready');
+                log('[SCORE] Score verified successfully!', 'success');
+            } else if (data.reason === 'proof_mismatch') {
+                setBadge('verify-badge', '✗ Tampered', 'badge-error');
+                log('[SCORE] Score verification FAILED — tampered score detected!', 'error');
+            } else {
+                setBadge('verify-badge', 'Failed', 'badge-error');
+            }
+        } catch (error) {
+            log('[SCORE] Verify request failed: ' + error.message, 'error');
+        }
+    }
+
+    async function submitLeaderboardEntry() {
+        if (!state.lbWorkerUrl) { log('[LB] No worker URL.', 'warn'); return; }
+
+        const playerId = document.getElementById('lb-player-id').value;
+        const playerName = document.getElementById('lb-player-name').value || 'Player';
+        const score = parseInt(document.getElementById('lb-score').value) || 0;
+        const level = parseInt(document.getElementById('lb-level').value) || 0;
+        const time = document.getElementById('lb-time').value || '0';
+
+        // Auto-compute proof using the LB worker's secret
+        const proof = btoa(score + ':' + state.lbScoreSecret + ':' + playerId);
+
+        const body = { playerId, playerName, score, level, time, proof, ball: 'rainbow' };
+        const url = state.lbWorkerUrl.replace(/\/$/, '') + '/api/leaderboard/global';
+
+        log('[LB] POST /api/leaderboard/global', 'info');
+        logData('Request body (proof auto-computed)', body);
+
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await resp.json();
+            showResponse('lb-response', data);
+
+            if (data.success) {
+                log('[LB] Score submitted to leaderboard!', 'success');
+                setBadge('leaderboard-badge', 'Submitted', 'badge-ready');
+                setTimeout(() => fetchLeaderboard(), 500);
+            } else {
+                log('[LB] Submit failed: ' + (data.error || 'unknown'), 'error');
+                setBadge('leaderboard-badge', 'Error', 'badge-error');
+            }
+        } catch (error) {
+            log('[LB] Submit failed: ' + error.message, 'error');
+        }
+    }
+
+    async function fetchLeaderboard() {
+        if (!state.lbWorkerUrl) { log('[LB] No worker URL.', 'warn'); return; }
+
+        const lbId = document.getElementById('lb-fetch-id').value || 'global';
+        const limit = parseInt(document.getElementById('lb-fetch-limit').value) || 10;
+        const url = state.lbWorkerUrl.replace(/\/$/, '') + '/api/leaderboard/' + lbId + '?limit=' + limit;
+
+        log('[LB] GET /api/leaderboard/' + lbId + '?limit=' + limit, 'info');
+
+        try {
+            const resp = await fetch(url);
+            const data = await resp.json();
+            showResponse('lb-response', data);
+            renderLeaderboardTable(data);
+            setBadge('leaderboard-badge', 'Fetched', 'badge-ready');
+            log('[LB] Leaderboard: ' + (data.total || 0) + ' entries', 'success');
+        } catch (error) {
+            log('[LB] Fetch leaderboard failed: ' + error.message, 'error');
+        }
+    }
+
+    function renderLeaderboardTable(data) {
+        const container = document.getElementById('lb-results');
+        const tbody = document.getElementById('lb-tbody');
+
+        if (!data.entries || data.entries.length === 0) {
+            container.style.display = 'block';
+            tbody.innerHTML = '<tr><td colspan="5" class="lb-empty">🏆 No entries yet — submit a score!</td></tr>';
+            return;
+        }
+
+        container.style.display = 'block';
+        tbody.innerHTML = '';
+
+        data.entries.forEach((entry, i) => {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+            const rankHtml = medal
+                ? '<span class="lb-medal">' + medal + '</span>'
+                : '<span class="lb-rank">#' + (i + 1) + '</span>';
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${rankHtml}</td>
+                <td class="lb-player">${entry.playerName || 'Unknown'}</td>
+                <td class="lb-score">${(entry.score || 0).toLocaleString()}</td>
+                <td class="lb-level">${entry.level || 0}</td>
+                <td class="lb-time">${entry.time || '--'}s</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+    </script>
+</body>
+</html>

@@ -19,10 +19,27 @@ import { playSound } from './audio.js';
 import { applySkyConfig, getBallMaterial, applyBallSkin } from '../engine/scene.js';
 import { createLevel, createInfiniteLevel } from './levelgen.js';
 import { initVoiceToText, createMicButton, showTranscriptionToast, startListening, stopListening } from './voice_to_text.js';
+import { signScore } from './puter_integration.js';
 
 // --- Remote data sanitization ---
 const REMOTE_MAX_STRING = 128;
 const REMOTE_MAX_NUMBER = 1e9;
+
+/**
+ * Generate or retrieve a player display name.
+ */
+function getPlayerName(game) {
+    if (!game.saveData.playerName) {
+        const prefixes = ['Pro', 'Mega', 'Ultra', 'Super', 'Neon', 'Cyber', 'Turbo', 'Hyper', 'Nitro', 'XLR8'];
+        const suffixes = ['Ball', 'Roller', 'Bouncer', 'Dasher', 'Racer', 'Glider', 'Cruiser', 'Jumper', 'Z', 'Flyer'];
+        game.saveData.playerName =
+            prefixes[Math.floor(Math.random() * prefixes.length)] +
+            suffixes[Math.floor(Math.random() * suffixes.length)] +
+            Math.floor(Math.random() * 99);
+        saveGame(game);
+    }
+    return game.saveData.playerName;
+}
 
 function sanitizeRemoteEntry(entry) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
@@ -514,12 +531,14 @@ export function gameOver(game, win, room) {
         showTimeBonus(game, bonus);
         updateWalletUI(game);
 
-        // Leaderboard submission
+        // Leaderboard submission — include player name
         addLeaderboardEntry(game, {
+            playerName: getPlayerName(game),
             level: game.currentLevel - 1,
             time: timeTaken.toFixed(1),
             coins: game.saveData.totalCoins,
             ball: game.saveData.selectedBall || 'rainbow',
+            ballName: (game.ballConfigs[game.saveData.selectedBall] || {}).name || game.saveData.selectedBall,
             score: game.score
         }, room);
 
@@ -635,89 +654,213 @@ export function renderGrids(game) {
     const overlay = document.getElementById('overlay');
     if (!overlay) return;
 
+    // Shop search state
+    game._shopSearchQuery = '';
+
     overlay.innerHTML = `
-        <div class="modal" style="max-width:600px;max-height:85vh;overflow-y:auto;padding:20px;background:linear-gradient(145deg,#1a1a2e,#16213e);border-radius:16px;color:#fff;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <h2 style="margin:0;">Shop</h2>
-                <span style="font-size:14px;">🪙 ${game.saveData.totalCoins}</span>
+        <div class="modal" style="max-width:640px;max-height:88vh;overflow-y:auto;padding:0;background:linear-gradient(180deg,rgba(20,20,40,0.98),rgba(15,15,30,0.98));border:2px solid rgba(136,68,255,0.2);border-radius:16px;color:#fff;">
+            <div style="padding:14px 18px 10px;border-bottom:1px solid rgba(255,255,255,0.08);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <h2 style="margin:0;font-family:'5x5dots',monospace;font-size:16px;letter-spacing:1px;">🛒 SHOP</h2>
+                    <span style="font-size:14px;background:rgba(255,215,0,0.1);padding:4px 10px;border-radius:6px;border:1px solid rgba(255,215,0,0.2);">🪙 ${game.saveData.totalCoins}</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <input type="text" id="shop-search-input" placeholder="🔍 Search skins, skies, powerups..." style="
+                        flex:1;padding:6px 10px;border-radius:8px;
+                        background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+                        color:#ddd;font-size:11px;font-family:'Segoe UI',sans-serif;
+                        outline:none;transition:border-color 0.2s;
+                    ">
+                </div>
             </div>
-            <div style="display:flex;gap:8px;margin-bottom:12px;">
-                <button class="menu-btn tab-btn active" data-tab="skins" aria-label="Show skins">Skins</button>
-                <button class="menu-btn tab-btn" data-tab="skies" aria-label="Show skies">Skies</button>
-                <button class="menu-btn tab-btn" data-tab="powerups" aria-label="Show powerups">Powerups</button>
-                <button class="menu-btn" id="shop-close-btn" aria-label="Close shop" style="margin-left:auto;">✕</button>
+            <div style="display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.06);overflow-x:auto;flex-shrink:0;">
+                <button class="menu-btn tab-btn active" data-tab="skins" aria-label="Show skins" style="font-size:10px;padding:5px 12px;">⚽ Skins</button>
+                <button class="menu-btn tab-btn" data-tab="skies" aria-label="Show skies" style="font-size:10px;padding:5px 12px;">🌤️ Skies</button>
+                <button class="menu-btn tab-btn" data-tab="powerups" aria-label="Show powerups" style="font-size:10px;padding:5px 12px;">⚡ Powerups</button>
+                <button class="menu-btn" id="shop-close-btn" aria-label="Close shop" style="margin-left:auto;font-size:10px;padding:5px 10px;">✕ Close</button>
             </div>
-            <div id="skins-grid" class="tab-content"></div>
-            <div id="skies-grid" class="tab-content" style="display:none;"></div>
-            <div id="powerups-grid" class="tab-content" style="display:none;"></div>
+            <div id="skins-grid" class="tab-content" style="padding:8px 14px;"></div>
+            <div id="skies-grid" class="tab-content" style="display:none;padding:8px 14px;"></div>
+            <div id="powerups-grid" class="tab-content" style="display:none;padding:8px 14px;"></div>
         </div>`;
 
     const closeBtn = document.getElementById('shop-close-btn');
     if (closeBtn) closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; overlay.innerHTML = ''; });
 
+    // Search input — restore previous search value if any
+    const searchInput = document.getElementById('shop-search-input');
+    if (searchInput) {
+        if (game._shopSearchQuery) searchInput.value = game._shopSearchQuery;
+        searchInput.addEventListener('input', (e) => {
+            game._shopSearchQuery = e.target.value.trim().toLowerCase();
+            // Refresh active tab content
+            const activeTab = overlay.querySelector('.tab-btn.active');
+            if (activeTab) {
+                const tab = activeTab.dataset.tab;
+                if (tab === 'skins') renderSkinsGrid(game);
+                else if (tab === 'skies') renderSkiesGrid(game);
+                else if (tab === 'powerups') renderPowerupsGrid(game);
+            }
+        });
+    }
+
+    // Restore active tab or default to 'skins'
+    const restoreTab = game._shopActiveTab || 'skins';
+
     // Tab switching
     overlay.querySelectorAll('.tab-btn').forEach(btn => {
+        const tabName = btn.dataset.tab;
+        // Restore active state
+        if (tabName === restoreTab) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
+            game._shopActiveTab = tabName;
             overlay.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            const tab = btn.dataset.tab;
-            document.getElementById('skins-grid').style.display = tab === 'skins' ? '' : 'none';
-            document.getElementById('skies-grid').style.display = tab === 'skies' ? '' : 'none';
-            document.getElementById('powerups-grid').style.display = tab === 'powerups' ? '' : 'none';
+            document.getElementById('skins-grid').style.display = tabName === 'skins' ? '' : 'none';
+            document.getElementById('skies-grid').style.display = tabName === 'skies' ? '' : 'none';
+            document.getElementById('powerups-grid').style.display = tabName === 'powerups' ? '' : 'none';
+            if (tabName === 'skins') renderSkinsGrid(game);
+            else if (tabName === 'skies') renderSkiesGrid(game);
+            else if (tabName === 'powerups') renderPowerupsGrid(game);
         });
+        // Show correct content for initial render
+        if (tabName === restoreTab) {
+            // Will be rendered below
+        }
     });
 
-    renderSkinsGrid(game);
-    renderSkiesGrid(game);
-    renderPowerupsGrid(game);
+    // Show the correct tab content pane
+    document.getElementById('skins-grid').style.display = restoreTab === 'skins' ? '' : 'none';
+    document.getElementById('skies-grid').style.display = restoreTab === 'skies' ? '' : 'none';
+    document.getElementById('powerups-grid').style.display = restoreTab === 'powerups' ? '' : 'none';
+
+    // Render the active tab (and keep others in memory)
+    if (restoreTab === 'skins') renderSkinsGrid(game);
+    else if (restoreTab === 'skies') renderSkiesGrid(game);
+    else if (restoreTab === 'powerups') renderPowerupsGrid(game);
+    // Also cache the other grids so tab-switching doesn't lose scroll state
+    // (they'll re-render on first switch, which is fine)
 }
 
 function renderSkinsGrid(game) {
     const container = document.getElementById('skins-grid');
     if (!container) return;
     container.innerHTML = '';
+
+    const searchQuery = (game._shopSearchQuery || '').toLowerCase();
+
     const grid = document.createElement('div');
-    grid.className = 'grid';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;';
     container.appendChild(grid);
 
-    const keys = Object.keys(game.ballConfigs).sort((a, b) => {
+    let keys = Object.keys(game.ballConfigs).sort((a, b) => {
         const pa = Number(game.ballConfigs[a] && game.ballConfigs[a].price ? game.ballConfigs[a].price : 0);
         const pb = Number(game.ballConfigs[b] && game.ballConfigs[b].price ? game.ballConfigs[b].price : 0);
         return pb - pa;
     });
+
+    // Filter by search query
+    if (searchQuery) {
+        keys = keys.filter(key => {
+            const conf = game.ballConfigs[key];
+            return (conf.name || '').toLowerCase().includes(searchQuery) ||
+                   key.toLowerCase().includes(searchQuery) ||
+                   (conf.description || '').toLowerCase().includes(searchQuery) ||
+                   (conf.ability && conf.ability.key || '').includes(searchQuery);
+        });
+    }
+
+    if (keys.length === 0 && searchQuery) {
+        container.innerHTML = `<div style="text-align:center;padding:30px;color:#888;font-size:12px;">🔍 No skins match "<span style="color:#9944ff;">${searchQuery}</span>"</div>`;
+        return;
+    }
 
     keys.forEach(key => {
         const conf = game.ballConfigs[key];
         const isUnlocked = Array.isArray(game.saveData.unlockedBalls) && game.saveData.unlockedBalls.includes(key);
         const isSelected = game.saveData.selectedBall === key;
         const level = (game.saveData.skinLevels && game.saveData.skinLevels[key]) ? Math.max(1, Math.min(5, game.saveData.skinLevels[key])) : 1;
+        const price = Number(conf && conf.price ? conf.price : 0);
+        const maxLevel = 5;
+
+        // Compute ability stats
+        let abilityHtml = '';
+        let abilityKey = '';
+        let abilityEffect = '';
+        if (conf && conf.ability) {
+            const abil = conf.ability;
+            const base = Number.isFinite(Number(abil.base)) ? Number(abil.base) : 1.0;
+            const per = Number.isFinite(Number(abil.perLevel)) ? Number(abil.perLevel) : 0.0;
+            const eff = base + per * Math.max(0, level - 1);
+            abilityKey = abil.key.toUpperCase();
+            abilityEffect = `x${eff.toFixed(2)}`;
+            abilityHtml = `<div style="font-size:9px;color:#ffdd66;margin-top:2px;">${abilityKey} ${abilityEffect}</div>`;
+        }
+
+        // Level-up cost
+        const levelUpCost = Math.floor(price * (1 + (level * 0.6)));
+        const isMaxLevel = level >= maxLevel;
+
+        // Equipped badge
+        const equippedBadge = isSelected ? `<div style="position:absolute;top:4px;right:4px;background:#44ff88;color:#000;font-size:7px;font-weight:700;padding:1px 5px;border-radius:4px;letter-spacing:0.5px;">✓ EQUIPPED</div>` : '';
 
         const card = document.createElement('div');
-        card.className = `item-card ${isSelected ? 'selected' : ''} ${!isUnlocked ? 'locked' : ''}`;
-        const previewStyle = conf && conf.tex ? `background-image: url(${conf.tex});` : 'background-color: #666;';
-        const price = Number(conf && conf.price ? conf.price : 0);
+        card.style.cssText = `
+            position:relative;background:${isSelected ? 'rgba(68,255,136,0.08)' : 'rgba(255,255,255,0.03)'};
+            border:2px solid ${isSelected ? 'rgba(68,255,136,0.4)' : isUnlocked ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)'};
+            border-radius:10px;padding:10px;text-align:center;
+            transition:all 0.2s;
+        `;
+        card.onmouseenter = () => { card.style.background = 'rgba(136,68,255,0.08)'; card.style.borderColor = 'rgba(136,68,255,0.3)'; };
+        card.onmouseleave = () => { card.style.background = isSelected ? 'rgba(68,255,136,0.08)' : 'rgba(255,255,255,0.03)'; card.style.borderColor = isSelected ? 'rgba(68,255,136,0.4)' : 'rgba(255,255,255,0.08)'; };
+
+        const previewStyle = conf && conf.tex ? `background-image: url(${conf.tex});background-size:cover;background-position:center;` : 'background-color: #666;';
 
         card.innerHTML = `
-            <div class="item-card-inner">
-                <div class="item-card-front">
-                    <div class="item-preview ball-preview" style="${previewStyle}"></div>
-                    <div style="font-size:14px;margin-top:6px;font-weight:700;">${conf && conf.name ? conf.name : key}</div>
-                    <div class="price">${isUnlocked ? (isSelected ? 'EQUIPPED' : 'OWNED') : (price + ' 🪙')}</div>
-                    <div style="display:flex;gap:4px;margin-top:8px;">
-                        ${isUnlocked ? `<button class="menu-btn equip-btn" data-key="${key}" aria-label="${isSelected ? 'Equipped' : 'Equip'} ${conf && conf.name ? conf.name : key}">${isSelected ? 'EQUIPPED' : 'EQUIP'}</button>` : `<button class="menu-btn buy-btn" data-key="${key}" aria-label="Buy ${conf && conf.name ? conf.name : key} for ${price} coins">BUY ${price}</button>`}
-                        <button class="menu-btn level-btn" data-key="${key}" aria-label="Level up ${conf && conf.name ? conf.name : key}">Lv${level}</button>
-                    </div>
-                </div>
-            </div>`;
+            ${equippedBadge}
+            <div style="width:64px;height:64px;border-radius:50%;margin:0 auto 6px;${previewStyle}border:2px solid rgba(255,255,255,0.1);"></div>
+            <div style="font-size:13px;font-weight:700;color:#fff;">${conf && conf.name ? conf.name : key}</div>
+            <div style="font-size:10px;color:#888;margin:2px 0 4px;line-height:1.3;min-height:26px;">${conf && conf.description ? conf.description.slice(0, 60) + (conf.description.length > 60 ? '...' : '') : ''}</div>
+            ${abilityHtml}
+            <div style="font-size:11px;margin:4px 0;font-weight:600;">${isUnlocked ? (isSelected ? 'EQUIPPED' : 'OWNED') : `${price} 🪙`}</div>
+            <div style="display:flex;gap:4px;margin-top:4px;justify-content:center;flex-wrap:wrap;">
+                ${isUnlocked
+                    ? `<button class="shop-btn" data-action="equip" data-key="${key}" style="${isSelected ? 'opacity:0.5;cursor:default;' : ''}">${isSelected ? '✓ EQUIP' : 'EQUIP'}</button>`
+                    : `<button class="shop-btn" data-action="buy" data-key="${key}">BUY ${price} 🪙</button>`
+                }
+                <button class="shop-btn" data-action="level" data-key="${key}" ${isMaxLevel ? 'style="opacity:0.4;cursor:default;"' : ''}>
+                    ${isMaxLevel ? 'MAX' : `Lv.${level + 1} ${levelUpCost}🪙`}
+                </button>
+            </div>
+        `;
+
         grid.appendChild(card);
 
-        const buyBtn = card.querySelector('.buy-btn');
-        const equipBtn = card.querySelector('.equip-btn');
-        const lvlBtn = card.querySelector('.level-btn');
-        if (buyBtn) buyBtn.addEventListener('click', (e) => { e.stopPropagation(); handlePurchase(game, 'ball', key, price); renderGrids(game); });
-        if (equipBtn) equipBtn.addEventListener('click', (e) => { e.stopPropagation(); handlePurchase(game, 'ball', key, 0); renderGrids(game); });
-        if (lvlBtn) lvlBtn.addEventListener('click', (e) => { e.stopPropagation(); const cost = Math.floor(price * (1 + (level * 0.6))); levelUpSkin(game, key, cost); renderGrids(game); });
+        // Wire events
+        const buyBtn = card.querySelector('[data-action="buy"]');
+        const equipBtn = card.querySelector('[data-action="equip"]');
+        const lvlBtn = card.querySelector('[data-action="level"]');
+
+        if (buyBtn) buyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handlePurchase(game, 'ball', key, price);
+            renderGrids(game);
+        });
+        if (equipBtn && !isSelected) equipBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handlePurchase(game, 'ball', key, 0);
+            renderGrids(game);
+        });
+        if (lvlBtn && !isMaxLevel) lvlBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            levelUpSkin(game, key, levelUpCost);
+            renderGrids(game);
+        });
     });
 }
 
@@ -759,45 +902,103 @@ function renderPowerupsGrid(game) {
     const container = document.getElementById('powerups-grid');
     if (!container) return;
     container.innerHTML = '';
+
+    const searchQuery = (game._shopSearchQuery || '').toLowerCase();
+
     const grid = document.createElement('div');
-    grid.className = 'grid';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;';
     container.appendChild(grid);
 
-    Object.keys(game.powerupConfigs).forEach(key => {
+    let keys = Object.keys(game.powerupConfigs);
+
+    // Filter by search
+    if (searchQuery) {
+        keys = keys.filter(key => {
+            const conf = game.powerupConfigs[key];
+            return (conf.name || '').toLowerCase().includes(searchQuery) ||
+                   (conf.description || '').toLowerCase().includes(searchQuery) ||
+                   (conf.rarity || '').includes(searchQuery);
+        });
+    }
+
+    if (keys.length === 0 && searchQuery) {
+        container.innerHTML = `<div style="text-align:center;padding:30px;color:#888;font-size:12px;">🔍 No powerups match "<span style="color:#9944ff;">${searchQuery}</span>"</div>`;
+        return;
+    }
+
+    keys.forEach(key => {
         const conf = game.powerupConfigs[key];
         const owned = game.saveData.powerups && game.saveData.powerups[key];
         const level = owned && owned.level ? owned.level : 1;
         const equipped = owned && owned.equipped;
         const price = Number(conf && conf.price ? conf.price : 0);
 
+        const rarityColors = { common: '#aaa', uncommon: '#44ff44', rare: '#4488ff', epic: '#9944ff' };
+        const rarityColor = rarityColors[conf.rarity] || '#aaa';
+
         const card = document.createElement('div');
-        card.className = `item-card ${equipped ? 'selected' : ''}`;
+        card.style.cssText = `
+            background:${equipped ? 'rgba(68,255,136,0.08)' : 'rgba(255,255,255,0.03)'};
+            border:2px solid ${equipped ? 'rgba(68,255,136,0.4)' : 'rgba(255,255,255,0.08)'};
+            border-left:3px solid ${rarityColor};
+            border-radius:10px;padding:12px;text-align:center;
+            transition:all 0.2s;
+        `;
+        card.onmouseenter = () => { card.style.background = 'rgba(136,68,255,0.08)'; card.style.borderColor = 'rgba(136,68,255,0.3)'; };
+        card.onmouseleave = () => { card.style.background = equipped ? 'rgba(68,255,136,0.08)' : 'rgba(255,255,255,0.03)'; card.style.borderColor = equipped ? 'rgba(68,255,136,0.4)' : 'rgba(255,255,255,0.08)'; };
+
         card.innerHTML = `
-            <div style="padding:12px;text-align:center;">
-                <div style="font-weight:700;">${conf.name}</div>
-                <div style="font-size:11px;color:#aaa;margin:4px 0;">${conf.description || ''}</div>
-                <div style="font-size:12px;">Rarity: ${conf.rarity} · Level: ${level}/${conf.maxLevel}</div>
-                <div style="display:flex;gap:4px;margin-top:8px;justify-content:center;">
-                    <button class="menu-btn pu-buy-btn" data-key="${key}" aria-label="${owned ? 'Upgrade' : 'Buy'} ${conf.name}">${owned ? 'UPGRADE ' + Math.floor(price * level) : 'BUY ' + price}</button>
-                    ${owned ? `<button class="menu-btn pu-toggle-btn" data-key="${key}" aria-label="${equipped ? 'Unequip' : 'Equip'} ${conf.name}">${equipped ? 'ON' : 'OFF'}</button>` : ''}
-                </div>
-            </div>`;
+            <div style="font-size:14px;font-weight:700;">${conf.name}</div>
+            <div style="font-size:10px;color:${rarityColor};font-weight:600;margin:2px 0 4px;">${conf.rarity.toUpperCase()}</div>
+            <div style="font-size:10px;color:#aaa;margin:2px 0;line-height:1.3;min-height:26px;">${conf.description || ''}</div>
+            <div style="font-size:11px;color:#ddd;margin:6px 0;">Level ${level}/${conf.maxLevel}</div>
+            <div style="display:flex;gap:4px;margin-top:6px;justify-content:center;flex-wrap:wrap;">
+                ${owned
+                    ? `<button class="shop-btn" data-action="pu-upgrade" data-key="${key}" ${level >= conf.maxLevel ? 'style="opacity:0.4;cursor:default;"' : ''}>${level >= conf.maxLevel ? 'MAX LEVEL' : `UPGRADE ${Math.floor(price * level)}🪙`}</button>`
+                    : `<button class="shop-btn" data-action="pu-buy" data-key="${key}">BUY ${price} 🪙</button>`
+                }
+                ${owned ? `<button class="shop-btn" data-action="pu-toggle" data-key="${key}" style="background:${equipped ? 'rgba(68,255,136,0.2)' : 'rgba(255,255,255,0.06)'};">${equipped ? '✓ ON' : 'OFF'}</button>` : ''}
+            </div>
+        `;
+
         grid.appendChild(card);
 
-        const buyBtn = card.querySelector('.pu-buy-btn');
+        // Wire events
+        const buyBtn = card.querySelector('[data-action="pu-buy"]');
+        const upgradeBtn = card.querySelector('[data-action="pu-upgrade"]');
+        const toggleBtn = card.querySelector('[data-action="pu-toggle"]');
+
         if (buyBtn) buyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const cost = owned ? Math.floor(price * level) : price;
+            const cost = price;
             if (game.saveData.totalCoins >= cost) {
                 game.saveData.totalCoins -= cost;
                 game.saveData.powerups = game.saveData.powerups || {};
-                game.saveData.powerups[key] = { level: Math.min(conf.maxLevel, level + 1), owned: true, equipped: (game.saveData.powerups[key] && game.saveData.powerups[key].equipped) || false };
+                // FIXED: New purchases start at level 1, not level + 1 = 2
+                game.saveData.powerups[key] = { level: 1, owned: true, equipped: false };
                 saveGame(game);
                 updateWalletUI(game);
             }
             renderGrids(game);
         });
-        const toggleBtn = card.querySelector('.pu-toggle-btn');
+
+        if (upgradeBtn && level < conf.maxLevel) upgradeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const cost = Math.floor(price * level);
+            if (game.saveData.totalCoins >= cost) {
+                game.saveData.totalCoins -= cost;
+                game.saveData.powerups = game.saveData.powerups || {};
+                game.saveData.powerups[key] = {
+                    level: Math.min(conf.maxLevel, level + 1),
+                    owned: true,
+                    equipped: equipped
+                };
+                saveGame(game);
+                updateWalletUI(game);
+            }
+            renderGrids(game);
+        });
+
         if (toggleBtn) toggleBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (game.saveData.powerups && game.saveData.powerups[key]) {
@@ -831,7 +1032,14 @@ export function getLeaderboard(game, room) {
         entries = Object.values(dedup);  
     }
 
-    return entries.sort((a, b) => (b.level || 0) - (a.level || 0) || parseFloat(a.time || 99) - parseFloat(b.time || 99)).slice(0, 50);
+    // Sort by: highest score first, then fastest time, then highest level
+    return entries.sort((a, b) => {
+        const scoreDiff = (b.score || 0) - (a.score || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        const timeDiff = parseFloat(a.time || 999) - parseFloat(b.time || 999);
+        if (timeDiff !== 0) return timeDiff;
+        return (b.level || 0) - (a.level || 0);
+    }).slice(0, 50);
 }
 
 export function saveLeaderboard(game, entries, room) {
@@ -850,6 +1058,10 @@ export function saveLeaderboard(game, entries, room) {
 export function addLeaderboardEntry(game, entry, room) {
     entry.id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     entry.date = new Date().toISOString();
+    // Sign the score with the shared secret so the worker can verify authenticity
+    if (entry.score !== undefined && (entry.playerName || entry.playerId)) {
+        entry.proof = signScore(entry.score, entry.playerName || entry.playerId || 'Player');
+    }
     const entries = getLeaderboard(game, room);
     entries.push(entry);
     saveLeaderboard(game, entries, room);
@@ -860,22 +1072,49 @@ export function renderLeaderboard(game, room) {
     if (!overlay) return;
     const entries = getLeaderboard(game, room);
 
-    let rowsHtml = '';
-    entries.slice(0, 10).forEach((e, i) => {
-        rowsHtml += `
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.1);font-size:13px;">
-                <span>#${i + 1} ${e.ball || '?'}</span>
-                <span>Lv${e.level || 0}</span>
-                <span>${e.time || '--'}s</span>
-                <span>${e.coins || 0} 🪙</span>
-            </div>`;
-    });
+    // Add column header row
+    let rowsHtml = `
+        <div style="display:flex;gap:8px;padding:8px 0;border-bottom:2px solid rgba(255,255,255,0.15);font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">
+            <span style="width:32px;text-align:center;">#</span>
+            <span style="flex:1;">Player</span>
+            <span style="width:44px;text-align:center;">Level</span>
+            <span style="width:54px;text-align:right;">Time</span>
+            <span style="width:60px;text-align:right;">Coins</span>
+        </div>`;
+
+    if (entries.length === 0) {
+        rowsHtml = '<p style="text-align:center;color:#888;padding:30px 0;font-size:13px;">🏆 No entries yet!<br><span style="font-size:11px;color:#666;">Complete a level to submit your score.</span></p>';
+    } else {
+        entries.slice(0, 20).forEach((e, i) => {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+            const name = e.playerName || 'Player';
+            const ballEmoji = e.ball || '⚪';
+            rowsHtml += `
+                <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;transition:background 0.15s;"
+                     onmouseenter="this.style.background='rgba(255,255,255,0.04)'"
+                     onmouseleave="this.style.background='transparent'">
+                    <span style="width:32px;text-align:center;font-size:13px;font-weight:${i < 3 ? '700' : '400'};">${medal}</span>
+                    <span style="flex:1;display:flex;align-items:center;gap:4px;">
+                        <span style="font-size:14px;">${ballEmoji}</span>
+                        <span style="color:#eee;font-weight:600;">${name}</span>
+                    </span>
+                    <span style="width:44px;text-align:center;color:#88ff88;">${e.level || 0}</span>
+                    <span style="width:54px;text-align:right;color:#ffdd66;">${e.time || '--'}s</span>
+                    <span style="width:60px;text-align:right;color:#ffd700;">${e.coins || 0} 🪙</span>
+                </div>`;
+        });
+    }
 
     overlay.innerHTML = `
-        <div class="modal" style="max-width:420px;max-height:80vh;overflow-y:auto;padding:20px;background:linear-gradient(145deg,#1a1a2e,#16213e);border-radius:16px;color:#fff;">
-            <h2 style="text-align:center;">Leaderboard</h2>
-            <div style="margin:12px 0;">${rowsHtml || '<p style="text-align:center;color:#aaa;">No entries yet!</p>'}</div>
-            <button class="menu-btn" id="lb-close-btn" aria-label="Close leaderboard" style="display:block;margin:12px auto 0;">Close</button>
+        <div class="modal" style="max-width:480px;max-height:85vh;overflow-y:auto;padding:0;background:linear-gradient(180deg,rgba(20,20,40,0.98),rgba(15,15,30,0.98));border:2px solid rgba(255,215,0,0.15);border-radius:16px;color:#fff;">
+            <div style="padding:16px 20px 12px;border-bottom:1px solid rgba(255,255,255,0.08);text-align:center;">
+                <div style="font-size:18px;font-weight:700;font-family:'5x5dots',monospace;letter-spacing:2px;">🏆 LEADERBOARD</div>
+                <div style="font-size:10px;color:#888;margin-top:4px;">Top 20 — ${entries.length} total entries</div>
+            </div>
+            <div style="padding:4px 20px 12px;">${rowsHtml}</div>
+            <div style="padding:12px 20px;border-top:1px solid rgba(255,255,255,0.08);text-align:center;">
+                <button class="menu-btn" id="lb-close-btn" aria-label="Close leaderboard" style="font-size:11px;padding:6px 18px;">Close</button>
+            </div>
         </div>`;
     const closeBtn = document.getElementById('lb-close-btn');
     if (closeBtn) closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; overlay.innerHTML = ''; });

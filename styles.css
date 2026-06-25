@@ -109,6 +109,27 @@ body {
     opacity: 1;
     pointer-events: auto;
 }
+.shop-btn {
+    background: rgba(136,68,255,0.2);
+    border: 1px solid rgba(136,68,255,0.4);
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 10px;
+    font-family: 'Segoe UI', sans-serif;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.shop-btn:hover {
+    background: rgba(136,68,255,0.35);
+    border-color: rgba(136,68,255,0.6);
+}
+.shop-btn:active {
+    transform: scale(0.95);
+}
+
 .menu-btn {
     background: rgba(0,0,0,0.5);
     border: 2px solid white;
@@ -321,7 +342,58 @@ body {
     border-color: rgba(136,68,255,0.5);
 }
 
-/* Workshop UI panels */
+/* ── Builder Floating Panels (draggable/resizable, ported from Web Cloud OS) ─────
+   PanelWindowManager in src/builder/panels/panelWindowManager.js creates
+   .builder-panel elements with inline styles. These utilities style the
+   buttons and shared interaction patterns. */
+
+.panel-btn {
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.06);
+    color: #ddd;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.panel-btn:hover {
+    background: rgba(168, 139, 255, 0.15);
+    border-color: rgba(168, 139, 255, 0.3);
+}
+.panel-btn:active {
+    transform: scale(0.97);
+}
+
+.panel-btn-sm {
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
+    color: #999;
+    cursor: pointer;
+    font-size: 10px;
+    transition: background 0.15s;
+}
+.panel-btn-sm:hover {
+    background: rgba(168, 139, 255, 0.12);
+    color: #ccc;
+}
+
+/* Builder panels container (positioned to fill viewport, pointer-events:none so
+   clicks pass through to the game canvas; panels handle their own pointer events) */
+#builder-panels-container > .builder-panel {
+    pointer-events: auto;
+}
+
+/* Lumen Shaders panel inside the new floating container gets same styling as before */
+#builder-panels-container .lumen-shaders-panel {
+    pointer-events: auto;
+}
+
+/* Old static panel system — retained during transition */
 #ui-panels-container {
     position: absolute;
     left: 12px;

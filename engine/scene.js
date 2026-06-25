@@ -46,20 +46,38 @@ export function initScene(game) {
 
     document.body.appendChild(game.renderer.domElement);
 
-    // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    // Lights — three-point lighting setup for dramatic depth and visible shadows
+    // Ambient is kept low so directional shadows are visible
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
     game.scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-    sunLight.position.set(15, 30, 20);
+    // Key light (sun) — primary illumination with shadows
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1.3);
+    sunLight.position.set(25, 40, 30);
     sunLight.castShadow = true;
     sunLight.shadow.camera.left = -100;
     sunLight.shadow.camera.right = 100;
     sunLight.shadow.camera.top = 100;
     sunLight.shadow.camera.bottom = -100;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.mapSize.width = 4096;
+    sunLight.shadow.mapSize.height = 4096;
+    sunLight.shadow.bias = -0.001;
+    sunLight.shadow.normalBias = 0.02;
     game.scene.add(sunLight);
+
+    // Fill light — illuminates shadowed areas from the opposite side
+    const fillLight = new THREE.DirectionalLight(0x8888ff, 0.4);
+    fillLight.position.set(-20, 20, -15);
+    game.scene.add(fillLight);
+
+    // Rim/back light — adds edge definition so objects pop from background
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.35);
+    rimLight.position.set(-10, 15, -40);
+    game.scene.add(rimLight);
+
+    // Hemisphere light — always present for skylight color variation
+    game._skyHemisphere = new THREE.HemisphereLight(0x88ccff, 0x443366, 0.3);
+    game.scene.add(game._skyHemisphere);
 
     // GLTF Loader
     game.gltfLoader = new GLTFLoader();

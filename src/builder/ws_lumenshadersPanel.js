@@ -39,7 +39,7 @@ let _isOpen = false;
  * ─────────────────────────────────────────────────────────────────────── */
 
 export function initLumenShadersPanel() {
-  const container = document.getElementById('ui-panels-container') || document.body;
+  const container = document.getElementById('builder-panels-container') || document.body;
 
   // Create panel
   _panelEl = document.createElement('div');
