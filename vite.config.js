@@ -53,6 +53,29 @@ export default defineConfig({
     sourcemap: true,
     target: 'esnext',
     rollupOptions: {
+      // Multi-page config: each HTML page is its own Rollup entry.
+      // This makes dev mode serve each page at its real path
+      // (e.g. /apps/web-extractor.html, /docs/api.html, ...) without
+      // ad-hoc static-file fallthroughs, and produces a separate chunk
+      // per page in the production build under dist/.
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        build: resolve(__dirname, 'build.html'),
+        offline: resolve(__dirname, 'offline.html'),
+        puter_workers_demo: resolve(__dirname, 'puter_workers_demo.html'),
+        web_extractor: resolve(__dirname, 'apps/web-extractor.html'),
+        builder_workshop: resolve(__dirname, 'builderworkshop/index.html'),
+        docs: resolve(__dirname, 'docs/index.html'),
+        docs_api: resolve(__dirname, 'docs/api.html'),
+        docs_architecture: resolve(__dirname, 'docs/architecture.html'),
+        docs_monetization: resolve(__dirname, 'docs/monetization.html'),
+        docs_security: resolve(__dirname, 'docs/security.html'),
+        docs_zoning_plan: resolve(__dirname, 'docs/zoning_plan.html'),
+        // Note: lumenshaders / temp_lumenshaders are NOT entries because
+        // their HTML uses non-module <script src="js/..."> tags. The
+        // `copy-lumenshaders` plugin below ships them verbatim as part
+        // of the production build.
+      },
       onwarn(warning, warn) {
         // wasmoon imports Node.js 'module' for Node.js detection —
         // harmless in browser, Vite externalizes it automatically.

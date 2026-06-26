@@ -174,7 +174,7 @@ describe('getBallMaterial', () => {
   it('loads texture via cache when available', () => {
     const cachedTex = { dispose: vi.fn(), wrapS: null, wrapT: null, encoding: 0, needsUpdate: false };
     const game = makeGame();
-    game.textureCache.set('assets/image/dsfk.webp', cachedTex);
+    game.textureCache.set('assets/image/ball/dsfk.webp', cachedTex);
     const mat = getBallMaterial(game);
     expect(mat).toBeDefined();
     expect(mat.map).toBe(cachedTex);

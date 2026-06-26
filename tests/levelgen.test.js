@@ -128,8 +128,8 @@ function makeMockGame(currentLevel = 1) {
       weatherPrefs: { lastWeather: 'clear', bias: {} },
     },
     skyConfigs: {
-      day: { name: 'Blue Sky', price: 0, tex: 'assets/image/sky_day.webp', color: 0x87ceeb },
-      night: { name: 'Midnight', price: 250, tex: 'assets/image/sky_night.webp', color: 0x0a0a2a },
+      day: { name: 'Blue Sky', price: 0, tex: 'assets/image/sky/sky_day.webp', color: 0x87ceeb },
+      night: { name: 'Midnight', price: 250, tex: 'assets/image/sky/sky_night.webp', color: 0x0a0a2a },
     },
     ballConfigs: { rainbow: { type: 'color', color: 0xff0000 } },
     weatherAI: {

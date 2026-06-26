@@ -79,19 +79,19 @@ export function initPersistence(game) {
 
     // --- Sky configs ---
     game.skyConfigs = {
-        day:    { name: 'Blue Sky',    price: 0,   tex: 'assets/image/sky_day.webp',    color: 0x87ceeb },
-        sunset: { name: 'Sunset',      price: 100, tex: 'assets/image/sky_sunset.webp', color: 0xff7f50 },
-        night:  { name: 'Midnight',    price: 250, tex: 'assets/image/sky_night.webp',  color: 0x0a0a2a },
-        void:   { name: 'Cosmic',      price: 500, tex: 'assets/image/sky_void.webp',   color: 0x000000 },
-        clouds: { name: 'Cloudscape',  price: 80,  tex: 'assets/image/1eprhbtmvoo51.webp', color: 0xddeeff },
-        mosaic: { name: 'Rainbow Mosaic', price: 300, tex: 'assets/image/dsfk.webp', color: 0x223344 },
-        aurora: { name: 'Aurora Glow', price: 800, tex: 'assets/image/sky_void.webp', color: 0x055e7f },
-        retro:  { name: 'Retro Sunset', price: 200, tex: 'assets/image/sky_sunset.webp', color: 0xffb07a },
+        day:    { name: 'Blue Sky',    price: 0,   tex: 'assets/image/sky/sky_day.webp',    color: 0x87ceeb },
+        sunset: { name: 'Sunset',      price: 100, tex: 'assets/image/sky/sky_sunset.webp', color: 0xff7f50 },
+        night:  { name: 'Midnight',    price: 250, tex: 'assets/image/sky/sky_night.webp',  color: 0x0a0a2a },
+        void:   { name: 'Cosmic',      price: 500, tex: 'assets/image/sky/sky_void.webp',   color: 0x000000 },
+        clouds: { name: 'Cloudscape',  price: 80,  tex: 'assets/image/ball/1eprhbtmvoo51.webp', color: 0xddeeff },
+        mosaic: { name: 'Rainbow Mosaic', price: 300, tex: 'assets/image/ball/dsfk.webp', color: 0x223344 },
+        aurora: { name: 'Aurora Glow', price: 800, tex: 'assets/image/sky/sky_void.webp', color: 0x055e7f },
+        retro:  { name: 'Retro Sunset', price: 200, tex: 'assets/image/sky/sky_sunset.webp', color: 0xffb07a },
         // --- New sky types with conditions & bonuses (#8) ---
-        storm:  { name: 'Storm Front', price: 600, tex: 'assets/image/sky_night.webp', color: 0x1a1a3a, conditions: { coinBonus: 1.3, rainChance: 0.9, windChance: 0.5 } },
-        inferno:{ name: 'Inferno',      price: 1200, tex: 'assets/image/sky_sunset.webp', color: 0x2a0a00, conditions: { coinBonus: 1.5, speedBoost: 1.15, heatHaze: true, fireSparks: true } },
-        frost:  { name: 'Frostbite',   price: 700, tex: 'assets/image/sky_void.webp', color: 0xddeeff, conditions: { coinBonus: 1.4, snowAlways: true, icePatches: true } },
-        voidstorm:{ name: 'Void Storm', price: 2500, tex: 'assets/image/sky_void.webp', color: 0x000020, conditions: { coinBonus: 2.0, speedDebuff: 0.85, windChance: 1.0, meteorHazards: true } }
+        storm:  { name: 'Storm Front', price: 600, tex: 'assets/image/sky/sky_night.webp', color: 0x1a1a3a, conditions: { coinBonus: 1.3, rainChance: 0.9, windChance: 0.5 } },
+        inferno:{ name: 'Inferno',      price: 1200, tex: 'assets/image/sky/sky_sunset.webp', color: 0x2a0a00, conditions: { coinBonus: 1.5, speedBoost: 1.15, heatHaze: true, fireSparks: true } },
+        frost:  { name: 'Frostbite',   price: 700, tex: 'assets/image/sky/sky_void.webp', color: 0xddeeff, conditions: { coinBonus: 1.4, snowAlways: true, icePatches: true } },
+        voidstorm:{ name: 'Void Storm', price: 2500, tex: 'assets/image/sky/sky_void.webp', color: 0x000020, conditions: { coinBonus: 2.0, speedDebuff: 0.85, windChance: 1.0, meteorHazards: true } }
     };
 
     // --- Weather AI ---

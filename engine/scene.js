@@ -101,8 +101,8 @@ export function initScene(game) {
     );
 
     // Textures
-    game.ballTexture = loadTexture(game, 'assets/image/dsfk.webp');
-    game.woodTexture = loadTexture(game, 'assets/image/wood_texture.webp');
+    game.ballTexture = loadTexture(game, 'assets/image/ball/dsfk.webp');
+    game.woodTexture = loadTexture(game, 'assets/image/ball/wood_texture.webp');
     game.woodTexture.wrapS = THREE.RepeatWrapping;
     game.woodTexture.wrapT = THREE.RepeatWrapping;
     game.woodTexture.repeat.set(1, 4);
@@ -444,17 +444,17 @@ export function createFallbackFinishModel() {
 
 function preloadTrailModels(game) {
     const trailLoads = [
-        { key: 'skeleton', url: 'assets/image/skeleton.webp' },
+        { key: 'skeleton', url: 'assets/image/ball/skeleton.webp' },
         { key: 'zombie', url: 'assets/model/_halloween_Um_zumbi__0523105301_.glb' },
         { key: 'eye', url: 'assets/model/eye_low_poly_free_cute_eyeballs.glb' },
-        { key: 'soldier2', url: 'assets/image/soldier3.webp' },
-        { key: 'venus', url: 'assets/image/venus_fly_trap.webp' },
+        { key: 'soldier2', url: 'assets/image/ball/soldier3.webp' },
+        { key: 'venus', url: 'assets/image/ball/venus_fly_trap.webp' },
         // --- New trail types (#8) ---
-        { key: 'dragon', url: 'assets/image/dragon-ball.webp' },
-        { key: 'bowling_strike', url: 'assets/image/bowling-strike.gif' },
-        { key: 'easter', url: 'assets/image/easter.gif' },
-        { key: 'life', url: 'assets/image/life.gif' },
-        { key: 'love', url: 'assets/image/love.gif' }
+        { key: 'dragon', url: 'assets/image/ball/dragon-ball.webp' },
+        { key: 'bowling_strike', url: 'assets/image/ball/bowling-strike.gif' },
+        { key: 'easter', url: 'assets/image/ball/easter.gif' },
+        { key: 'life', url: 'assets/image/ball/life.gif' },
+        { key: 'love', url: 'assets/image/ball/love.gif' }
     ];
 
     const createSpriteFromImage = (src, size = 0.8) => {
@@ -656,7 +656,7 @@ export function createGroovyCanvas(game) {
         game.groovyCtx = ctx;
         game.groovyImg = new Image();
         game.groovyImg.crossOrigin = 'anonymous';
-        game.groovyImg.src = 'assets/image/dancing-groovy.webp';
+        game.groovyImg.src = 'assets/image/ball/dancing-groovy.webp';
         game.groovyImg.onerror = () => { game.groovyImg = null; };
         game.groovyCanvasTex = new THREE.CanvasTexture(canvas);
         game.groovyCanvasTex.minFilter = THREE.LinearMipMapLinearFilter;

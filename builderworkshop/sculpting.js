@@ -65,12 +65,13 @@ export function applySculptTool(mesh, point, normal, radius, strength, toolType)
                     vertex.lerp(localPoint, influence * 0.1);
                     break;
                     
-                case 'flatten':
+                case 'flatten': {
                     // Project vertex onto a plane defined by localPoint and localNormal
                     const dot = vertex.clone().sub(localPoint).dot(localNormal);
                     vertex.addScaledVector(localNormal, -dot * influence);
                     break;
-                    
+                }
+
                 default:
                     break;
             }

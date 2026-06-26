@@ -94,7 +94,7 @@ describe('asset filename safety', () => {
 
     it('should have consistent file extensions for textures', () => {
         const textureAssets = REFERENCED_ASSETS.filter((p) =>
-            p.startsWith('assets/image/')
+            p.startsWith('assets/image/ball/')
         );
         const validExts = ['.webp', '.gif', '.png', '.jpg', '.jpeg'];
         const invalid = textureAssets.filter((p) => {

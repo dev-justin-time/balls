@@ -18,12 +18,12 @@ import { playPortalSound } from './audio.js';
 
 // Physics constants (module-scoped for game feel tuning)
 const BALL_RADIUS = 0.5;
-const GRAVITY = -48; // bumped from -45 to tighten jump arc after JUMP_FORCE/MAX_VELOCITY increases
+const GRAVITY = -45; // per vision Part 3 (Keep-Balls Tightening reconciled)
 const BALL_SPEED = 5000;
 const STEER_SPEED = 22;
 const STEER_DAMPING = 0.92; // angular velocity decay factor applied per frame
 export const MAX_VELOCITY = 22;
-const JUMP_FORCE = 28; // bumped from 25 to compensate for higher MAX_VELOCITY (22 vs 18)
+const JUMP_FORCE = 28; // per vision Part 3
 
 export function initPhysics(game) {
     game.world = new CANNON.World();

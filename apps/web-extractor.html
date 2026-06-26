@@ -65,6 +65,9 @@ input:focus{border-color:rgba(168,139,255,0.4);}
     <input type="range" id="concurrencyInput" min="1" max="10" value="3">
     <span id="concurrencyValue" style="font-size:11px;width:20px;text-align:right;">3</span>
   </div>
+  <label style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);margin-top:8px;cursor:pointer;">
+    <input type="checkbox" id="useProxyFallback"> Use CORS proxy fallback (3rd-party, sends URL to corsproxy.io)
+  </label>
 </div>
 <button class="btn green" id="startBtn" style="width:100%;text-align:center;">▶ Start Extraction</button>
 <div class="progress" style="margin-top:8px;"><div class="bar" id="progressBar"></div></div>
@@ -137,6 +140,7 @@ const progressBar = getById('progressBar');
 const status = getById('status');
 const toast = getById('toast');
 const depthInput = getById('depthInput');
+const useProxyFallback = getById('useProxyFallback');
 let isRunning = false;
 let abortRequested = false;
 startBtn.addEventListener('click', async () => {
@@ -154,4 +158,216 @@ startBtn.addEventListener('click', async () => {
       text: optText.checked, title: optTitle.checked, meta: optMeta.checked,
       headings: optHeadings.checked, links: optLinks.checked, code: optCode.checked,
       images: optImages.checked, alts: optAlt.checked, tables: optTables.checked,
-     
+      jsonld: optJsonLD.checked
+    }, {
+      depth: Math.max(0, parseInt(depthInput.value, 10) || 0),
+      concurrency: Math.max(1, Math.min(10, parseInt(concurrencyInput.value, 10) || 3)),
+      useProxy: useProxyFallback.checked,
+      onProgress: (done, total, label) => {
+        if (abortRequested) return;
+        if (total > 0) progressBar.style.width = Math.min(100, Math.round((done / total) * 100)) + '%';
+        status.textContent = label || ('Processed ' + done + '/' + total + ' pages');
+      },
+      isAborted: () => abortRequested
+    });
+    output.textContent = content || '(no content extracted)';
+    if (content) {
+      copyBtn.style.display = '';
+      copyBtn.dataset.payload = content;
+    }
+    status.textContent = abortRequested ? 'Stopped' : 'Done';
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
+    output.textContent = 'Error: ' + msg + '\n\n(Tip: most sites block browser CORS. If you control the target, send CORS headers; otherwise enable the proxy fallback only works for sites that allow public CORS proxies.)';
+    status.textContent = 'Error';
+  } finally {
+    isRunning = false;
+    startBtn.textContent = '\u25B6 Start Extraction';
+  }
+});
+
+copyBtn.addEventListener('click', async () => {
+  const payload = copyBtn.dataset.payload || output.textContent || '';
+  if (!payload) return;
+  let tmp = null;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(payload);
+    } else {
+      tmp = document.createElement('textarea');
+      tmp.value = payload;
+      tmp.style.position = 'fixed';
+      tmp.style.opacity = '0';
+      document.body.appendChild(tmp);
+      tmp.select();
+      document.execCommand('copy');
+    }
+    toast.textContent = 'Copied!';
+    toast.classList.add('show');
+  } catch (err) {
+    toast.textContent = 'Copy failed';
+    toast.classList.add('show');
+  } finally {
+    if (tmp) { try { tmp.remove(); } catch (_) {} }
+    setTimeout(() => toast.classList.remove('show'), 1200);
+  }
+});
+
+// -------- Content extraction engine --------
+function safeAbsoluteUrl(href, base) {
+  try { return new URL(href, base).href; } catch (_) { return null; }
+}
+function sameOrigin(url, baseHref) {
+  try { return new URL(url).origin === new URL(baseHref).origin; } catch (_) { return false; }
+}
+function elText(el) { return (el && el.textContent ? el.textContent : '').replace(/\s+/g, ' ').trim(); }
+
+function extractFromDocument(doc, url, opts) {
+  const lines = [];
+  lines.push('=== ' + url + ' ===');
+  if (opts.title) {
+    const t = elText(doc.querySelector('title'));
+    if (t) lines.push('TITLE: ' + t);
+  }
+  if (opts.meta) {
+    const m = doc.querySelector('meta[name="description"]') || doc.querySelector('meta[property="og:description"]');
+    const c = m && m.getAttribute ? m.getAttribute('content') : '';
+    if (c) lines.push('META: ' + c);
+  }
+  if (opts.headings) {
+    doc.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(h => {
+      const txt = elText(h);
+      if (txt) lines.push('H' + h.tagName[1] + ': ' + txt);
+    });
+  }
+  if (opts.links) {
+    doc.querySelectorAll('a[href]').forEach(a => {
+      const href = a.getAttribute('href');
+      const abs = safeAbsoluteUrl(href, url);
+      const txt = elText(a);
+      lines.push('LINK: ' + (txt || '<no text>') + ' \u2192 ' + (abs || href));
+    });
+  }
+  if (opts.code) {
+    doc.querySelectorAll('pre').forEach(p => {
+      if (p.parentElement && p.parentElement.closest && p.parentElement.closest('pre') && p.parentElement.closest('pre') !== p) return;
+      const txt = p.textContent || '';
+      if (txt.trim()) lines.push('CODE:\n' + txt);
+    });
+    doc.querySelectorAll('code').forEach(c => {
+      if (c.closest('pre')) return;
+      const txt = c.textContent || '';
+      if (txt.trim()) lines.push('CODE:\n' + txt);
+    });
+  }
+  if (opts.images) {
+    doc.querySelectorAll('img[src]').forEach(img => {
+      const src = img.getAttribute('src');
+      const abs = safeAbsoluteUrl(src, url);
+      lines.push('IMG: ' + (abs || src));
+    });
+  }
+  if (opts.alts) {
+    doc.querySelectorAll('img[alt]').forEach(img => {
+      const alt = img.getAttribute('alt');
+      if (alt) lines.push('ALT: ' + alt);
+    });
+  }
+  if (opts.tables) {
+    doc.querySelectorAll('table').forEach((tbl, i) => {
+      lines.push('TABLE #' + (i + 1) + ':\n' + (tbl.textContent || '').replace(/\s+/g, ' ').trim());
+    });
+  }
+  if (opts.jsonld) {
+    doc.querySelectorAll('script[type="application/ld+json"]').forEach(s => {
+      const raw = s.textContent || '';
+      if (raw.trim()) lines.push('JSON-LD:\n' + raw);
+    });
+  }
+  if (opts.text) {
+    const body = doc.body || doc.documentElement;
+    if (body) lines.push('TEXT:\n' + elText(body));
+  }
+  return lines.join('\n');
+}
+
+async function fetchAsDocument(url, useProxy) {
+  // Direct fetch first (works for CORS-enabled sites).
+  try {
+    const resp = await fetch(url, { credentials: 'omit', redirect: 'follow' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const text = await resp.text();
+    return new DOMParser().parseFromString(text, 'text/html');
+  } catch (err) {
+    // Only fall back to a public CORS proxy if user has explicitly opted in.
+    if (!useProxy) {
+      throw new Error('Direct fetch failed (' + err.message + '). Tick "Use CORS proxy fallback" in Settings to retry via a 3rd-party service.');
+    }
+    if (typeof status !== 'undefined' && status) status.textContent = 'Direct fetch failed for ' + url + ' \u2014 using corsproxy.io fallback...';
+    const proxied = 'https://corsproxy.io/?' + encodeURIComponent(url);
+    const resp2 = await fetch(proxied, { credentials: 'omit', redirect: 'follow' });
+    if (!resp2.ok) throw new Error('Direct fetch failed (' + err.message + '); proxy HTTP ' + resp2.status);
+    const t2 = await resp2.text();
+    return new DOMParser().parseFromString(t2, 'text/html');
+  }
+}
+
+async function extractContentFromWebsite(baseUrl, options, ctx) {
+  ctx = ctx || {};
+  const depth = ctx.depth != null ? ctx.depth : 0;
+  const concurrency = ctx.concurrency || 3;
+  const useProxy = !!ctx.useProxy;
+  const onProgress = typeof ctx.onProgress === 'function' ? ctx.onProgress : function () {};
+  const isAborted = typeof ctx.isAborted === 'function' ? ctx.isAborted : function () { return false; };
+
+  const visited = new Set();
+  const queue = [{ url: baseUrl, d: 0 }];
+  const results = [];
+  let processed = 0;
+  let estimatedTotal = 1;
+
+  while (queue.length) {
+    if (isAborted()) break;
+    const batch = [];
+    while (queue.length && batch.length < concurrency) {
+      const item = queue.shift();
+      const u = item.url;
+      if (visited.has(u)) continue;
+      visited.add(u);
+      batch.push(item);
+    }
+    if (!batch.length) break;
+    estimatedTotal = Math.max(estimatedTotal, processed + batch.length + queue.length);
+
+    await Promise.all(batch.map(async (item) => {
+      if (isAborted()) return;
+      try {
+        onProgress(processed, estimatedTotal, 'Fetching ' + item.url);
+        const doc = await fetchAsDocument(item.url, useProxy);
+        const snippet = extractFromDocument(doc, item.url, options);
+        results.push(snippet);
+        if (item.d < depth) {
+          doc.querySelectorAll('a[href]').forEach(a => {
+            const abs = safeAbsoluteUrl(a.getAttribute('href'), item.url);
+            if (abs && sameOrigin(abs, baseUrl) && !visited.has(abs)) {
+              queue.push({ url: abs, d: item.d + 1 });
+            }
+          });
+        }
+      } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        results.push('=== ' + item.url + ' ===\nERROR: ' + msg);
+      } finally {
+        processed++;
+        onProgress(processed, estimatedTotal, processed + ' page(s) processed');
+      }
+    }));
+  }
+
+  if (!results.length) return '';
+  return results.join('\n\n');
+}
+</script>
+</body>
+</html>
+ 
