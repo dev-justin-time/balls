@@ -131,6 +131,23 @@
       box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
     }
   </style>
+  <!-- Import map: resolves bare specifiers in /builderworkshop/app.js (and any
+       module loaded from it) to ESM CDN URLs. Required when serving statically
+       (e.g. via `node server.js`) or in production deploys without Vite.
+       Kept in sync with /index.html's importmap. -->
+  <script type="importmap">
+  {
+      "imports": {
+          "three":          "https://esm.sh/three@0.184.0",
+          "three/addons/":  "https://esm.sh/three@0.184.0/examples/jsm/",
+          "cannon-es":      "https://esm.sh/cannon-es@0.20.0",
+          "wasmoon":        "https://esm.sh/wasmoon@1.16.0",
+          "nipplejs":       "https://esm.sh/nipplejs@0.10.2"
+      }
+  }
+  </script>
+  <!-- LUMEN shader studio (docked panel + pipeline) -->
+  <link rel="stylesheet" href="lumen/lumen.css"/>
 </head>
 <body>
 <div id="root">
@@ -184,9 +201,9 @@
 <option value="rotate">Rotate</option>
 <option value="scale">Scale</option>
 <option value="slice">Slice</option>
-<option value="paint">Paint</option>
-<option value="sculpt">Sculpt</option>
-</select>
+<option value="paint">Paint</option><option value="sculpt">Sculpt</option>
+<option value="shader">Procedural Texture</option>
+            </select>
 </div>
 <div>
 <label class="field-label">Material</label>
@@ -288,13 +305,54 @@
 <span class="text-[9px] font-bold uppercase tracking-tighter">Tex</span>
 </button>
 <button class="glass-panel bg-purple-600/30 border-purple-500/40 p-3 flex flex-col items-center gap-1 btn-glow" id="export-glb">
-<span class="material-symbols-outlined text-sm text-purple-300">download</span>
-<span class="text-[9px] font-bold uppercase tracking-tighter text-purple-200">GLB</span>
-</button>
-</div>
-<input accept="image/*" id="texture-input" style="display:none" type="file"/>
-</div>
-<!-- Rigging Mock (from Screen 2) -->
+<span class="material-symbols-outlined text-sm text-purple-300">download</span>            <span class="text-[9px] font-bold uppercase tracking-tighter text-purple-200">GLB</span>
+            </button>
+          </div>
+          <input accept="image/*" id="texture-input" style="display:none" type="file"/>
+        </div>
+        <!-- LUMEN shader studio dock -->
+        <div class="glass-panel p-5 hidden animate-in lumen-studio" id="lumen-controls">
+          <label class="field-label">Procedural Texture</label>
+          <canvas id="view" width="512" height="288" style="width:100%;max-width:340px;border-radius:8px;background:#000;display:block;"></canvas>
+          <label class="field-label" style="margin-top:12px;color:var(--accent-purple);">Style</label>
+          <select class="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-purple-500/50" id="lumen-mode-select">
+            <option value="0">Chrome</option>
+            <option value="1">Silk</option>
+            <option value="2">Bloom</option>
+            <option value="3">Aura</option>
+            <option value="4">Light Rays</option>
+            <option value="5">Halftone</option>
+            <option value="6">Glyphs</option>
+            <option value="7">Reeded</option>
+            <option value="8">Mosaic</option>
+          </select>
+          <label class="field-label" style="margin-top:12px;color:var(--accent-purple);">Palette</label>
+          <div class="lumen-mini-grid" id="lumen-palette-chips"></div>
+          <div class="space-y-3" style="margin-top:10px;">
+            <div class="flex justify-between text-[10px] opacity-60 uppercase"><span>Hue Shift</span><span id="lumen-hue-val">23°</span></div>
+            <input class="w-full" id="lumen-hue" max="180" min="-180" step="1" type="range" value="23"/>
+            <div class="flex justify-between text-[10px] opacity-60 uppercase"><span>Saturation</span><span id="lumen-sat-val">0.55</span></div>
+            <input class="w-full" id="lumen-sat" max="2" min="0" step="0.01" type="range" value="0.55"/>
+            <div class="flex justify-between text-[10px] opacity-60 uppercase"><span>Warp</span><span id="lumen-warp-val">1.07</span></div>
+            <input class="w-full" id="lumen-warp" max="2.5" min="0" step="0.01" type="range" value="1.073"/>
+            <div class="flex justify-between text-[10px] opacity-60 uppercase"><span>Seed</span><span id="lumen-seed-val">9015</span></div>
+            <input class="w-full" id="lumen-seed" max="9999" min="0" type="number" value="9015"/>
+          </div>
+          <div class="lumen-link-row">
+            <button id="lumen-link-btn">Live Link</button>
+            <button id="lumen-skybox-btn">Skybox</button>
+            <button id="lumen-detach-btn">Detach</button>
+          </div>
+          <label class="field-label" style="margin-top:14px;color:var(--accent-purple);">Export</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button class="glass-panel bg-white/5 border-none p-2 flex flex-col items-center btn-glow" id="lumen-export-png"><span class="text-[10px] font-bold uppercase">Image</span><span class="text-[9px] opacity-60 font-mono">PNG</span></button>
+            <button class="glass-panel bg-white/5 border-none p-2 flex flex-col items-center btn-glow" id="lumen-export-video"><span class="text-[10px] font-bold uppercase">Video</span><span class="text-[9px] opacity-60 font-mono">WEBM</span></button>
+            <button class="glass-panel bg-white/5 border-none p-2 flex flex-col items-center btn-glow" id="lumen-export-gif"><span class="text-[10px] font-bold uppercase">Loop</span><span class="text-[9px] opacity-60 font-mono">GIF</span></button>
+            <button class="glass-panel bg-white/5 border-none p-2 flex flex-col items-center btn-glow" id="lumen-export-set"><span class="text-[10px] font-bold uppercase">Set</span><span class="text-[9px] opacity-60 font-mono">ZIP</span></button>
+          </div>
+          <button class="w-full mt-3 py-2 bg-white/5 border border-white/10 rounded-lg text-[10px] uppercase font-bold tracking-widest btn-glow" id="lumen-random-btn">Randomize</button>
+        </div>
+        <!-- Rigging Mock (from Screen 2) -->
 <div class="glass-panel p-5 animate-in" style="animation-delay: 0.6s">
 <label class="field-label text-purple-400">Rigging Studio</label>
 <div class="flex gap-3">
@@ -413,10 +471,13 @@
       sliceControls.classList.add('hidden');
       paintControls.classList.add('hidden');
       const sculptControls = document.getElementById('sculpt-controls');
+      const lumenControls = document.getElementById('lumen-controls');
       if (sculptControls) sculptControls.classList.add('hidden');
+      if (lumenControls) lumenControls.classList.add('hidden');
       if (e.target.value === 'slice') sliceControls.classList.remove('hidden');
       if (e.target.value === 'paint') paintControls.classList.remove('hidden');
       if (e.target.value === 'sculpt' && sculptControls) sculptControls.classList.remove('hidden');
+      if (e.target.value === 'shader' && lumenControls) lumenControls.classList.remove('hidden');
     });
 
     const btnLoad = document.getElementById('btn-load');
@@ -427,6 +488,18 @@
     const textureInput = document.getElementById('texture-input');
     btnTexture.addEventListener('click', () => textureInput.click());
   </script>
+  <!-- LUMEN shader studio: classic-script IIFE globals, loaded in dep order
+       before app.js so app.js can call window.Engine/Exporter/UI/Modals/etc. -->
+  <script src="/builderworkshop/lumen/js/palettes.js"></script>
+  <script src="/builderworkshop/lumen/js/shaders.js"></script>
+  <script src="/builderworkshop/lumen/js/ui.js"></script>
+  <script src="/builderworkshop/lumen/js/gifenc.js"></script>
+  <script src="/builderworkshop/lumen/js/webmmux.js"></script>
+  <script src="/builderworkshop/lumen/js/zip.js"></script>
+  <script src="/builderworkshop/lumen/js/engine.js"></script>
+  <script src="/builderworkshop/lumen/js/exporter.js"></script>
+  <script src="/builderworkshop/lumen/js/fx.js"></script>
+  <script src="/builderworkshop/lumen/js/modals.js"></script>
   <!-- Three.js Workshop App (ES module — loaded by app.js) -->
   <script type="module" src="/builderworkshop/app.js"></script>
 </body></html>

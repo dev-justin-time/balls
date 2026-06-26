@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { state, initState } from "./state.js";
 import { initScene } from "./scene.js";
-import { initControls, setupSelection, selectMesh } from "./controls.js";
+import { initControls, setupSelection, selectMesh, traverseMeshes } from "./controls.js";
 import { setupLoaderUI } from "./loaders.js";
 import { setupOperations } from "./operations.js";
 import { setupExporter } from "./exporter.js";
@@ -75,6 +75,10 @@ window.rigSlots     = rigSlots;
         selectMesh(mesh, transform, painter);
         selectionHistory.push(mesh ? [mesh.uuid] : []);
         updateSelectionInfo(mesh, state.modelInfo);
+        // Follow selection: if Live Link is ON, re-bind lumenTexture to the new mesh.
+        if (window.__lumenLiveLinked && window.__applyLumenLive && mesh) {
+            window.__applyLumenLive(mesh);
+        }
     });
 
     initSelection(scene);
@@ -263,9 +267,237 @@ window.rigSlots     = rigSlots;
         const dt = clock.getDelta();
         if (painter && painter.update) painter.update(dt);
         if (orbit && orbit.update) orbit.update();
+        if (window.__lumenActive && window.lumenTexture) window.lumenTexture.needsUpdate = true;
         renderer.render(scene, camera);
     }
     animate();
+
+    // ==========================================
+    // 8.5 LUMEN SHADER STUDIO (docked panel)
+    // Engine/Exporter/Modals/UI are IIFE globals exposed by the 10
+    // lumen/*.js scripts loaded in builderworkshop/index.html BEFORE
+    // this module. We pin one CanvasTexture wrapper around #view and
+    // refresh it every frame whenever something in the workshop needs
+    // it (selected mesh "Live Link" or scene skybox/environment).
+    // ==========================================
+    (function initLumen() {
+        const viewCanvas = document.getElementById('view');
+        if (!viewCanvas || typeof Engine === 'undefined') {
+            console.warn('[lumen] #view canvas or Engine global missing — shader studio disabled');
+            return;
+        }
+        const lumenTexture = new THREE.CanvasTexture(viewCanvas);
+        lumenTexture.colorSpace = THREE.SRGBColorSpace;
+        lumenTexture.minFilter = THREE.LinearFilter;
+        lumenTexture.magFilter = THREE.LinearFilter;
+        lumenTexture.generateMipmaps = false;
+        window.lumenTexture = lumenTexture;
+
+        // Boot Engine once. RAF loop is lightweight (maxFps throttled).
+        try {
+            Engine.init(viewCanvas, () => window.P, {
+                autostart: true,
+                onContextLost: () => UI.toast('LUMEN WebGL context lost'),
+                onError: (msg) => UI.toast('LUMEN init error: ' + msg)
+            });
+            Engine.setMaxFps(45);
+            Engine.start();
+            window.__lumenActive = true;
+        } catch (e) {
+            console.error('[lumen] init failed:', e);
+            return;
+        }
+
+        // ----- mode select -----
+        const modeSel = document.getElementById('lumen-mode-select');
+        if (modeSel) {
+            modeSel.value = String(window.P.mode);
+            modeSel.addEventListener('change', () => {
+                window.P.mode = parseInt(modeSel.value, 10);
+                window.P.genomeOn = false;
+                window.P.synthOn = false;
+            });
+        }
+
+        // ----- palette chips (8 of 16) -----
+        const chipsHost = document.getElementById('lumen-palette-chips');
+        if (chipsHost && typeof PALETTES !== 'undefined') {
+            const pick = [3, 5, 7, 8, 10, 11, 12, 14]; // 8 distinguishing palettes
+            pick.forEach(i => {
+                const pal = PALETTES[i]; if (!pal) return;
+                const btn = document.createElement('button');
+                btn.dataset.idx = String(i);
+                btn.title = pal.name;
+                btn.style.display = 'flex';
+                btn.style.flexDirection = 'row';
+                btn.style.gap = '0';
+                btn.style.padding = '0';
+                btn.style.height = '24px';
+                pal.colors.forEach(c => {
+                    const s = document.createElement('i');
+                    s.style.flex = '1';
+                    s.style.background = c;
+                    btn.appendChild(s);
+                });
+                btn.addEventListener('click', () => {
+                    window.P.c1 = pal.colors[0];
+                    window.P.c2 = pal.colors[1];
+                    window.P.c3 = pal.colors[2];
+                    window.P.c4 = pal.colors[3];
+                    window.P.bg = pal.bg;
+                });
+                chipsHost.appendChild(btn);
+            });
+        }
+
+        // ----- sliders (link <-> P) -----
+        function bindSlider(id, valId, key, fmt) {
+            const el = document.getElementById(id);
+            const lab = document.getElementById(valId);
+            if (!el) return;
+            el.value = String(window.P[key]);
+            if (lab) lab.textContent = fmt(window.P[key]);
+            el.addEventListener('input', () => {
+                const v = parseFloat(el.value);
+                window.P[key] = v;
+                if (lab) lab.textContent = fmt(v);
+            });
+        }
+        const hueFmt = v => Math.round(v) + '°';
+        const numFmt = v => (+v).toFixed(2);
+        bindSlider('lumen-hue',  'lumen-hue-val',  'hue',  hueFmt);
+        bindSlider('lumen-sat',  'lumen-sat-val',  'sat',  numFmt);
+        bindSlider('lumen-warp', 'lumen-warp-val', 'warp', numFmt);
+
+        // Seed (number input: pressing Enter applies, typing live is fine)
+        const seedInput = document.getElementById('lumen-seed');
+        const seedLab = document.getElementById('lumen-seed-val');
+        if (seedInput) {
+            seedInput.value = String(Math.round(window.P.seed));
+            if (seedLab) seedLab.textContent = String(Math.round(window.P.seed));
+            seedInput.addEventListener('input', () => {
+                const v = Math.max(0, Math.min(9999, parseInt(seedInput.value, 10) || 0));
+                window.P.seed = v;
+                if (seedLab) seedLab.textContent = String(v);
+            });
+        }
+
+        // ----- Live Link (toggle texture assignment to selected.mesh.material) -----
+        // Use traverseMeshes() so Group roots with nested meshes are reached.
+        // Expose state on window so the selection-follow hook (below) can react.
+        window.__lumenLiveLinked = false;
+        const applyLiveToRoot = (mesh) => {
+            if (!mesh) return;
+            traverseMeshes(mesh, (m) => {
+                if (!m.material) return;
+                m.material.map = lumenTexture;
+                m.material.needsUpdate = true;
+            });
+        };
+        window.__applyLumenLive = applyLiveToRoot;
+
+        const linkBtn = document.getElementById('lumen-link-btn');
+        if (linkBtn) {
+            linkBtn.addEventListener('click', () => {
+                if (!state.selected) { UI.toast('Select a mesh first'); return; }
+                window.__lumenLiveLinked = !window.__lumenLiveLinked;
+                linkBtn.classList.toggle('lumen-on', window.__lumenLiveLinked);
+                linkBtn.textContent = window.__lumenLiveLinked ? 'Live Linked' : 'Live Link';
+                if (!window.__lumenLiveLinked) {
+                    // Bake a frozen snapshot before detaching to close the 1-frame
+                    // timing race where animate() would otherwise refresh needsUpdate.
+                    Engine.suspend();
+                    const snap = new THREE.CanvasTexture(viewCanvas);
+                    snap.colorSpace = THREE.SRGBColorSpace;
+                    snap.needsUpdate = true;
+                    traverseMeshes(state.selected, (m) => {
+                        if (!m.material) return;
+                        m.material.map = snap;
+                        m.material.needsUpdate = true;
+                    });
+                    Engine.resume();
+                    return;
+                }
+                applyLiveToRoot(state.selected);
+            });
+        }
+
+        // ----- Skybox -----
+        const skyBtn = document.getElementById('lumen-skybox-btn');
+        if (skyBtn) {
+            skyBtn.addEventListener('click', () => {
+                const on = scene.background !== lumenTexture;
+                if (on) {
+                    // LUMEN renders in flat UV space — keep default UVMapping so
+                    // scene.background doesn't spherize the texture.
+                    lumenTexture.mapping = THREE.UVMapping;
+                    scene.background = lumenTexture;
+                    // Only set scene.environment if the texture is color-clean enough;
+                    // skip env IBL to avoid mixing LUMEN noise with the model lighting.
+                    skyBtn.textContent = 'Skybox On';
+                    skyBtn.classList.add('lumen-on');
+                } else {
+                    scene.background = null;
+                    scene.environment = null;
+                    skyBtn.textContent = 'Skybox';
+                    skyBtn.classList.remove('lumen-on');
+                }
+            });
+        }
+
+        // ----- Detach (clear all live bindings) -----
+        const detachBtn = document.getElementById('lumen-detach-btn');
+        if (detachBtn) {
+            detachBtn.addEventListener('click', () => {
+                if (state.selected) {
+                    traverseMeshes(state.selected, (m) => {
+                        if (!m.material) return;
+                        m.material.map = null;
+                        m.material.needsUpdate = true;
+                    });
+                }
+                scene.background = null;
+                scene.environment = null;
+                window.__lumenLiveLinked = false;
+                linkBtn && linkBtn.classList.remove('lumen-on');
+                linkBtn && (linkBtn.textContent = 'Live Link');
+                skyBtn && skyBtn.classList.remove('lumen-on');
+                skyBtn && (skyBtn.textContent = 'Skybox');
+            });
+        }
+
+        // ----- Export buttons -----
+        const wireExport = (id, fn) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('click', () => {
+                if (typeof fn === 'function') fn();
+            });
+        };
+        wireExport('lumen-export-png',   () => Modals.openExport('png'));
+        wireExport('lumen-export-video', () => Modals.openExport('video'));
+        wireExport('lumen-export-gif',   () => Modals.openExport('gif'));
+        wireExport('lumen-export-set',   () => Modals.openSetGenerator());
+
+        // ----- Randomize -----
+        const randBtn = document.getElementById('lumen-random-btn');
+        if (randBtn) {
+            randBtn.addEventListener('click', () => {
+                window.P.mode = Math.floor(Math.random() * (typeof MODES !== 'undefined' ? MODES.length : 9));
+                window.P.seed = Math.floor(Math.random() * 10000);
+                window.P.warp = 0.3 + Math.random() * 1.5;
+                window.P.sat = 0.95 + Math.random() * 0.4;
+                window.P.exposure = 0.95 + Math.random() * 0.15;
+                if (modeSel) modeSel.value = String(window.P.mode);
+                if (seedInput) seedInput.value = String(window.P.seed);
+                const warpEl = document.getElementById('lumen-warp');
+                const warpLab = document.getElementById('lumen-warp-val');
+                if (warpEl) warpEl.value = String(window.P.warp);
+                if (warpLab) warpLab.textContent = (+window.P.warp).toFixed(2);
+                UI.toast('LUMEN randomized');
+            });
+        }
+    })();
 
     // ==========================================
     // 10. GLOBAL HELPERS

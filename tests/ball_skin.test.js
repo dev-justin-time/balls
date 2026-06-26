@@ -19,6 +19,22 @@ vi.mock('three', () => {
     shininess: opts.shininess ?? 40,
     map: opts.map ?? null,
     color: opts.color ?? 0xffffff,
+    envMap: opts.envMap ?? null,
+    emissive: opts.emissive ?? null,
+  }));
+  // engine/scene.js uses MeshStandardMaterial as the fallback material for
+  // gltf skins and missing-config cases (lines 503, 577). Without this export
+  // the mock throws "No MeshStandardMaterial export is defined on the three mock".
+  const MeshStandardMaterial = vi.fn((opts = {}) => ({
+    dispose: vi.fn(),
+    ...opts,
+    side: opts.side ?? null,
+    transparent: opts.transparent ?? false,
+    opacity: opts.opacity ?? 1,
+    map: opts.map ?? null,
+    color: opts.color ?? 0xffffff,
+    envMap: opts.envMap ?? null,
+    emissive: opts.emissive ?? null,
   }));
   const DataTexture = vi.fn(() => ({ dispose: vi.fn(), needsUpdate: false }));
   const TextureLoader = vi.fn(() => ({
@@ -27,6 +43,7 @@ vi.mock('three', () => {
   return {
     default: {
       MeshPhongMaterial,
+      MeshStandardMaterial,
       DataTexture,
       TextureLoader,
       sRGBEncoding: 3001,
@@ -35,6 +52,7 @@ vi.mock('three', () => {
       RGBAFormat: 1023,
     },
     MeshPhongMaterial,
+    MeshStandardMaterial,
     DataTexture,
     TextureLoader,
     sRGBEncoding: 3001,
