@@ -1,6 +1,6 @@
 // modifiers.js
 import * as THREE from "three";
-import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import * as BufferGeometryUtils from "three/addons/utils/BufferGeometryUtils.js";
 import { state } from "./state.js";
 
 // Hollow Out: Creates an inner shell and merges it (Visual hollow)

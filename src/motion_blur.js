@@ -181,13 +181,12 @@ export function finishMotionBlur(game) {
         // Only composite when blur was active (render target was set)
         if (mb.material.uniforms.uIntensity.value === 0) return;
 
-        // Restore default framebuffer
+        // Restore default framebuffer and composite blur to screen
         game.renderer.setRenderTarget(null);
-
-        // Render fullscreen quad with blur shader
         game.renderer.render(mb.postScene, mb.postCamera);
     } catch (e) {
-        // Fail silently
+        // Fail silently; always reset RT
+        try { game.renderer.setRenderTarget(null); } catch (e) {}
     }
 }
 

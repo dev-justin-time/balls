@@ -16,8 +16,10 @@ import * as THREE from 'three';
 // --- Tuning ---
 const BLOOM_THRESHOLD = 0.6;     // luminance above this contributes to bloom
 const BLOOM_INTENSITY = 0.35;    // overall bloom strength
-const BLOOM_RADIUS = 0.008;      // blur sample radius (UV units)
-const BLOOM_SAMPLES = 6;         // radial samples per side
+const BLOOM_RADIUS = 0.009;      // blur sample radius (UV units)
+const BLOOM_SAMPLES = 4;         // radial directions (was 6 — reduced for mobile perf)
+const BLOOM_DISTANCES = 2;       // blur tap distances per direction (was 3)
+const BLOOM_HYSTERESIS = 4;      // frames before toggling bloom off after motion blur starts
 
 // --- Vertex shader (shared fullscreen quad) ---
 const VERT = /* glsl */ `
@@ -49,7 +51,7 @@ const FRAG = /* glsl */ `
         // Bright-pass: extract only pixels above threshold
         float bright = smoothstep(uThreshold, uThreshold + 0.25, baseLum);
 
-        // Radial blur of bright areas (6-directional with diminishing weights)
+        // Radial blur of bright areas (4-directional with diminishing weights)
         vec3 bloom = vec3(0.0);
         float totalWeight = 0.0;
         const int SAMPLES = ${BLOOM_SAMPLES};
@@ -59,7 +61,7 @@ const FRAG = /* glsl */ `
             vec2 dir = vec2(cos(angle), sin(angle));
             float weight = 1.0 / (float(i) + 1.0);
 
-            for (int j = 1; j <= 3; j++) {
+            for (int j = 1; j <= ${BLOOM_DISTANCES}; j++) {
                 float dist = float(j) * uRadius;
                 vec2 offset = dir * dist;
                 float w = weight / float(j);
@@ -78,13 +80,10 @@ const FRAG = /* glsl */ `
 
         bloom /= max(totalWeight, 1e-4);
 
-        // Composite: original + bloom overlay
-        vec3 color = baseColor.rgb + bloom * uIntensity * bright;
+    // Composite: original + bloom overlay (scene is already ACES tone-mapped)
+    vec3 color = baseColor.rgb + bloom * uIntensity * bright;
 
-        // Subtle tone mapping to prevent over-brightening
-        color = color / (1.0 + color);
-
-        gl_FragColor = vec4(color, baseColor.a);
+    gl_FragColor = vec4(color, baseColor.a);
     }
 `;
 
@@ -129,7 +128,7 @@ export function initBloom(game) {
         postScene.add(quad);
         const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-        game._bloom = { rt, material, quad, postScene, postCamera, active: false };
+        game._bloom = { rt, material, quad, postScene, postCamera, active: false, _mbFramesActive: 0 };
     } catch (e) {
         console.warn('initBloom failed', e);
     }
@@ -145,12 +144,19 @@ export function updateBloom(game) {
         const bloom = game._bloom;
         if (!bloom) return;
 
-        // Only activate bloom when motion blur is NOT active
-        // (they compete for the off-screen RT and combining them is too expensive for mobile)
+        // Only activate bloom when motion blur is NOT active (they share RT pipeline).
+        // Hysteresis: require BLOOM_HYSTERESIS consecutive motion blur frames before
+        // disabling bloom, preventing rapid toggling when ball speed hovers near threshold.
         const mb = game._motionBlur;
         const mbActive = mb && mb.material.uniforms.uIntensity.value > 0;
 
-        if (!mbActive) {
+        if (mbActive) {
+            bloom._mbFramesActive = (bloom._mbFramesActive || 0) + 1;
+        } else {
+            bloom._mbFramesActive = 0;
+        }
+
+        if (bloom._mbFramesActive < BLOOM_HYSTERESIS) {
             bloom.active = true;
             bloom.material.uniforms.uIntensity.value = game.saveData?.bloomIntensity ?? BLOOM_INTENSITY;
             game.renderer.setRenderTarget(bloom.rt);
@@ -169,15 +175,18 @@ export function updateBloom(game) {
 export function finishBloom(game) {
     try {
         const bloom = game._bloom;
-        if (!bloom || !bloom.active) return;
+        if (!bloom || !bloom.active) {
+            // Ensure RT is clean even if bloom didn't run
+            try { game.renderer.setRenderTarget(null); } catch (e) {}
+            return;
+        }
 
-        // Restore default framebuffer
+        // Restore default framebuffer and composite bloom to screen
         game.renderer.setRenderTarget(null);
-
-        // Render fullscreen quad with bloom shader
         game.renderer.render(bloom.postScene, bloom.postCamera);
     } catch (e) {
-        // Fail silently
+        // Fail silently; always reset RT
+        try { game.renderer.setRenderTarget(null); } catch (e) {}
     }
 }
 

@@ -135,8 +135,14 @@
 <body>
 <div id="root">
 <!-- WebGL space shader background {{DATA:SCREEN:SCREEN_4}} -->
-<div class="fixed inset-0 w-full h-full" style="display:block;">
+<div class="fixed inset-0 w-full h-full" style="display:block;z-index:0;">
 <canvas id="shader-canvas-ANIMATION_5" style="display:block;width:100%;height:100%"></canvas>
+</div>
+<!-- Three.js 3D model canvas (id='c' used by app.js) -->
+<canvas id="c" style="display:block;position:fixed;inset:0;width:100%;height:100%;z-index:1;"></canvas>
+<!-- Loading progress overlay -->
+<div id="loader-progress" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:20;width:320px;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
+  <div id="loader-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:3px;transition:width 0.3s ease;"></div>
 </div>
 <div id="ui-overlay">
 <!-- Top Bar: Branding & Resource Agent -->
@@ -375,10 +381,12 @@
 
     const btnLoad = document.getElementById('btn-load');
     const fileInput = document.getElementById('file-input');
-    btnLoad.addEventListener('click', () => fileInput.click());
+    // [AI NOTE: File loading handled by loaders.js setupLoaderUI() — duplicate registration removed.]
 
     const btnTexture = document.getElementById('btn-apply-texture');
     const textureInput = document.getElementById('texture-input');
     btnTexture.addEventListener('click', () => textureInput.click());
   </script>
+  <!-- Three.js Workshop App (ES module — loaded by app.js) -->
+  <script type="module" src="/builderworkshop/app.js"></script>
 </body></html>

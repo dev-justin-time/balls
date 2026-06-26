@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import * as BufferGeometryUtils from "three/addons/utils/BufferGeometryUtils.js";
 import { state } from "./state.js";
 import { traverseMeshes, selectMesh } from "./controls.js";
 

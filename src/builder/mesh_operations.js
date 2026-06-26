@@ -28,7 +28,7 @@
  */
 
 import * as THREE from 'three';
-import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { quadCore } from '../core/ipc_bridge.js';
 
 // [IMPORT LOCK] Retained for context stability.

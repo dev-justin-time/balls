@@ -1,8 +1,8 @@
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
-import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
-import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { state } from "./state.js";
 import { traverseMeshes } from "./controls.js";
 
@@ -75,12 +75,30 @@ async function handleFileSelect(e) {
   function processLoaded(obj) {
     const sceneObj = obj.scene || obj;
     state.modelRoot.add(sceneObj);
-    sceneObj.position.set(0, 0, 0);
+
+    // Auto-center and auto-scale the model to fit the view
+    const box = new THREE.Box3().setFromObject(sceneObj);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    // Center model at origin
+    sceneObj.position.set(-center.x, -center.y, -center.z);
+
+    // Auto-scale: target max dimension of ~5 units for comfortable viewing
+    if (maxDim > 0.01 && maxDim < 1000) {
+      const targetSize = 5;
+      const scale = targetSize / maxDim;
+      sceneObj.scale.setScalar(scale);
+    }
+
     traverseMeshes(sceneObj, (m) => {
       if (!m.material) m.material = new THREE.MeshStandardMaterial({ color: 0x999999, side: THREE.DoubleSide });
       m.castShadow = true;
       m.receiveShadow = true;
     });
+
+    console.info(`[Loader] Model loaded: ${(maxDim > 0.01 ? maxDim.toFixed(1) : '?')} units max dim, centered at origin`);
   }
 
   function handleError(err) {

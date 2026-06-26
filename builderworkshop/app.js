@@ -181,9 +181,12 @@ import { initLassoSelect } from "./lassoSelect.js";
         });
     });
 
-    document.getElementById('slice-distance').addEventListener('input', (e) => {
-        state.clippingPlane.constant = parseFloat(e.target.value);
-    });
+    const sliceDistance = document.getElementById('slice-distance');
+    if (sliceDistance) {
+        sliceDistance.addEventListener('input', (e) => {
+            state.clippingPlane.constant = parseFloat(e.target.value);
+        });
+    }
 
     // ==========================================
     // 8. MISC UI HOOKS
@@ -218,11 +221,7 @@ import { initLassoSelect } from "./lassoSelect.js";
         sel.scale.z = Math.round(sel.scale.z * 100) / 100;
     });
 
-    window.addEventListener('resize', () => {
-        camera.aspect = innerWidth / innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(innerWidth, innerHeight);
-    });
+    // Resize handled by scene.js initScene — duplicate removed.
 
     // ==========================================
     // 9. ANIMATION LOOP

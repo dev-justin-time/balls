@@ -226,13 +226,11 @@ export function animate(game) {
     try { game.renderer.render(game.scene, game.camera); } catch (e) {}
 
     // Composite motion blur to screen (when active)
+    // Each finish function is self-cleaning — it resets render target to null.
     finishMotionBlur(game);
 
     // Composite bloom to screen (when active & motion blur was off)
     finishBloom(game);
-
-    // Ensure render target is reset to default if neither effect was active
-    try { game.renderer.setRenderTarget(null); } catch (e) {}
 
     // Auto-save periodically
     if (!game._lastSave || Date.now() - game._lastSave > 5000) {
@@ -306,21 +304,27 @@ function updateSnow(game, dt) {
 }
 
 // Coin idle animation — subtle bob + spin for visual life
+// Only applies to placed coins (not dropped/falling ones).
+// Uses dt-based time accumulation to avoid per-frame performance.now() calls.
+let _coinAnimTime = 0;
+
 function updateCoinAnimation(game, dt) {
     try {
         if (!game.coins || !game.coins.length) return;
-        const now = performance.now() * 0.001;
+        _coinAnimTime += dt;
         for (let i = 0; i < game.coins.length; i++) {
             const coin = game.coins[i];
             if (!coin || coin.userData?.collected) continue;
-            // Subtle vertical bob
-            const bob = Math.sin(now * 2.5 + i * 0.7) * 0.12;
-            coin.position.y = (coin.userData._baseY ?? coin.position.y) + bob;
-            // Store base Y on first frame
-            if (coin.userData._baseY === undefined) {
-                coin.userData._baseY = coin.position.y - bob;
+            // Dropped coins are falling — skip idle bob (they have their own physics)
+            const isDropped = coin.userData?.dropped;
+            if (!isDropped) {
+                const bob = Math.sin(_coinAnimTime * 2.5 + i * 0.7) * 0.12;
+                if (coin.userData._baseY === undefined) {
+                    coin.userData._baseY = coin.position.y - bob;
+                }
+                coin.position.y = coin.userData._baseY + bob;
             }
-            // Gentle spin
+            // Gentle spin (applies to all coins, including dropped)
             coin.rotation.z += dt * 1.8;
         }
     } catch (e) { /* non-critical cosmetic */ }
