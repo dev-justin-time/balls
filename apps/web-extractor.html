@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Web Extractor — Content Crawler</title>
+<style>
+:root{--bg:#0a0a1a;--card:rgba(255,255,255,0.02);--border:rgba(255,255,255,0.06);--text:#ddd;--muted:#888;--accent:#a88bff;}
+.dark-theme{--bg:#f5f5f5;--card:rgba(0,0,0,0.02);--border:rgba(0,0,0,0.1);--text:#222;--muted:#666;--accent:#6644cc;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px;transition:background 0.3s,color 0.3s;}
+header{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+header h1{font-size:18px;flex:1;}
+.theme-toggle{display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;}
+.theme-toggle input{display:none;}
+.two-col{display:grid;grid-template-columns:300px 1fr;gap:14px;}
+@media(max-width:700px){.two-col{grid-template-columns:1fr;}}
+.section{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;}
+.section h3{font-size:12px;color:var(--accent);margin-bottom:8px;}
+label{display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0;cursor:pointer;color:var(--muted);}
+label:hover{color:var(--text);}
+input[type="checkbox"]{accent-color:var(--accent);}
+input[type="text"],input[type="number"]{width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:rgba(0,0,0,0.2);color:var(--text);font-size:12px;outline:none;font-family:inherit;}
+input:focus{border-color:rgba(168,139,255,0.4);}
+.btn{padding:7px 16px;border-radius:6px;border:1px solid rgba(168,139,255,0.3);background:rgba(168,139,255,0.1);color:var(--accent);cursor:pointer;font-size:11px;transition:all 0.15s;font-family:inherit;}
+.btn:hover{background:rgba(168,139,255,0.2);}
+.btn.green{background:rgba(68,200,100,0.1);border-color:rgba(68,200,100,0.3);color:#4c8;}
+.btn.green:hover{background:rgba(68,200,100,0.2);}
+.btn:disabled{opacity:0.4;cursor:default;}
+.progress{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;margin:8px 0;}
+.progress .bar{height:100%;width:0%;background:var(--accent);transition:width 0.3s;}
+#output{background:rgba(0,0,0,0.2);border-radius:6px;padding:10px;font-size:11px;font-family:'Courier New',monospace;max-height:400px;overflow-y:auto;white-space:pre-wrap;color:#8c8;line-height:1.5;}
+#status{font-size:10px;color:var(--muted);margin:4px 0;}
+.concurrency-row{display:flex;align-items:center;gap:8px;}
+.concurrency-row input[type="range"]{flex:1;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:8px 16px;border-radius:8px;background:rgba(0,0,0,0.85);color:#eee;font-size:11px;opacity:0;transition:opacity 0.3s;z-index:9999;pointer-events:none;}
+.toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🕸️ Web Content Extractor</h1>
+  <label class="theme-toggle">
+    <span id="theme-icon-left">☀️</span>
+    <input type="checkbox" id="theme-toggle">
+    <span id="theme-icon-right">🌙</span>
+  </label>
+</header>
+<div class="two-col">
+<div>
+<div class="section">
+  <h3>🔗 Target URL</h3>
+  <input type="text" id="urlInput" placeholder="https://example.com" value="https://example.com">
+</div>
+<div class="section">
+  <h3>📋 Extract</h3>
+  <div id="options"></div>
+</div>
+<div class="section">
+  <h3>⚙️ Settings</h3>
+  <label style="display:block;margin-bottom:4px;font-size:10px;color:var(--muted);">Crawl Depth:</label>
+  <input type="number" id="depthInput" value="1" min="0" max="5" style="margin-bottom:8px;">
+  <label style="display:block;margin-bottom:4px;font-size:10px;color:var(--muted);">Concurrency:</label>
+  <div class="concurrency-row">
+    <input type="range" id="concurrencyInput" min="1" max="10" value="3">
+    <span id="concurrencyValue" style="font-size:11px;width:20px;text-align:right;">3</span>
+  </div>
+</div>
+<button class="btn green" id="startBtn" style="width:100%;text-align:center;">▶ Start Extraction</button>
+<div class="progress" style="margin-top:8px;"><div class="bar" id="progressBar"></div></div>
+<div id="status">Idle</div>
+</div>
+<div>
+<div class="section" style="display:flex;flex-direction:column;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <h3 style="margin:0;flex:1;">📄 Extracted Content</h3>
+    <button class="btn" id="copyBtn" style="display:none;">📋 Copy</button>
+  </div>
+  <div id="output">Enter a URL and click Start to begin extraction.</div>
+</div>
+</div>
+</div>
+<div class="toast" id="toast">Copied!</div>
+<script>
+const optionDefinitions = [
+  { id:'opt-text', label:'Text', checked:true },
+  { id:'opt-title', label:'Title', checked:true },
+  { id:'opt-meta', label:'Meta description', checked:false },
+  { id:'opt-headings', label:'Headings (h1-h6)', checked:true },
+  { id:'opt-links', label:'Links', checked:false },
+  { id:'opt-code', label:'Code blocks', checked:false },
+  { id:'opt-images', label:'Images (src)', checked:false },
+  { id:'opt-alt', label:'Image alts', checked:false },
+  { id:'opt-tables', label:'Tables', checked:false },
+  { id:'opt-jsonld', label:'JSON-LD', checked:false },
+  { id:'opt-select-all', label:'Select All', checked:false }
+];
+const optionsContainer = document.getElementById('options');
+optionDefinitions.forEach(opt => {
+  const label = document.createElement('label');
+  label.innerHTML = `<input type="checkbox" id="${opt.id}" ${opt.checked?'checked':''}> ${opt.label}`;
+  optionsContainer.appendChild(label);
+});
+const $ = sel => document.querySelector(sel);
+const getById = id => document.getElementById(id);
+const optText = getById('opt-text');
+const optTitle = getById('opt-title');
+const optMeta = getById('opt-meta');
+const optHeadings = getById('opt-headings');
+const optLinks = getById('opt-links');
+const optCode = getById('opt-code');
+const optImages = getById('opt-images');
+const optAlt = getById('opt-alt');
+const optTables = getById('opt-tables');
+const optJsonLD = getById('opt-jsonld');
+const optSelectAll = getById('opt-select-all');
+optSelectAll.addEventListener('change', () => {
+  [optText,optTitle,optMeta,optHeadings,optLinks,optCode,optImages,optAlt,optTables,optJsonLD]
+    .forEach(c => c.checked = optSelectAll.checked);
+});
+const themeToggle = getById('theme-toggle');
+const iconLeft = getById('theme-icon-left');
+const iconRight = getById('theme-icon-right');
+themeToggle.addEventListener('change', () => {
+  document.body.classList.toggle('dark-theme');
+  iconLeft.textContent = document.body.classList.contains('dark-theme') ? '🌙' : '☀️';
+  iconRight.textContent = document.body.classList.contains('dark-theme') ? '☀️' : '🌙';
+});
+const concurrencyInput = getById('concurrencyInput');
+const concurrencyValue = getById('concurrencyValue');
+concurrencyInput.addEventListener('input', () => { concurrencyValue.textContent = concurrencyInput.value; });
+const urlInput = getById('urlInput');
+const startBtn = getById('startBtn');
+const output = getById('output');
+const copyBtn = getById('copyBtn');
+const progressBar = getById('progressBar');
+const status = getById('status');
+const toast = getById('toast');
+const depthInput = getById('depthInput');
+let isRunning = false;
+let abortRequested = false;
+startBtn.addEventListener('click', async () => {
+  if (isRunning) { abortRequested = true; startBtn.textContent = '⏹ Stopping...'; return; }
+  const baseUrl = urlInput.value.trim();
+  if (!baseUrl) { output.textContent = '⚠️ Enter a URL.'; return; }
+  isRunning = true; abortRequested = false;
+  startBtn.textContent = '⏸ Pause';
+  output.textContent = '';
+  copyBtn.style.display = 'none';
+  status.textContent = 'Running...';
+  progressBar.style.width = '0%';
+  try {
+    const content = await extractContentFromWebsite(baseUrl, {
+      text: optText.checked, title: optTitle.checked, meta: optMeta.checked,
+      headings: optHeadings.checked, links: optLinks.checked, code: optCode.checked,
+      images: optImages.checked, alts: optAlt.checked, tables: optTables.checked,
+     

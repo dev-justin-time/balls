@@ -104,9 +104,7 @@ pub fn record_physics_frame(
 
             // 1. Pack 4 f32 values into 16 raw bytes (no struct, no serde)
             let frame_data: [f32; 4] = [position_x, position_y, position_z, velocity];
-            let frame_bytes: &[u8; 16] = unsafe {
-                &*(&frame_data as *const [f32; 4] as *const [u8; 16])
-            };
+            let frame_bytes: &[u8; 16] = &*(&frame_data as *const [f32; 4] as *const [u8; 16]);
 
             // 2. Hash chain: H(n) = SHA256(H(n-1) + frame_data)
             let mut hasher = Sha256::new();
@@ -136,7 +134,7 @@ pub fn stop_recording() -> JsValue {
 
             let telemetry_len = ctx.frame_buffer.len();
             let frame_count = ctx.frame_count;
-            let final_hash = format!("{:x}", ctx.current_hash);
+            let final_hash = ctx.current_hash.iter().map(|b| format!("{:02x}", b)).collect::<String>();
 
             // Copy buffer to JS via Uint8Array
             let telemetry_vec: Vec<u8> = ctx.frame_buffer.drain(..).collect();
@@ -181,7 +179,7 @@ pub fn get_recorded_frame_count() -> u32 {
 pub fn get_current_hash() -> String {
     unsafe {
         RECORDER.as_ref()
-            .map(|ctx| format!("{:x}", ctx.current_hash))
+            .map(|ctx| ctx.current_hash.iter().map(|b| format!("{:02x}", b)).collect::<String>())
             .unwrap_or_else(|| "0000".to_string())
     }
 }

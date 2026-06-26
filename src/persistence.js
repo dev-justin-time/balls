@@ -160,3 +160,43 @@ export function getParticleCount(game, type, defaultCount) {
         return defaultCount;
     }
 }
+
+
+// ── Usage Analytics (Web Cloud OS port) ──
+const USAGE_KEY = 'goingBalls_usage';
+function getUsageData() {
+  try { return JSON.parse(localStorage.getItem(USAGE_KEY)) || _defaultUsage(); }
+  catch { return _defaultUsage(); }
+}
+function _defaultUsage() {
+  return { sessions: 0, totalPlayTime: 0, levelsCompleted: 0, levelsFailed: 0, coinsCollected: 0, builderPartsPlaced: 0, tracksCreated: 0, shopsVisits: 0, purchases: 0, firstPlay: Date.now(), lastPlay: null, dailyPlayCount: {}, featureUsage: {} };
+}
+function saveUsage(game) {
+  try { localStorage.setItem(USAGE_KEY, JSON.stringify(game._usageData)); } catch {}
+}
+export function initUsageTracking(game) {
+  game._usageData = getUsageData();
+  game._sessionStart = Date.now();
+  game._usageData.lastPlay = Date.now();
+  game._usageData.sessions++;
+  const today = new Date().toDateString();
+  game._usageData.dailyPlayCount[today] = (game._usageData.dailyPlayCount[today] || 0) + 1;
+  saveUsage(game);
+}
+export function trackUsageFeature(game, feature, count = 1) {
+  if (!game._usageData) return;
+  game._usageData.featureUsage[feature] = (game._usageData.featureUsage[feature] || 0) + count;
+  saveUsage(game);
+}
+export function endUsageSession(game) {
+  if (!game._usageData || !game._sessionStart) return;
+  const duration = Date.now() - game._sessionStart;
+  game._usageData.totalPlayTime += duration;
+  game._usageData.lastPlay = Date.now();
+  saveUsage(game);
+  game._sessionStart = null;
+}
+export function getUsageStats(game) {
+  if (!game._usageData) game._usageData = getUsageData();
+  return { ...game._usageData };
+}
