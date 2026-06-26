@@ -84,12 +84,14 @@ struct CleanStats {
 /// Cell size for the spatial hash grid.
 const GRID_CELL_SIZE: f64 = 10.0;
 
+#[allow(dead_code)]
 struct SpatialGrid {
     cell_size: f64,
     cells: HashMap<(i64, i64), Vec<usize>>,
     threshold_sq: f64,
 }
 
+#[allow(dead_code)]
 impl SpatialGrid {
     fn new(threshold: f64) -> Self {
         Self {
@@ -339,7 +341,7 @@ fn _is_collinear(a: (f64, f64), b: (f64, f64), c: (f64, f64), angle_tolerance_de
 
 // [AI NOTE: Retained for context stability. Replaced by _snap_vertices_full which takes node positions.]
 /// Snap nearby vertices together and update edge references.
-fn _snap_vertices(edges: &[Edge], threshold: f64) -> (Vec<CleanedNode>, Vec<CleanedEdge>) {
+fn _snap_vertices(edges: &[Edge], _threshold: f64) -> (Vec<CleanedNode>, Vec<CleanedEdge>) {
     if edges.is_empty() {
         return (Vec::new(), Vec::new());
     }

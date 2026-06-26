@@ -1,3 +1,6 @@
+// Single-threaded WASM target — static mut pattern is safe here
+#![allow(static_mut_refs)]
+
 /**
  * =====================================================================
  * @domain:    compute
@@ -32,6 +35,18 @@
 use wasm_bindgen::prelude::*;
 use sha2::{Sha256, Digest};
 use std::collections::VecDeque;
+
+// Hex encoding helper — avoids format! trait resolution issues with [u8; 32]
+const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+
+fn hex_encode(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for &byte in bytes {
+        s.push(HEX_CHARS[(byte >> 4) as usize] as char);
+        s.push(HEX_CHARS[(byte & 0x0f) as usize] as char);
+    }
+    s
+}
 
 // Anti-RE: Opaque internal state struct — JS cannot inspect or modify it
 struct _TelemetryContext {
@@ -134,7 +149,7 @@ pub fn stop_recording() -> JsValue {
 
             let telemetry_len = ctx.frame_buffer.len();
             let frame_count = ctx.frame_count;
-            let final_hash = ctx.current_hash.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+            let final_hash = hex_encode(&ctx.current_hash);
 
             // Copy buffer to JS via Uint8Array
             let telemetry_vec: Vec<u8> = ctx.frame_buffer.drain(..).collect();
@@ -157,21 +172,13 @@ pub fn stop_recording() -> JsValue {
 /// Check if the recorder is currently active.
 #[wasm_bindgen]
 pub fn is_recording() -> bool {
-    unsafe {
-        RECORDER.as_ref()
-            .map(|ctx| ctx.is_recording)
-            .unwrap_or(false)
-    }
+    unsafe { RECORDER.as_ref().map(|ctx| ctx.is_recording).unwrap_or(false) }
 }
 
 /// Get the current frame count (synchronization check).
 #[wasm_bindgen]
 pub fn get_recorded_frame_count() -> u32 {
-    unsafe {
-        RECORDER.as_ref()
-            .map(|ctx| ctx.frame_count)
-            .unwrap_or(0)
-    }
+    unsafe { RECORDER.as_ref().map(|ctx| ctx.frame_count).unwrap_or(0) }
 }
 
 /// Get the current intermediate hash (for progress verification).
@@ -179,7 +186,7 @@ pub fn get_recorded_frame_count() -> u32 {
 pub fn get_current_hash() -> String {
     unsafe {
         RECORDER.as_ref()
-            .map(|ctx| ctx.current_hash.iter().map(|b| format!("{:02x}", b)).collect::<String>())
+            .map(|ctx| hex_encode(&ctx.current_hash))
             .unwrap_or_else(|| "0000".to_string())
     }
 }

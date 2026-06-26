@@ -25,7 +25,7 @@
 
 use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::OnceLock;
 
@@ -634,57 +634,6 @@ fn _csg_clip_positive_side(
     }
 
     (out_positions, out_indices)
-}
-
-/// Interpolate a vertex along edge (idx_a → idx_b) at the exact plane intersection.
-///
-/// `d_a` and `d_b` are the signed distances for `idx_a` and `idx_b`.
-/// It is assumed that one side is positive (≥ 0) and the other negative (< 0).
-/// The interpolation factor `t = d_a / (d_a - d_b)` gives the point where
-/// the signed distance crosses zero.
-///
-/// If the intersection falls very close to an existing vertex, that vertex's
-/// index is returned directly to avoid creating near-duplicate vertices.
-fn _interpolate_edge_vertex(
-    d_a: f32,
-    d_b: f32,
-    idx_a: usize,
-    idx_b: usize,
-    positions: &[f32],
-    out_positions: &mut Vec<f32>,
-) -> u32 {
-    // If either vertex is already on the plane, reuse it directly
-    if d_a.abs() <= 1e-9 {
-        return idx_a as u32;
-    }
-    if d_b.abs() <= 1e-9 {
-        return idx_b as u32;
-    }
-
-    // Interpolation factor from idx_a toward idx_b
-    let t = d_a / (d_a - d_b);
-
-    // Clamp: if extremely close to either end, reuse that vertex
-    if t <= 0.001 {
-        return idx_a as u32;
-    }
-    if t >= 0.999 {
-        return idx_b as u32;
-    }
-
-    // Interpolate position
-    let i3a = idx_a * 3;
-    let i3b = idx_b * 3;
-    let ix = positions[i3a] + t * (positions[i3b] - positions[i3a]);
-    let iy = positions[i3a + 1] + t * (positions[i3b + 1] - positions[i3a + 1]);
-    let iz = positions[i3a + 2] + t * (positions[i3b + 2] - positions[i3a + 2]);
-
-    // Append as a new vertex
-    let new_idx = out_positions.len() / 3;
-    out_positions.push(ix);
-    out_positions.push(iy);
-    out_positions.push(iz);
-    new_idx as u32
 }
 
 /// Interpolate a vertex along edge (idx_a → idx_b) at the exact plane intersection.

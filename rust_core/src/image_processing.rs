@@ -27,8 +27,6 @@ use rayon::prelude::*;
 
 /// Minimum image dimensions to benefit from parallel processing
 const PARALLEL_THRESHOLD: u32 = 128;
-/// Default Sobel kernel size for Canny edge detection
-const CANNY_SOBEL_SIZE: i32 = 3;
 
 // ---------------------------------------------------------------------------
 // Public API — Exported to JavaScript
