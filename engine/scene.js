@@ -76,7 +76,7 @@ export function initScene(game) {
     game.scene.add(rimLight);
 
     // Hemisphere light — always present for skylight color variation
-    game._skyHemisphere = new THREE.HemisphereLight(0x88ccff, 0x443366, 0.3);
+    game._skyHemisphere = new THREE.HemisphereLight(0x88ccff, 0x554466, 0.4);
     game.scene.add(game._skyHemisphere);
 
     // GLTF Loader
@@ -107,19 +107,19 @@ export function initScene(game) {
     game.woodTexture.wrapT = THREE.RepeatWrapping;
     game.woodTexture.repeat.set(1, 4);
 
-    // Shared materials
+    // Shared materials — PBR Standard for realistic lighting response
     game.sharedMaterials = {
-        wood: new THREE.MeshPhongMaterial({ map: game.woodTexture }),
-        finish: new THREE.MeshPhongMaterial({ color: 0x00ff00 }),
-        coin: new THREE.MeshPhongMaterial({ color: 0xffd700, shininess: 80 }),
-        pendulum: new THREE.MeshPhongMaterial({ color: 0xaa0000 }),
-        spinner: new THREE.MeshPhongMaterial({ color: 0x0000ff }),
+        wood: new THREE.MeshStandardMaterial({ map: game.woodTexture, roughness: 0.7, metalness: 0.05 }),
+        finish: new THREE.MeshStandardMaterial({ color: 0x00ff00, roughness: 0.3, metalness: 0.1, emissive: 0x003300, emissiveIntensity: 0.4 }),
+        coin: new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.15, metalness: 0.95, emissive: 0xffaa00, emissiveIntensity: 0.55 }),
+        pendulum: new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.25, metalness: 0.7 }),
+        spinner: new THREE.MeshStandardMaterial({ color: 0x2244ff, roughness: 0.3, metalness: 0.6, emissive: 0x001133, emissiveIntensity: 0.3 }),
         rope: new THREE.LineBasicMaterial({ color: 0x333333 }),
-        wall: new THREE.MeshPhongMaterial({ color: 0x666666, transparent: true, opacity: 0.5 }),
-        speed: new THREE.MeshPhongMaterial({ color: 0xffff00, emissive: 0x444400 }),
-        hazard: new THREE.MeshPhongMaterial({ color: 0xff4500 }),
-        neon: new THREE.MeshPhongMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 1.4, shininess: 120 }),
-        glass: new THREE.MeshPhongMaterial({ color: 0xddeeff, transparent: true, opacity: 0.28, shininess: 90, specular: 0xffffff })
+        wall: new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.5, metalness: 0.1, transparent: true, opacity: 0.5 }),
+        speed: new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 0.2, metalness: 0.3, emissive: 0xffaa00, emissiveIntensity: 0.7 }),
+        hazard: new THREE.MeshStandardMaterial({ color: 0xff4500, roughness: 0.2, metalness: 0.4, emissive: 0x330000, emissiveIntensity: 0.35 }),
+        neon: new THREE.MeshStandardMaterial({ color: 0x00ffff, roughness: 0.1, metalness: 0.1, emissive: 0x00ffff, emissiveIntensity: 1.8 }),
+        glass: new THREE.MeshStandardMaterial({ color: 0xddeeff, roughness: 0.05, metalness: 0.15, transparent: true, opacity: 0.28 })
     };
 }
 
@@ -429,7 +429,7 @@ export function createFallbackFinishModel() {
     const group = new THREE.Group();
     const archGeo = new THREE.BoxGeometry(10, 1, 1);
     const postGeo = new THREE.BoxGeometry(1, 8, 1);
-    const mat = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+    const mat = new THREE.MeshStandardMaterial({ color: 0x00ff00, roughness: 0.3, metalness: 0.1, emissive: 0x003300, emissiveIntensity: 0.4 });
 
     const arch = new THREE.Mesh(archGeo, mat);
     arch.position.y = 8;
@@ -497,22 +497,26 @@ function preloadTrailModels(game) {
     })();
 }
 
-// Ball material
+// Ball material — PBR Standard with environment reflections
 export function getBallMaterial(game) {
     const conf = game.ballConfigs[game.saveData.selectedBall] || game.ballConfigs.rainbow;
-    if (!conf) return new THREE.MeshPhongMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    if (!conf) return new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide, roughness: 0.4, metalness: 0.3 });
     try {
+        // Shared envMap for reflective ball surfaces
+        const envOpts = game._lastEnvMap ? { envMap: game._lastEnvMap, envMapIntensity: 0.45 } : {};
+
         if (game.saveData.selectedBall === 'groovy') {
             if (!game.groovyCanvasTex) {
                 createGroovyCanvas(game);
             }
             try { game.groovyCanvasTex.colorSpace = THREE.SRGBColorSpace; } catch (e) {}
             game.groovyCanvasTex.needsUpdate = true;
-            return new THREE.MeshPhongMaterial({
+            return new THREE.MeshStandardMaterial({
                 map: game.groovyCanvasTex,
                 side: THREE.DoubleSide,
-                shininess: 40,
-                transparent: true
+                roughness: 0.35,
+                metalness: 0.1,
+                ...envOpts
             });
         }
 
@@ -526,34 +530,51 @@ export function getBallMaterial(game) {
                 tex.needsUpdate = true;
             } catch (e) {}
 
-            // Glass-like treatment for p2opp skin (was GIF, now WebP)
+            // Glass-like treatment for p2opp skin
             if (game.saveData.selectedBall === 'p2opp') {
-                return new THREE.MeshPhongMaterial({
+                return new THREE.MeshStandardMaterial({
                     map: tex,
                     side: THREE.DoubleSide,
-                    shininess: 80,
+                    roughness: 0.1,
+                    metalness: 0.05,
                     transparent: true,
                     opacity: 0.92,
                     envMap: game._lastEnvMap || null,
-                    envMapIntensity: 0.3
+                    envMapIntensity: 0.5
                 });
             }
 
-            return new THREE.MeshPhongMaterial({
+            return new THREE.MeshStandardMaterial({
                 map: tex,
                 side: THREE.DoubleSide,
-                shininess: 40
+                roughness: 0.35,
+                metalness: 0.1,
+                ...envOpts
             });
         } else if (conf.type === 'color') {
-            return new THREE.MeshPhongMaterial({ color: conf.color, shininess: conf.shininess, side: THREE.DoubleSide });
+            return new THREE.MeshStandardMaterial({
+                color: conf.color,
+                roughness: conf.roughness || 0.35,
+                metalness: conf.metalness || 0.2,
+                side: THREE.DoubleSide,
+                ...envOpts
+            });
         } else if (conf.type === 'emissive') {
-            return new THREE.MeshPhongMaterial({ color: conf.color, emissive: conf.emissive, side: THREE.DoubleSide });
+            return new THREE.MeshStandardMaterial({
+                color: conf.color,
+                emissive: conf.emissive,
+                emissiveIntensity: conf.emissiveIntensity || 0.6,
+                roughness: 0.25,
+                metalness: 0.4,
+                side: THREE.DoubleSide,
+                ...envOpts
+            });
         }
     } catch (e) {
         console.warn('getBallMaterial fallback', e);
     }
     // Default fallback (also used temporarily for gltf while loading)
-    return new THREE.MeshPhongMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide, roughness: 0.4, metalness: 0.3 });
 }
 
 // Ball skin application — handles both material swap (texture/color/emissive)

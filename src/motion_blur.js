@@ -154,10 +154,16 @@ export function updateMotionBlur(game) {
             mb.material.uniforms.uVelocity.value.set(0, 0);
         }
 
-        mb.material.uniforms.uIntensity.value = intensity > 0 ? 1 : 0;
-
-        // Redirect scene render into the off-screen RT
-        game.renderer.setRenderTarget(mb.rt);
+        // Only redirect to off-screen RT when blur is actually active.
+        // If we redirect but skip the composite pass (intensity == 0),
+        // the scene is rendered to the RT but never drawn to the screen,
+        // leaving a blank canvas.
+        if (intensity > 0) {
+            mb.material.uniforms.uIntensity.value = 1;
+            game.renderer.setRenderTarget(mb.rt);
+        } else {
+            mb.material.uniforms.uIntensity.value = 0;
+        }
     } catch (e) {
         // Fail silently — motion blur is cosmetic
     }
@@ -172,11 +178,11 @@ export function finishMotionBlur(game) {
         const mb = game._motionBlur;
         if (!mb) return;
 
+        // Only composite when blur was active (render target was set)
+        if (mb.material.uniforms.uIntensity.value === 0) return;
+
         // Restore default framebuffer
         game.renderer.setRenderTarget(null);
-
-        // Skip the composite pass when blur is off to avoid redundant draw
-        if (mb.material.uniforms.uIntensity.value === 0) return;
 
         // Render fullscreen quad with blur shader
         game.renderer.render(mb.postScene, mb.postCamera);

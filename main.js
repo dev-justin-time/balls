@@ -53,6 +53,7 @@ import { initPhysics, updatePhysics, jump } from './src/physics.js';
 import { onWindowResize, animate } from './src/rendering.js';
 import { initSpeedLines } from './src/speed_lines.js';
 import { initMotionBlur } from './src/motion_blur.js';
+import { initBloom } from './src/bloom.js';
 import { createLevel, clearLevel, addPlatform, addRamp, addCoins,
          addPendulum, addSpinner, addHammer, addMover, addWall,
          addTunnelWalls, addGlassPlatform, addCheckpoint, addBlade,
@@ -67,7 +68,7 @@ import { BALL_DB } from './src/ball_db.js';
 // ============================================================================
 
 import quadCore from './src/core/ipc_bridge.js';
-const { initializeQuadCore, resolvePhysicsFrame, requestSecureLevelSeed,
+const { initialize: initializeQuadCore, resolvePhysicsFrame, requestSecureLevelSeed,
          calculateShopPurchase, resetPhysicsState } = quadCore;
 
 // ============================================================================
@@ -152,6 +153,7 @@ class Game {
         updateLoadingBar(45, 'Loading visual effects...');
         initSpeedLines(this);
         initMotionBlur(this);
+        initBloom(this);
 
         // --- Phase 6: Initialize Multi-Language Cores (async) ---
         updateLoadingBar(55, 'Booting Quad-Core IPC...');
@@ -349,7 +351,7 @@ class Game {
     // ---- Quad-Core Physics Pipeline ----
     // Overrides the default cannon-es update with WASM physics when available
     _updatePhysicsWASM(dt) {
-        if (!quadCore.isInitialized) {
+        if (!quadCore.isInitialized || !resolvePhysicsFrame) {
             // Fall back to cannon-es while WASM boots
             updatePhysics(this, dt);
             return;
@@ -365,12 +367,18 @@ class Game {
             rotation: { x: bodyRot.x, y: bodyRot.y, z: bodyRot.z }
         }, dt);
 
+        // Guard against invalid WASM output (e.g., module crash)
+        if (!wasmResult || !wasmResult.position || !wasmResult.position.x || !isFinite(wasmResult.position.x)) {
+            updatePhysics(this, dt);
+            return;
+        }
+
         // Mix WASM-validated velocity back into cannon-es body
-        // This keeps visual/physics sync while WASM provides anti-cheat clamping
-        const mixFactor = 0.3; // Blend WASM influence gradually
-        bodyVel.x += (wasmResult.position.x / Math.max(0.001, dt) - bodyVel.x) * mixFactor;
-        bodyVel.y += (wasmResult.position.y / Math.max(0.001, dt) - bodyVel.y) * mixFactor;
-        bodyVel.z += (wasmResult.position.z / Math.max(0.001, dt) - bodyVel.z) * mixFactor;
+        const mixFactor = 0.3;
+        const safeDt = Math.max(0.001, dt);
+        bodyVel.x += (wasmResult.position.x / safeDt - bodyVel.x) * mixFactor;
+        bodyVel.y += (wasmResult.position.y / safeDt - bodyVel.y) * mixFactor;
+        bodyVel.z += (wasmResult.position.z / safeDt - bodyVel.z) * mixFactor;
 
         // Let cannon-es handle the actual step with corrected velocities
         updatePhysics(this, dt);

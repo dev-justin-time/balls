@@ -15,12 +15,14 @@ import { spawnInfiniteChunk } from './levelgen.js';
 import { updateNeighborPreview, animateNeighborPreview } from './world/world_minimap.js';
 import { updateSpeedLines } from './speed_lines.js';
 import { updateMotionBlur, finishMotionBlur, resizeMotionBlur } from './motion_blur.js';
+import { updateBloom, finishBloom, resizeBloom } from './bloom.js';
 
 export function onWindowResize(game) {
     game.camera.aspect = window.innerWidth / window.innerHeight;
     game.camera.updateProjectionMatrix();
     game.renderer.setSize(window.innerWidth, window.innerHeight);
     try { resizeMotionBlur(game); } catch (e) {}
+    try { resizeBloom(game); } catch (e) {}
 }
 
 // Log engine versions once on first render for debugging
@@ -108,6 +110,8 @@ export function animate(game) {
             if (game.updateMeteors) game.updateMeteors(dt);
             if (game.checkMeteorCollisions) game.checkMeteorCollisions();
         }
+        // Coin idle animation — subtle bob + rotation
+        updateCoinAnimation(game, dt);
 
         // Infinite runner: spawn chunks ahead of player
         if (game._isInfinite && typeof game._spawnZ !== 'undefined') {
@@ -212,14 +216,23 @@ export function animate(game) {
     // Speed lines (cosmetic — intensity tied to ball velocity)
     updateSpeedLines(game, dt);
 
-    // Motion blur post-process (redirects render to off-screen RT)
+    // Motion blur post-process (redirects render to off-screen RT when active)
     updateMotionBlur(game);
+
+    // Bloom post-process (redirects render to bloom RT when motion blur is off)
+    updateBloom(game);
 
     // Render
     try { game.renderer.render(game.scene, game.camera); } catch (e) {}
 
-    // Composite motion blur to screen
+    // Composite motion blur to screen (when active)
     finishMotionBlur(game);
+
+    // Composite bloom to screen (when active & motion blur was off)
+    finishBloom(game);
+
+    // Ensure render target is reset to default if neither effect was active
+    try { game.renderer.setRenderTarget(null); } catch (e) {}
 
     // Auto-save periodically
     if (!game._lastSave || Date.now() - game._lastSave > 5000) {
@@ -290,4 +303,25 @@ function updateSnow(game, dt) {
         }
         game.snowPoints.geometry.attributes.position.needsUpdate = true;
     } catch (e) {}
+}
+
+// Coin idle animation — subtle bob + spin for visual life
+function updateCoinAnimation(game, dt) {
+    try {
+        if (!game.coins || !game.coins.length) return;
+        const now = performance.now() * 0.001;
+        for (let i = 0; i < game.coins.length; i++) {
+            const coin = game.coins[i];
+            if (!coin || coin.userData?.collected) continue;
+            // Subtle vertical bob
+            const bob = Math.sin(now * 2.5 + i * 0.7) * 0.12;
+            coin.position.y = (coin.userData._baseY ?? coin.position.y) + bob;
+            // Store base Y on first frame
+            if (coin.userData._baseY === undefined) {
+                coin.userData._baseY = coin.position.y - bob;
+            }
+            // Gentle spin
+            coin.rotation.z += dt * 1.8;
+        }
+    } catch (e) { /* non-critical cosmetic */ }
 }
