@@ -121,7 +121,15 @@ export class WireframeImporter {
         meshCount: meshGroup.children.length,
         nodeCount: graphData.node_count,
         edgeCount: graphData.edge_count,
-        engineUsed: graphData.engine_used
+        engineUsed: graphData.engine_used,
+        // Expose raw graph data for inventory storage (offline re-extrusion)
+        graphData: {
+          nodes: graphData.nodes,
+          edges: graphData.edges,
+          node_count: graphData.node_count,
+          edge_count: graphData.edge_count,
+          engine_used: graphData.engine_used
+        }
       };
     } catch (error) {
       console.error('[WireframeImporter] AI import failed:', error);
@@ -129,6 +137,9 @@ export class WireframeImporter {
         success: false,
         meshCount: 0,
         nodeCount: 0,
+        edgeCount: 0,
+        engineUsed: 'error',
+        graphData: null,
         error: error.message
       };
     }
@@ -148,6 +159,66 @@ export class WireframeImporter {
       }
     }
     this.importedMeshes = [];
+  }
+
+  /**
+   * Import a wireframe directly from stored graph data (no AI backend needed).
+   * This is the offline/cached import path used by the Track Creator inventory.
+   * Extrudes the provided graph data into 3D geometry and places it in the
+   * builder scene, identical to the online importFromAI() result.
+   *
+   * @param {Object} graphData - { nodes: [[x,y],...], edges: [[i,j],...], node_count, edge_count, engine_used }
+   * @returns {{ success: boolean, meshCount: number, nodeCount: number, edgeCount: number, engineUsed: string, error?: string }}
+   */
+  async importFromGraphData(graphData) {
+    try {
+      // Validate input
+      if (!graphData.nodes || graphData.nodes.length === 0) {
+        throw new Error('No nodes in graph data');
+      }
+      if (graphData.node_count > _MAX_ALLOWED_NODES) {
+        throw new Error(`Wireframe too complex (${graphData.node_count} nodes). Maximum is ${_MAX_ALLOWED_NODES}.`);
+      }
+
+      // Extrude 2D graph to 3D geometry
+      const { geometry } = this._extrudeGraphToGeometry(graphData);
+
+      // Validate the geometry
+      this._validateGeometry(geometry, graphData);
+
+      // Optimize via WASM (same as online import path)
+      const optimizedGeometry = await this._optimizeViaWASM(geometry);
+
+      // Create mesh group and add to scene
+      const meshGroup = this._createWireframeMesh(optimizedGeometry, graphData);
+
+      // Record for undo support
+      this.importedMeshes.push({
+        group: meshGroup,
+        nodeCount: graphData.node_count || graphData.nodes.length,
+        edgeCount: graphData.edge_count || (graphData.edges ? graphData.edges.length : 0),
+        engineUsed: graphData.engine_used || 'cached',
+        timestamp: Date.now()
+      });
+
+      return {
+        success: true,
+        meshCount: meshGroup.children.length,
+        nodeCount: graphData.node_count || graphData.nodes.length,
+        edgeCount: graphData.edge_count || (graphData.edges ? graphData.edges.length : 0),
+        engineUsed: graphData.engine_used || 'cached'
+      };
+    } catch (error) {
+      console.error('[WireframeImporter] Graph data import failed:', error);
+      return {
+        success: false,
+        meshCount: 0,
+        nodeCount: 0,
+        edgeCount: 0,
+        engineUsed: graphData.engine_used || 'cached',
+        error: error.message
+      };
+    }
   }
 
   /**

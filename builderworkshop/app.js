@@ -10,6 +10,7 @@ import { initPainter } from "./painter.js";
 import { initSelection } from "./selection.js";
 import { initUIPanels } from "./uiPanels.js";
 import { generateThumbnail } from "./gallery.js";
+import { updateSelectionInfo, zoomToFit } from "./modelInfo.js";
 
 // Import new fully-implemented modules
 import { initSelectionHistory } from "./selectionHistory.js";
@@ -59,10 +60,11 @@ import { initLassoSelect } from "./lassoSelect.js";
     setupExporter();
     setupAgent();
     
-    // Wrap selection to automatically push to history
+    // Wrap selection to automatically push to history and update model info panel
     setupSelection(renderer, camera, (mesh) => {
         selectMesh(mesh, transform, painter);
         selectionHistory.push(mesh ? [mesh.uuid] : []);
+        updateSelectionInfo(mesh, state.modelInfo);
     });
 
     initSelection(scene);
@@ -72,6 +74,15 @@ import { initLassoSelect } from "./lassoSelect.js";
     // 5. UNDO / REDO KEYBOARD SHORTCUTS
     // ==========================================
     window.addEventListener('keydown', (e) => {
+        // Zoom to fit: F key (no modifiers)
+        if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+            // Don't capture if user is typing in an input
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+            e.preventDefault();
+            const target = state.selected || state.modelRoot;
+            zoomToFit(camera, orbit, target);
+            return;
+        }
         if (e.ctrlKey || e.metaKey) {
             if (e.key === 'z' && !e.shiftKey) {
                 e.preventDefault();
@@ -198,6 +209,16 @@ import { initLassoSelect } from "./lassoSelect.js";
     document.getElementById('brush-color').addEventListener('input', (e) => painter.setColor(e.target.value));
     document.getElementById('brush-size').addEventListener('input', (e) => painter.setSize(parseInt(e.target.value)));
     document.getElementById('clear-paint').addEventListener('click', () => painter.clear());
+
+    // --- Zoom to Fit button ---
+    const zoomFitBtn = document.getElementById('btn-zoom-fit');
+    if (zoomFitBtn) {
+        zoomFitBtn.addEventListener('click', () => {
+            // Zoom to selected mesh if one is active, otherwise whole model
+            const target = state.selected || state.modelRoot;
+            zoomToFit(camera, orbit, target);
+        });
+    }
 
     const helpBtn = document.getElementById('help-btn');
     const helpModal = document.getElementById('help-modal');

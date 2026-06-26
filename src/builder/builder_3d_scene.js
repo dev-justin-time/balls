@@ -27,7 +27,7 @@
 import * as THREE from 'three';
 import { computePlacement, createPreviewGhost } from './builder_snap.js';
 import { getPartDef } from './catalog.js';
-import { placePart } from './builder_scene.js';
+import { placePart, _wire2DEvents, _unwire2DEvents } from './builder_scene.js';
 import { addBuilderXP } from './builder_xp.js';
 
 // ---------------------------------------------------------------------------
@@ -331,29 +331,35 @@ export function activate3DMode(game) {
         init3DBuilder(game);
     }
 
+    // Unwire 2D events, wire 3D events
+    _unwire2DEvents(game);
+
     // Hide 2D grid, show 3D grid
     if (game._builderGrid) game._builderGrid.visible = false;
     if (game._builderGrid3D) game._builderGrid3D.visible = true;
 
     game._builderIs3D = true;
 
-    // Wire 3D builder event listeners (auto-removed in activate2DMode)
+    // Wire 3D builder event listeners
     _wire3DEvents(game);
 }
 
 /**
  * Activate 2D mode (call when toggling from 3D to 2D).
- * Removes 3D event listeners.
+ * Removes 3D event listeners, wires 2D events.
  */
 export function activate2DMode(game) {
+    // Unwire 3D events, wire 2D events
+    _unwire3DEvents(game);
+
     // Hide 3D grid, show 2D grid
     if (game._builderGrid3D) game._builderGrid3D.visible = false;
     if (game._builderGrid) game._builderGrid.visible = true;
 
     game._builderIs3D = false;
 
-    // Remove 3D event listeners
-    _unwire3DEvents(game);
+    // Wire 2D builder event listeners
+    _wire2DEvents(game);
 }
 
 // ---------------------------------------------------------------------------
@@ -697,7 +703,7 @@ export function dispose3DBuilder(game) {
 
 let _3DListenersWired = false;
 
-function _wire3DEvents(game) {
+export function _wire3DEvents(game) {
     if (_3DListenersWired) return;
 
     game._builder3D_onMouseDown = (e) => {
@@ -750,7 +756,7 @@ function _wire3DEvents(game) {
     _3DListenersWired = true;
 }
 
-function _unwire3DEvents(game) {
+export function _unwire3DEvents(game) {
     if (!_3DListenersWired) return;
 
     if (game._builder3D_onMouseDown) window.removeEventListener('mousedown', game._builder3D_onMouseDown);

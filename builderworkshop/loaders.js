@@ -5,6 +5,7 @@ import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { state } from "./state.js";
 import { traverseMeshes } from "./controls.js";
+import { showModelInfo, updateModelInfoPanel, computeModelInfo } from "./modelInfo.js";
 
 const manager = new THREE.LoadingManager();
 const gltfLoader = new GLTFLoader(manager);
@@ -98,7 +99,13 @@ async function handleFileSelect(e) {
       m.receiveShadow = true;
     });
 
-    console.info(`[Loader] Model loaded: ${(maxDim > 0.01 ? maxDim.toFixed(1) : '?')} units max dim, centered at origin`);
+    // Compute and display model info
+    const info = computeModelInfo(sceneObj);
+    state.modelInfo = info;
+    updateModelInfoPanel(info);
+    showModelInfo(true);
+
+    console.info(`[Loader] Model loaded: ${(maxDim > 0.01 ? maxDim.toFixed(1) : '?')} units max dim, ${info.triangles.toLocaleString()} tris, ${info.materials} materials`);
   }
 
   function handleError(err) {

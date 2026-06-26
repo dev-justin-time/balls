@@ -747,6 +747,7 @@ export function loadPartsIntoBuilder(game, parts) {
  * Dispose the entire builder scene.
  */
 export function disposeBuilderScene(game) {
+    _unwire2DEvents(game);
     clearBuilderScene(game);
     if (game._builderPreview) {
         game._builderScene.remove(game._builderPreview);
@@ -763,4 +764,93 @@ export function disposeBuilderScene(game) {
     }
     game._builderScene = null;
     game._builderCamera = null;
+}
+
+// ---------------------------------------------------------------------------
+// Event Wiring: self-managed 2D builder event listeners
+// (mirrors the 3D builder's _wire3DEvents / _unwire3DEvents pattern)
+// ---------------------------------------------------------------------------
+
+let _2DListenersWired = false;
+
+/**
+ * Wire 2D builder mouse/keyboard events to the window.
+ * Only fires when _builderActive is true AND _builderIs3D is false.
+ */
+export function _wire2DEvents(game) {
+    if (_2DListenersWired) return;
+
+    game._builder2D_onMouseDown = (e) => {
+        if (!game._builderActive || game._builderIs3D) return;
+        if (e.target.closest && (e.target.closest('#builder-sidebar') || e.target.closest('#top-menu') || e.target.closest('.modal'))) return;
+        // Right-click = start panning
+        if (e.button === 2) {
+            e.preventDefault();
+            onBuilderPanStart(game, e.clientX, e.clientY);
+        }
+        // Track shift key for delete-on-click
+        game._builderShiftDown = e.shiftKey;
+    };
+
+    game._builder2D_onMouseMove = (e) => {
+        if (!game._builderActive || game._builderIs3D) return;
+        onBuilderMouseMove(game, e.clientX, e.clientY);
+    };
+
+    game._builder2D_onMouseUp = (e) => {
+        if (!game._builderActive || game._builderIs3D) return;
+        if (game._builderIsPanning) {
+            onBuilderPanEnd(game);
+        }
+    };
+
+    game._builder2D_onClick = (e) => {
+        if (!game._builderActive || game._builderIs3D) return;
+        if (e.target.closest && (e.target.closest('#builder-sidebar') || e.target.closest('#top-menu') || e.target.closest('.modal'))) return;
+        game._builderShiftDown = e.shiftKey;
+        onBuilderClick(game, e.clientX, e.clientY);
+    };
+
+    game._builder2D_onWheel = (e) => {
+        if (!game._builderActive || game._builderIs3D) return;
+        e.preventDefault();
+        onBuilderWheel(game, e.deltaY);
+    };
+
+    game._builder2D_onContextMenu = (e) => {
+        if (!game._builderActive || game._builderIs3D) return;
+        e.preventDefault(); // Block right-click menu in builder
+    };
+
+    window.addEventListener('mousedown', game._builder2D_onMouseDown);
+    window.addEventListener('mousemove', game._builder2D_onMouseMove);
+    window.addEventListener('mouseup', game._builder2D_onMouseUp);
+    window.addEventListener('click', game._builder2D_onClick);
+    window.addEventListener('wheel', game._builder2D_onWheel, { passive: false });
+    window.addEventListener('contextmenu', game._builder2D_onContextMenu);
+
+    _2DListenersWired = true;
+}
+
+/**
+ * Remove 2D builder event listeners from the window.
+ */
+export function _unwire2DEvents(game) {
+    if (!_2DListenersWired) return;
+
+    if (game._builder2D_onMouseDown) window.removeEventListener('mousedown', game._builder2D_onMouseDown);
+    if (game._builder2D_onMouseMove) window.removeEventListener('mousemove', game._builder2D_onMouseMove);
+    if (game._builder2D_onMouseUp) window.removeEventListener('mouseup', game._builder2D_onMouseUp);
+    if (game._builder2D_onClick) window.removeEventListener('click', game._builder2D_onClick);
+    if (game._builder2D_onWheel) window.removeEventListener('wheel', game._builder2D_onWheel);
+    if (game._builder2D_onContextMenu) window.removeEventListener('contextmenu', game._builder2D_onContextMenu);
+
+    game._builder2D_onMouseDown = null;
+    game._builder2D_onMouseMove = null;
+    game._builder2D_onMouseUp = null;
+    game._builder2D_onClick = null;
+    game._builder2D_onWheel = null;
+    game._builder2D_onContextMenu = null;
+
+    _2DListenersWired = false;
 }

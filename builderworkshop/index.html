@@ -194,6 +194,24 @@
 </div>
 </div>
 <!-- Dynamic Controls -->
+<!-- Model Info Panel (hidden until a model is loaded) -->
+<div class="glass-panel p-5 hidden animate-in" id="model-info-panel" style="overflow:hidden;">
+<label class="field-label" style="display:flex;justify-content:space-between;align-items:center;">
+<span>Model Info</span>
+<button id="btn-zoom-fit" class="btn-glow" style="font-size:9px;padding:3px 10px;background:rgba(59,130,246,0.25);border:1px solid rgba(59,130,246,0.4);border-radius:6px;color:#60a5fa;cursor:pointer;font-family:'Segoe UI',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;" title="Frame the loaded model in the camera view (F)">🔍 Fit</button>
+</label>
+<div class="space-y-2" style="font-size:10px;color:var(--text-dim);font-family:'Segoe UI',sans-serif;">
+<div class="flex justify-between"><span>📐 Polygons</span><span id="info-polys" style="color:#fff;font-weight:600;">—</span></div>
+<div class="flex justify-between"><span>🔷 Vertices</span><span id="info-verts" style="color:#fff;font-weight:600;">—</span></div>
+<div class="flex justify-between"><span>🎨 Materials</span><span id="info-mats" style="color:#fff;font-weight:600;">—</span></div>
+<div class="flex justify-between"><span>📦 Meshes</span><span id="info-meshes" style="color:#fff;font-weight:600;">—</span></div>
+<hr style="border-color:rgba(255,255,255,0.06);"/>
+<div class="flex justify-between"><span>↔ Width</span><span id="info-width" style="color:#fff;font-weight:600;">—</span></div>
+<div class="flex justify-between"><span>↕ Height</span><span id="info-height" style="color:#fff;font-weight:600;">—</span></div>
+<div class="flex justify-between"><span>↗ Depth</span><span id="info-depth" style="color:#fff;font-weight:600;">—</span></div>
+<div class="flex justify-between" style="margin-top:4px;"><span>📏 Volume</span><span id="info-volume" style="color:#fff;font-weight:600;">—</span></div>
+</div>
+</div>
 <div class="glass-panel p-5 hidden animate-in" id="slice-controls">
 <label class="field-label">Slice Plane</label>
 <div class="space-y-4">

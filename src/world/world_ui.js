@@ -7,7 +7,51 @@
 */
 
 import { SITE_SIZE, TERRAIN_PRESETS, WORLD_SKY_TYPES, getNeighborCoords } from './world_state.js';
-import { getZoneForSite, getZoneBadgeHTML, getZoneCSSColor, canClaimSite } from './world_zoning.js';
+import { getZoneForSite, getZoneBadgeHTML, getZoneCSSColor, canClaimSite, ZONE_TYPES } from './world_zoning.js';
+
+// Zone transition animation — injected once into document stylesheet
+let _zoneAnimInjected = false;
+function _injectZoneAnimStyle() {
+    if (_zoneAnimInjected) return;
+    _zoneAnimInjected = true;
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes zone-pulse {
+            0%   { box-shadow: 0 0 0px var(--zone-pulse-color, #fff); }
+            50%  { box-shadow: 0 0 20px var(--zone-pulse-color, #fff), inset 0 0 15px var(--zone-pulse-color, #fff); }
+            100% { box-shadow: 0 0 0px var(--zone-pulse-color, #fff); }
+        }
+        @keyframes zone-border-glow {
+            0%   { border-color: rgba(255,255,255,0.08); }
+            30%  { border-color: var(--zone-border-color, #fff); }
+            100% { border-color: rgba(255,255,255,0.08); }
+        }
+        @keyframes zone-bg-flash {
+            0%   { background-color: transparent; }
+            40%  { background-color: var(--zone-flash-color, rgba(255,255,255,0.06)); }
+            100% { background-color: transparent; }
+        }
+        .zone-transition-pulse {
+            animation: zone-pulse 0.6s ease-out;
+        }
+        .zone-border-glow {
+            animation: zone-border-glow 0.8s ease-out;
+        }
+        .zone-bg-flash {
+            animation: zone-bg-flash 0.7s ease-out;
+        }
+        .zone-transition-label {
+            animation: zone-fade-in-out 1.4s ease-out;
+        }
+        @keyframes zone-fade-in-out {
+            0%   { opacity: 0; transform: translateY(8px); }
+            20%  { opacity: 1; transform: translateY(0); }
+            80%  { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-8px); }
+        }
+    `;
+    document.head.appendChild(style);
+}
 
 /**
  * Render the full world map UI into the overlay.
@@ -111,6 +155,17 @@ export function renderWorldUI(game) {
         }
     });
 
+    // Inject zone transition animation stylesheet
+    _injectZoneAnimStyle();
+
+    // Track initial zone for transition detection
+    const grid = game._worldGrid;
+    if (grid) {
+        const center = grid.viewCenter || { col: 0, row: 0 };
+        const initialZone = getZoneForSite(center.col, center.row);
+        game._worldLastZoneId = initialZone ? initialZone.id : null;
+    }
+
     // Render initial tab
     renderTabContent(game, 'map');
 
@@ -200,8 +255,22 @@ function renderMapTab(game, container) {
     // Wire nav buttons
     requestAnimationFrame(() => {
         const moveMap = (dc, dr) => {
+            const oldCenter = { col: grid.viewCenter.col, row: grid.viewCenter.row };
             grid.viewCenter.col += dc;
             grid.viewCenter.row += dr;
+
+            // Zone transition detection
+            const newCenter = grid.viewCenter;
+            const oldZone = game._worldLastZoneId;
+            const newZoneDef = getZoneForSite(newCenter.col, newCenter.row);
+            const newZoneId = newZoneDef ? newZoneDef.id : null;
+
+            if (oldZone !== newZoneId && newZoneDef) {
+                // Zone changed — trigger transition animation
+                _triggerZoneTransition(game, oldZone, newZoneDef);
+                game._worldLastZoneId = newZoneId;
+            }
+
             renderTabContent(game, 'map');
         };
         const up = document.getElementById('world-nav-up');
@@ -286,8 +355,14 @@ function createSiteTile(game, col, row, center) {
         tile.style.boxShadow = '';
     });
 
-    // Click — open site details or claim
+    // Click — open site details or claim (with zone transition if crossing zones)
     tile.addEventListener('click', () => {
+        const clickedZone = getZoneForSite(col, row);
+        const clickedZoneId = clickedZone ? clickedZone.id : null;
+        if (clickedZone && clickedZoneId !== game._worldLastZoneId) {
+            _triggerZoneTransition(game, game._worldLastZoneId, clickedZone);
+            game._worldLastZoneId = clickedZoneId;
+        }
         openSiteDetail(game, col, row);
     });
 
@@ -435,7 +510,15 @@ function openSiteDetail(game, col, row) {
             <div style="color:#ccc;font-size:10px;font-weight:600;">${n.dir.toUpperCase()} — (${n.col},${n.row})</div>
             <div style="color:#888;font-size:9px;">${nSite ? `${nSite.partCount || 0} parts · ${TERRAIN_PRESETS[nSite.terrain]?.name || 'Unknown'}` : 'Vacant'}</div>
         `;
-        nCard.addEventListener('click', () => openSiteDetail(game, n.col, n.row));
+        nCard.addEventListener('click', () => {
+            const nZone = getZoneForSite(n.col, n.row);
+            const nZoneId = nZone ? nZone.id : null;
+            if (nZone && nZoneId !== game._worldLastZoneId) {
+                _triggerZoneTransition(game, game._worldLastZoneId, nZone);
+                game._worldLastZoneId = nZoneId;
+            }
+            openSiteDetail(game, n.col, n.row);
+        });
         nCard.addEventListener('mouseenter', () => { nCard.style.background = 'rgba(136,68,255,0.12)'; });
         nCard.addEventListener('mouseleave', () => { nCard.style.background = 'rgba(255,255,255,0.04)'; });
         neighborGrid.appendChild(nCard);
@@ -706,6 +789,103 @@ function renderConfigTab(game, container) {
 }
 
 // --- Helper functions ---
+
+// --- Zone Transition Animation ---
+
+/**
+ * Trigger a zone transition animation on the world container.
+ * Shows a color pulse, border glow, and floating zone name label.
+ * @param {Object} game
+ * @param {string|null} oldZoneId
+ * @param {Object} newZoneDef - ZoneDefinition object
+ */
+function _triggerZoneTransition(game, oldZoneId, newZoneDef) {
+    const container = document.getElementById('world-container');
+    if (!container || !newZoneDef) return;
+
+    const zoneColor = newZoneDef.color || '#fff';
+    const zoneName = newZoneDef.name || 'Unknown';
+    const zoneIcon = newZoneDef.icon || '📍';
+
+    // Set CSS custom properties for the animation
+    container.style.setProperty('--zone-pulse-color', zoneColor);
+    container.style.setProperty('--zone-border-color', zoneColor);
+    container.style.setProperty('--zone-flash-color', zoneColor + '18');
+
+    // Trigger pulse on main container
+    container.classList.remove('zone-transition-pulse');
+    void container.offsetWidth; // force reflow
+    container.classList.add('zone-transition-pulse');
+
+    // Trigger border glow
+    container.classList.remove('zone-border-glow');
+    void container.offsetWidth;
+    container.classList.add('zone-border-glow');
+
+    // Trigger background flash
+    container.classList.remove('zone-bg-flash');
+    void container.offsetWidth;
+    container.classList.add('zone-bg-flash');
+
+    // Show floating zone label
+    _showZoneLabel(game, zoneIcon, zoneName, zoneColor);
+
+    // Clean up animation classes after they complete
+    setTimeout(() => {
+        container.classList.remove('zone-transition-pulse', 'zone-border-glow', 'zone-bg-flash');
+        container.style.removeProperty('--zone-pulse-color');
+        container.style.removeProperty('--zone-border-color');
+        container.style.removeProperty('--zone-flash-color');
+    }, 900);
+}
+
+/**
+ * Show a floating zone name label that fades in and out.
+ */
+function _showZoneLabel(game, icon, name, color) {
+    // Remove any existing label
+    const existing = document.getElementById('zone-transition-label');
+    if (existing) existing.remove();
+
+    const label = document.createElement('div');
+    label.id = 'zone-transition-label';
+    label.className = 'zone-transition-label';
+    label.style.cssText = `
+        position: fixed;
+        top: 18%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 20000;
+        pointer-events: none;
+        font-family: '5x5dots', monospace;
+        font-size: 22px;
+        font-weight: 700;
+        color: ${color};
+        text-shadow: 0 0 16px ${color}, 0 0 32px ${color}44;
+        letter-spacing: 2px;
+        background: rgba(0,0,0,0.6);
+        padding: 10px 24px;
+        border-radius: 14px;
+        border: 2px solid ${color}66;
+        backdrop-filter: blur(8px);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    `;
+    label.innerHTML = `${icon} ${name}`;
+    document.body.appendChild(label);
+
+    // Fade in → hold → fade out
+    requestAnimationFrame(() => {
+        label.style.opacity = '1';
+    });
+
+    setTimeout(() => {
+        label.style.opacity = '0';
+        setTimeout(() => {
+            if (label.parentNode) label.remove();
+        }, 400);
+    }, 1100);
+}
 
 function getTerrainIcon(terrain) {
     const icons = {

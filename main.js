@@ -346,6 +346,13 @@ class Game {
                 console.warn('UI setup error (non-critical):', e);
             }
         }).catch(e => console.warn('UI module load error:', e));
+
+        // Wire the builder entry point so the builder button works
+        import('./src/builder/builder_ui.js').then(mod => {
+            if (typeof mod.enterBuilder === 'function') {
+                this.enterBuilder = () => mod.enterBuilder(this);
+            }
+        }).catch(() => {});
     }
 
     // ---- Quad-Core Physics Pipeline ----

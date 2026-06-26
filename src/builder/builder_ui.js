@@ -10,6 +10,10 @@ import { initBuilderXP, addBuilderXP, renderBuilderXPBar, calculateTrackBonusXP 
 import { WireframeImporter } from './wireframe_importer.js';
 import { setupBuilderShare } from './builder_networking.js';
 import { activate3DMode, activate2DMode } from './builder_3d_scene.js';
+// _unwire3DEvents used in exitBuilder for cleanup after mode switch
+import { _unwire3DEvents } from './builder_3d_scene.js';
+import { openCreatorSection } from './creator_section.js';
+import { initBuilderScene, _wire2DEvents, _unwire2DEvents } from './builder_scene.js';
 
 /**
  * Render the full builder UI into the overlay.
@@ -147,6 +151,7 @@ export function renderBuilderUI(game) {
         <button id="builder-workshop-btn" class="menu-btn" aria-label="Open 3D Workshop" style="font-size:10px;padding:6px 10px;background:rgba(220,120,0,0.4);border-color:#ff8800;">🎨 WORKSHOP</button>
         <button id="builder-ai-import-btn" class="menu-btn" aria-label="Import from AI" style="font-size:10px;padding:6px 10px;background:rgba(0,120,220,0.4);border-color:#4488ff;">🤖 AI IMPORT</button>
         <button id="builder-3d-toggle-btn" class="menu-btn" aria-label="Toggle 3D view" style="font-size:10px;padding:6px 10px;background:rgba(120,60,220,0.4);border-color:#8844ff;">🌐 3D VIEW</button>
+        <button id="builder-creator-btn" class="menu-btn" aria-label="Track Creator" style="font-size:10px;padding:6px 10px;background:rgba(0,180,220,0.4);border-color:#00b4dc;">🧬 CREATOR</button>
     `;
     sidebar.appendChild(actions);
 
@@ -375,6 +380,14 @@ function wireBuilderUIEvents(game) {
         });
     }
 
+    // Track Creator section
+    const creatorBtn = document.getElementById('builder-creator-btn');
+    if (creatorBtn) {
+        creatorBtn.addEventListener('click', () => {
+            openCreatorSection(game);
+        });
+    }
+
     // Rotate part
     const rotateBtn = document.getElementById('builder-rotate-btn');
     if (rotateBtn) {
@@ -576,6 +589,27 @@ export function updateBuilderUIState(game) {
 }
 
 /**
+ * Enter builder mode — initialize the builder scene, render UI, and wire 2D events.
+ * Called from the UI builder button (ui.js) and catalog panel (catalog_ui.js).
+ */
+export function enterBuilder(game) {
+    // Initialize the builder scene if not already done
+    if (!game._builderScene) {
+        initBuilderScene(game);
+    }
+
+    // Render the builder sidebar UI
+    renderBuilderUI(game);
+
+    // Set active flag (before wiring events so handlers fire)
+    game._builderActive = true;
+    game._builderIs3D = false;
+
+    // Wire 2D builder event listeners (default mode is 2D)
+    _wire2DEvents(game);
+}
+
+/**
  * Exit builder mode and return to the game.
  */
 export function exitBuilder(game) {
@@ -588,8 +622,13 @@ export function exitBuilder(game) {
         overlay.style.padding = '';
     }
 
+    // Unwire both 2D and 3D builder event listeners
+    _unwire2DEvents(game);
+    _unwire3DEvents(game);
+
     // Switch back to game scene
     game._builderActive = false;
+    game._builderIs3D = false;
 
     if (typeof game._onExitBuilder === 'function') {
         game._onExitBuilder();
