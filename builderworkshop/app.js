@@ -17,6 +17,16 @@ import { initSelectionHistory } from "./selectionHistory.js";
 import { initSelectGroups } from "./selectGroups.js";
 import { initLassoSelect } from "./lassoSelect.js";
 
+// New concern modules — previously unreferenced; now wired to live UI:
+import { applySculptTool, applySmoothTool } from "./sculpting.js";
+import { hollowOut, patchHole } from "./modifiers.js";
+import { uploadBoneData, downloadBoneData, startGenerativeTask, rigSlots } from "./rigging.js";
+import { addTriangle, removeTriangle, drawCustomLine } from "./wireframeEditor.js";
+
+// Shared module state (used by sculpt/modifiers/rigging/editor)
+window.sculptState  = { active: false, ray: new THREE.Raycaster(), point: new THREE.Vector3(), normal: new THREE.Vector3() };
+window.rigSlots     = rigSlots;
+
 (async function main() {
     // ==========================================
     // 1. INITIALIZE CORE STATE & SCENE
@@ -268,6 +278,154 @@ import { initLassoSelect } from "./lassoSelect.js";
             }
         });
     };
+
+    // ==========================================
+    // 11. SCULPT MODE (sculpting.js)
+    // Drag-to-sculpt the currently selected mesh. Tool type, radius, strength
+    // are read from the new sculpt-controls panel. Uses raycaster for hit
+    // point + face normal.
+    // ==========================================
+    const sculptTool     = document.getElementById('sculpt-tool');
+    const sculptRadius   = document.getElementById('sculpt-radius');
+    const sculptStrength = document.getElementById('sculpt-strength');
+    const sculptRadiusVal   = document.getElementById('sculpt-radius-val');
+    const sculptStrengthVal = document.getElementById('sculpt-strength-val');
+    const sculptSmoothBtn   = document.getElementById('sculpt-smooth-btn');
+    const sculptState       = window.sculptState;
+
+    // Inline the sculpt-controls toggle into the existing mode-change handler
+    if (modeEl) {
+        modeEl.addEventListener('change', () => {
+            const ctrls = ['sculpt-controls'];
+            ctrls.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('hidden', modeEl.value !== id.replace('-controls', ''));
+            });
+        });
+    }
+    if (sculptRadius)   sculptRadius.addEventListener('input',   () => sculptRadiusVal.textContent   = sculptRadius.value);
+    if (sculptStrength) sculptStrength.addEventListener('input', () => sculptStrengthVal.textContent = sculptStrength.value);
+
+    canvas.addEventListener('pointerdown', (e) => {
+        if (modeEl.value !== 'sculpt' || !state.selected) return;
+        sculptState.active = false;
+        const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+        sculptState.ray.setFromCamera(ndc, camera);
+        const hits = sculptState.ray.intersectObject(state.selected, true);
+        if (hits.length === 0) return;
+        sculptState.active = true;
+        sculptState.point.copy(hits[0].point);
+        if (hits[0].face) {
+            sculptState.normal.copy(hits[0].face.normal);
+            sculptState.normal.transformDirection(hits[0].object.matrixWorld).normalize();
+        }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+        if (!sculptState.active || modeEl.value !== 'sculpt' || !state.selected) return;
+        const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+        sculptState.ray.setFromCamera(ndc, camera);
+        const hits = sculptState.ray.intersectObject(state.selected, true);
+        if (hits.length === 0) return;
+        sculptState.point.copy(hits[0].point);
+        if (hits[0].face) {
+            sculptState.normal.copy(hits[0].face.normal);
+            sculptState.normal.transformDirection(hits[0].object.matrixWorld).normalize();
+        }
+        applySculptTool(
+            state.selected,
+            sculptState.point,
+            sculptState.normal,
+            parseFloat(sculptRadius.value),
+            parseFloat(sculptStrength.value),
+            sculptTool.value
+        );
+    });
+
+    canvas.addEventListener('pointerup', () => { sculptState.active = false; });
+
+    if (sculptSmoothBtn) sculptSmoothBtn.addEventListener('click', () => {
+        if (state.selected) applySmoothTool(state.selected, 3, 0.5);
+    });
+
+    // ==========================================
+    // 12. MODIFIERS (modifiers.js)
+    // ==========================================
+    const modHollowBtn = document.getElementById('mod-hollow-btn');
+    if (modHollowBtn) modHollowBtn.addEventListener('click', () => {
+        if (!state.selected) return;
+        const ok = confirm('Hollow Out: create inner shell & merge with selected mesh. Continue?');
+        if (!ok) return;
+        hollowOut(state.selected, 0.1);
+    });
+
+    // Expose patch helpers on window so the late uiPanels (which reads selection.indices)
+    // can still be triggered from a future UI without re-wiring.
+    window.modifyHollowOut = (mesh, thickness = 0.1) => mesh && hollowOut(mesh, thickness);
+    window.modifyPatchHole = (mesh, indices) => mesh && patchHole(mesh, indices || []);
+
+    // ==========================================
+    // 13. RIGGING (rigging.js)
+    // Click each rig slot → file JSON → uploadBoneData → visual shell.
+    // Auto-Rig button → startGenerativeTask.
+    // ==========================================
+    ['left1', 'right1', 'left2', 'right2'].forEach(slotId => {
+        const slotEl = document.getElementById('rig-slot-' + slotId);
+        if (!slotEl) return;
+        slotEl.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json,application/json';
+            input.onchange = (e) => {
+                const f = e.target.files && e.target.files[0];
+                if (f) {
+                    uploadBoneData(slotId, f);
+                }
+            };
+            input.click();
+        });
+        // Right-click to download the slot's stored skeleton
+        slotEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (rigSlots[slotId]) downloadBoneData(slotId);
+            else alert(`Slot ${slotId} is empty — upload a bone JSON first.`);
+        });
+    });
+
+    const rigGenerate = document.getElementById('rig-generate');
+    if (rigGenerate) rigGenerate.addEventListener('click', startGenerativeTask);
+
+    // ==========================================
+    // 14. WIREFRAME EDITOR (wireframeEditor.js)
+    // Key shortcuts:  T  → append tri using last 3 vertices
+    //                 Shift+T → remove first face
+    //                 Shift+L → draw a custom line from origin to (1,1,1)
+    // (kept out of the main UI grid to avoid clashing with rotate 'r')
+    // ==========================================
+    window.addEventListener('keydown', (e) => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        // Avoid clobbering undo/redo; require Alt modifier as the modifier prefix.
+        if (!e.altKey || e.shiftKey) return;
+        if (!state.selected || !state.selected.geometry) return;
+        const key = e.key.toLowerCase();
+        if (key === 't') {
+            e.preventDefault();
+            const pos = state.selected.geometry.attributes.position;
+            if (!pos || pos.count < 3) return;
+            addTriangle(state.selected, pos.count - 3, pos.count - 2, pos.count - 1);
+        } else if (key === 'r') {
+            e.preventDefault();
+            if (state.selected.geometry.index && state.selected.geometry.index.count >= 3) {
+                removeTriangle(state.selected, 0);
+            } else if (state.selected.geometry.attributes.position.count >= 3) {
+                // Non-indexed: rebuild a smaller geometry to drop the first triangle.
+                state.selected.geometry.setDrawRange(3, Infinity);
+            }
+        } else if (key === 'l') {
+            e.preventDefault();
+            drawCustomLine(scene, new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 1, 1));
+        }
+    });
 
 })();
 

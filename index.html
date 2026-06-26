@@ -230,9 +230,23 @@
     <div id="joystick-container"></div>
     <div id="jump-btn" role="button" tabindex="0" aria-label="Jump">JUMP</div>
 
-    <!-- Vite dev server handles module resolution for npm packages.
-         Import maps are provided as fallback for production builds.
-         Packages: three@0.184, cannon-es@0.20, wasmoon@1.16, nipplejs@0.10 -->
+    <!-- Import map: resolves bare specifiers in main.js (and any module loaded
+         from it) to ESM CDN URLs. Vite ignores this when running locally and
+         uses npm-installed packages instead. Required when serving statically
+         (e.g. via `node server.js`) or in production deploys without Vite. -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three":          "https://esm.sh/three@0.184.0",
+            "three/addons/":  "https://esm.sh/three@0.184.0/examples/jsm/",
+            "cannon-es":      "https://esm.sh/cannon-es@0.20.0",
+            "wasmoon":        "https://esm.sh/wasmoon@1.16.0",
+            "nipplejs":       "https://esm.sh/nipplejs@0.10.2"
+        }
+    }
+    </script>
+
+    <!-- Packages: three@0.184, cannon-es@0.20, wasmoon@1.16, nipplejs@0.10 -->
     <script type="module" src="/main.js"></script>
 </body>
 </html>

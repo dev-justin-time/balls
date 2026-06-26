@@ -185,6 +185,7 @@
 <option value="scale">Scale</option>
 <option value="slice">Slice</option>
 <option value="paint">Paint</option>
+<option value="sculpt">Sculpt</option>
 </select>
 </div>
 <div>
@@ -219,6 +220,24 @@
 <input class="w-full" id="slice-y" max="5" min="-5" step="0.01" type="range" value="0"/>
 <input class="w-full" id="slice-z" max="5" min="-5" step="0.01" type="range" value="0"/>
 <button class="w-full py-2 bg-white/10 rounded-lg text-[10px] uppercase font-bold tracking-widest border border-white/10" id="slice-toggle">Toggle Plane</button>
+</div>
+</div>
+<div class="glass-panel p-5 hidden animate-in" id="sculpt-controls">
+<label class="field-label text-purple-400">Sculpt Brush</label>
+<div class="space-y-4">
+<select class="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-purple-500/50" id="sculpt-tool">
+<option value="grab">Grab</option>
+<option value="inflate">Inflate</option>
+<option value="deflate">Deflate</option>
+<option value="pinch">Pinch</option>
+<option value="flatten">Flatten</option>
+</select>
+<div class="flex justify-between text-[10px] opacity-60 uppercase"><span>Radius</span><span id="sculpt-radius-val">0.5</span></div>
+<input class="w-full" id="sculpt-radius" max="2" min="0.05" step="0.05" type="range" value="0.5"/>
+<div class="flex justify-between text-[10px] opacity-60 uppercase"><span>Strength</span><span id="sculpt-strength-val">0.5</span></div>
+<input class="w-full" id="sculpt-strength" max="1" min="0.05" step="0.05" type="range" value="0.5"/>
+<button class="w-full py-2 bg-white/10 rounded-lg text-[10px] uppercase font-bold tracking-widest border border-white/10" id="sculpt-smooth-btn">Smooth (3 iter)</button>
+<button class="w-full py-2 bg-red-500/10 text-red-400 rounded-lg text-[10px] uppercase font-bold border border-red-500/20" id="mod-hollow-btn" title="Generate inner shell and merge">Hollow Out Mesh</button>
 </div>
 </div>
 <div class="glass-panel p-5 hidden animate-in" id="paint-controls">
@@ -280,13 +299,13 @@
 <label class="field-label text-purple-400">Rigging Studio</label>
 <div class="flex gap-3">
 <div class="grid grid-cols-2 gap-1.5 w-20">
-<div class="aspect-square glass-panel border-dashed border-white/20 bg-white/5 flex items-center justify-center"><span class="material-symbols-outlined text-xs opacity-20">add</span></div>
-<div class="aspect-square glass-panel border-dashed border-white/20 bg-white/5 flex items-center justify-center"><span class="material-symbols-outlined text-xs opacity-20">add</span></div>
-<div class="aspect-square glass-panel border-dashed border-white/20 bg-white/5 flex items-center justify-center"><span class="material-symbols-outlined text-xs opacity-20">add</span></div>
-<div class="aspect-square glass-panel border-dashed border-white/20 bg-white/5 flex items-center justify-center"><span class="material-symbols-outlined text-xs opacity-20">add</span></div>
+<div class="aspect-square glass-panel border-dashed border-white/20 bg-white/5 flex items-center justify-center cursor-pointer" data-slot="left1" id="rig-slot-left1" title="Click to upload bone JSON for L1"><span class="material-symbols-outlined text-xs opacity-40">add</span></div>
+<div class="aspect-square glass-panel border-dashed border-white/20 bg-white/5 flex items-center justify-center cursor-pointer" data-slot="right1" id="rig-slot-right1" title="Click to upload bone JSON for R1"><span class="material-symbols-outlined text-xs opacity-40">add</span></div>
+<div class="aspect-square glass-panel border-dashed border-white/20 bg-white/5 flex items-center justify-center cursor-pointer" data-slot="left2" id="rig-slot-left2" title="Click to upload bone JSON for L2"><span class="material-symbols-outlined text-xs opacity-40">add</span></div>
+<div class="aspect-square glass-panel border-dashed border-white/20 bg-white/5 flex items-center justify-center cursor-pointer" data-slot="right2" id="rig-slot-right2" title="Click to upload bone JSON for R2"><span class="material-symbols-outlined text-xs opacity-40">add</span></div>
 </div>
 <div class="flex-1 flex flex-col justify-end">
-<button class="w-full bg-gradient-to-br from-blue-500 to-purple-600 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest btn-glow">Auto-Rig</button>
+<button class="w-full bg-gradient-to-br from-blue-500 to-purple-600 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest btn-glow" id="rig-generate">Auto-Rig</button>
 </div>
 </div>
 </div>
@@ -393,8 +412,11 @@
     modeSelect.addEventListener('change', (e) => {
       sliceControls.classList.add('hidden');
       paintControls.classList.add('hidden');
+      const sculptControls = document.getElementById('sculpt-controls');
+      if (sculptControls) sculptControls.classList.add('hidden');
       if (e.target.value === 'slice') sliceControls.classList.remove('hidden');
       if (e.target.value === 'paint') paintControls.classList.remove('hidden');
+      if (e.target.value === 'sculpt' && sculptControls) sculptControls.classList.remove('hidden');
     });
 
     const btnLoad = document.getElementById('btn-load');
