@@ -268,6 +268,7 @@ window.rigSlots     = rigSlots;
         if (painter && painter.update) painter.update(dt);
         if (orbit && orbit.update) orbit.update();
         if (window.__lumenActive && window.lumenTexture) window.lumenTexture.needsUpdate = true;
+        if (window.__lumenActive && window.lumenCubeCam) window.lumenCubeCam.update(renderer, window.lumenEnvScene);
         renderer.render(scene, camera);
     }
     animate();
@@ -292,6 +293,39 @@ window.rigSlots     = rigSlots;
         lumenTexture.magFilter = THREE.LinearFilter;
         lumenTexture.generateMipmaps = false;
         window.lumenTexture = lumenTexture;
+
+        // ----- CubeCamera IBL wrapper -----
+        // Render LUMEN's live canvas into a cubemap so Skybox mode can act as
+        // scene.environment for PBR meshes (MeshStandardMaterial,
+        // MeshPhysicalMaterial, etc.). A dedicated scene wraps the CanvasTexture
+        // on the inside of a sphere; a CubeCamera at origin captures 6 cube
+        // faces into WebGLCubeRenderTarget. The wrapper is updated every frame
+        // while LUMEN is active (cost: 6 × 256² ≈ 0.4M pixels/frame) so the IBL
+        // stays in sync with the live shader. Calling order matters: CanvasTexture
+        // must have needsUpdate=true (set in animate() just before this) before
+        // the cube capture runs, otherwise the sphere samples stale canvas pixels.
+        const lumenCubeRT = new THREE.WebGLCubeRenderTarget(256, {
+            generateMipmaps: true,
+            minFilter: THREE.LinearMipmapLinearFilter,
+            format: THREE.RGBAFormat,
+            colorSpace: THREE.SRGBColorSpace,
+            type: THREE.UnsignedByteType
+        });
+        const lumenCubeCam = new THREE.CubeCamera(0.1, 100, lumenCubeRT);
+        const lumenEnvScene = new THREE.Scene();
+        const lumenEnvSphere = new THREE.Mesh(
+            new THREE.SphereGeometry(50, 32, 32),
+            new THREE.MeshBasicMaterial({
+                map: lumenTexture,
+                side: THREE.BackSide,        // sphere seen from the inside
+                depthWrite: false,
+                toneMapped: false
+            })
+        );
+        lumenEnvScene.add(lumenEnvSphere);
+        window.lumenCubeRT = lumenCubeRT;
+        window.lumenCubeCam = lumenCubeCam;
+        window.lumenEnvScene = lumenEnvScene;
 
         // Boot Engine once. RAF loop is lightweight (maxFps throttled).
         try {
@@ -432,8 +466,10 @@ window.rigSlots     = rigSlots;
                     // scene.background doesn't spherize the texture.
                     lumenTexture.mapping = THREE.UVMapping;
                     scene.background = lumenTexture;
-                    // Only set scene.environment if the texture is color-clean enough;
-                    // skip env IBL to avoid mixing LUMEN noise with the model lighting.
+                    // Use the CubeCamera wrapper's pre-mipped cubemap so PBR meshes
+                    // see proper IBL reflections from the live LUMEN shader. Without
+                    // this, MeshStandardMaterial / MeshPhysicalMaterial get no env.
+                    scene.environment = window.lumenCubeRT && window.lumenCubeRT.texture;
                     skyBtn.textContent = 'Skybox On';
                     skyBtn.classList.add('lumen-on');
                 } else {
@@ -474,6 +510,96 @@ window.rigSlots     = rigSlots;
                 if (typeof fn === 'function') fn();
             });
         };
+        // ----- Bake to Mesh (export #view as PNG → TextureLoader → apply) -----
+        // Mirrors the existing TextureLoader path used by `btn-apply-texture` in
+        // operations.js. Engine.suspend/resume brackets the toBlob() call so the
+        // captured pixels are the last drawn frame (preserveDrawingBuffer: true in
+        // engine.js ensures the buffer is still readable after RAF stops).
+        const bakeBtn = document.getElementById('lumen-bake-btn');
+        if (bakeBtn) {
+            bakeBtn.addEventListener('click', () => {
+                if (!state.selected) { UI.toast('Select a mesh first'); return; }
+                bakeBtn.disabled = true;
+                bakeBtn.textContent = 'Baking…';
+                Engine.suspend();
+                try {
+                    viewCanvas.toBlob((blob) => {
+                        try {
+                            if (!blob) { UI.toast('Bake failed: empty canvas'); return; }
+                            const url = URL.createObjectURL(blob);
+                            new THREE.TextureLoader().load(
+                                url,
+                                (tex) => {
+                                    tex.colorSpace = THREE.SRGBColorSpace;
+                                    tex.flipY = false;
+                                    traverseMeshes(state.selected, (m) => {
+                                        if (!m.material) return;
+                                        m.material.map = tex;
+                                        m.material.needsUpdate = true;
+                                    });
+                                    URL.revokeObjectURL(url);
+                                    UI.toast('LUMEN texture baked to mesh');
+                                    // Bake replaces material.map with a static texture, so the
+                                    // previously-live binding to lumenTexture is now broken.
+                                    // Reset Live Link state + button label to reflect reality,
+                                    // matching the Detach handler's pattern.
+                                    window.__lumenLiveLinked = false;
+                                    linkBtn && linkBtn.classList.remove('lumen-on');
+                                    linkBtn && (linkBtn.textContent = 'Live Link');
+                                },
+                                undefined,
+                                (err) => {
+                                    URL.revokeObjectURL(url);
+                                    UI.toast('Bake load error: ' + (err && err.message ? err.message : err));
+                                }
+                            );
+                        } finally {
+                            Engine.resume();
+                            bakeBtn.disabled = false;
+                            bakeBtn.textContent = 'Bake to Mesh';
+                        }
+                    }, 'image/png');
+                } catch (e) {
+                    Engine.resume();
+                    bakeBtn.disabled = false;
+                    bakeBtn.textContent = 'Bake to Mesh';
+                    UI.toast('Bake error: ' + e.message);
+                }
+            });
+        }
+
+        // ----- Paint Group (distribute palette c1..c4 across descendant meshes) -----
+        // Iterates every mesh in state.selected (including nested children via
+        // traverseMeshes), clones each material so per-mesh color doesn't leak
+        // to siblings, and assigns window.P.c1..c4 cyclically by traversal order.
+        // Color and map (texture) are independent PBR channels; if a Live Link
+        // texture is already on a mesh, the palette color tints the texture.
+        const paintBtn = document.getElementById('lumen-paint-group-btn');
+        if (paintBtn) {
+            paintBtn.addEventListener('click', () => {
+                if (!state.selected) { UI.toast('Select a mesh or group first'); return; }
+                const palette = [window.P.c1, window.P.c2, window.P.c3, window.P.c4];
+                let i = 0, painted = 0;
+                traverseMeshes(state.selected, (m) => {
+                    // Skip meshes with no material or multi-material draw groups —
+                    // Material.clone() returns a single Material, so cloning an array
+                    // would collapse multi-material meshes into one and break them.
+                    if (!m.material || Array.isArray(m.material)) return;
+                    const cloned = m.material.clone();
+                    cloned.color = new THREE.Color(palette[i % palette.length]);
+                    cloned.needsUpdate = true;
+                    m.material = cloned;
+                    i++;
+                    painted++;
+                });
+                if (painted === 0) {
+                    UI.toast('No meshes with materials in selection');
+                } else {
+                    UI.toast(`Painted ${painted} mesh${painted === 1 ? '' : 'es'} with palette`);
+                }
+            });
+        }
+
         wireExport('lumen-export-png',   () => Modals.openExport('png'));
         wireExport('lumen-export-video', () => Modals.openExport('video'));
         wireExport('lumen-export-gif',   () => Modals.openExport('gif'));

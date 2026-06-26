@@ -1,0 +1,10 @@
+{
+  "_doc": "Single source of truth for the project's ES module import map. Consumed by /index.html and /builderworkshop/index.html via scripts/sync-importmaps.cjs. URLs are local /vendor/* paths (mirroring node_modules layout) populated by scripts/vendor-deps.cjs on each predev/prestart/prebuild run. To bump a package version: run `npm install <pkg>`, then `npm run vendor:deps && npm run sync:importmaps`.",
+  "imports": {
+    "three":          "/vendor/three/build/three.module.js",
+    "three/addons/":  "/vendor/three/examples/jsm/",
+    "cannon-es":      "/vendor/cannon-es/dist/cannon-es.js",
+    "wasmoon":        "/vendor/wasmoon/dist/index.js",
+    "nipplejs":       "/vendor/nipplejs/src/index.js"
+  }
+}
