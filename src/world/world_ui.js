@@ -7,6 +7,7 @@
 */
 
 import { SITE_SIZE, TERRAIN_PRESETS, WORLD_SKY_TYPES, getNeighborCoords } from './world_state.js';
+import { getZoneForSite, getZoneBadgeHTML, getZoneCSSColor, canClaimSite } from './world_zoning.js';
 
 /**
  * Render the full world map UI into the overlay.
@@ -224,9 +225,11 @@ function createSiteTile(game, col, row, center) {
     const isOwned = site && site.ownerId === (grid ? grid.playerId : null);
     const isNeighbor = Math.abs(col - center.col) + Math.abs(row - center.row) === 1;
 
+    const zone = getZoneForSite(col, row);
+    const zoneColor = zone ? getZoneCSSColor(zone.id, 0.35) : 'rgba(255,255,255,0.03)';
     const terrain = site ? (TERRAIN_PRESETS[site.terrain] || TERRAIN_PRESETS.sky_high) : null;
-    const bgColor = terrain ? `rgba(${(terrain.color >> 16) & 0xff},${(terrain.color >> 8) & 0xff},${terrain.color & 0xff},0.3)` : 'rgba(255,255,255,0.03)';
-    const borderColor = isCenter ? '#9944ff' : isOwned ? '#44ff88' : isNeighbor ? 'rgba(136,68,255,0.4)' : 'rgba(255,255,255,0.08)';
+    const bgColor = terrain ? `rgba(${(terrain.color >> 16) & 0xff},${(terrain.color >> 8) & 0xff},${terrain.color & 0xff},0.3)` : zoneColor;
+    const borderColor = isCenter ? '#9944ff' : isOwned ? '#44ff88' : isNeighbor ? 'rgba(136,68,255,0.4)' : zone ? `${zone.color}66` : 'rgba(255,255,255,0.08)';
 
     const tile = document.createElement('div');
     tile.className = 'world-site-tile';
@@ -246,6 +249,11 @@ function createSiteTile(game, col, row, center) {
         position:relative;
     `;
 
+    // Zone badge (bottom-left)
+    const zoneBadge = zone && zone.id !== 'HUB'
+        ? `<div style="font-size:7px;position:absolute;bottom:2px;left:3px;color:${zone.color};opacity:0.8;">${zone.icon}</div>`
+        : '';
+
     if (site) {
         const terrainIcon = getTerrainIcon(site.terrain);
         tile.innerHTML = `
@@ -256,11 +264,13 @@ function createSiteTile(game, col, row, center) {
             <div style="font-size:8px;color:#888;">${site.partCount || 0} parts</div>
             ${site.ownerId ? `<div style="font-size:7px;color:#44ff88;position:absolute;top:2px;right:4px;">👤</div>` : ''}
             ${site.listed ? `<div style="font-size:7px;color:#ffcc00;position:absolute;top:2px;left:4px;">💰</div>` : ''}
+            ${zoneBadge}
         `;
     } else {
         tile.innerHTML = `
             <div style="font-size:10px;color:#555;">+</div>
             <div style="font-size:8px;color:#444;">(${col},${row})</div>
+            ${zoneBadge}
         `;
     }
 
@@ -310,16 +320,22 @@ function openSiteDetail(game, col, row) {
     panel.appendChild(backBtn);
 
     // Site header
+    const zone = getZoneForSite(col, row);
+    const zoneInfo = zone ? getZoneBadgeHTML(zone.id) : '';
+    const claimCheck = !site ? canClaimSite(grid, grid ? grid.playerId : null, col, row, (game.saveData && game.saveData.totalCoins) || 0) : null;
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;align-items:center;gap:12px;';
     header.innerHTML = `
         <div style="font-size:32px;">${getTerrainIcon(site ? site.terrain : 'sky_high')}</div>
         <div>
-            <div style="color:#fff;font-size:16px;font-weight:700;">Site (${col}, ${row})</div>
-            <div style="color:#888;font-size:11px;">${terrain.name}</div>
+            <div style="color:#fff;font-size:16px;font-weight:700;">Site (${col}, ${row}) ${zoneInfo}</div>
+            <div style="color:#888;font-size:11px;">${terrain.name} · ${zone ? zone.name : 'Unknown Zone'}</div>
+            ${zone ? `<div style="color:#888;font-size:9px;margin-top:1px;">${zone.description}</div>` : ''}
             <div style="color:#aaa;font-size:10px;margin-top:2px;">
                 ${site ? `${site.partCount || 0} parts` : 'Unclaimed'} ·
                 ${isOwned ? '✅ Your site' : site ? `Owned by ${site.ownerId || 'unknown'}` : 'Vacant'}
+                ${!site && claimCheck && !claimCheck.allowed ? `<span style="color:#ff8844;margin-left:4px;">⚠ ${claimCheck.reason}</span>` : ''}
+                ${!site && claimCheck && claimCheck.allowed ? `<span style="color:#44ff88;margin-left:4px;">🪙 ${claimCheck.cost} coins to claim</span>` : ''}
             </div>
         </div>
     `;
@@ -330,18 +346,26 @@ function openSiteDetail(game, col, row) {
     actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;';
 
     if (!site) {
-        // Claim button
+        // Claim button (zone-aware — disabled if claiming not allowed)
         const claimBtn = document.createElement('button');
         claimBtn.className = 'menu-btn';
-        claimBtn.style.cssText = 'background:rgba(0,180,0,0.4);border-color:#44ff44;font-size:12px;padding:8px 16px;';
-        claimBtn.innerText = '🏗️ CLAIM THIS SITE';
-        claimBtn.addEventListener('click', async () => {
-            if (game._worldSync) {
-                await game._worldSync.claimSite(col, row);
-                grid.getOrCreateSite(col, row, grid.playerId);
-                openSiteDetail(game, col, row);
-            }
-        });
+        const canClaim = claimCheck ? claimCheck.allowed : true;
+        claimBtn.style.cssText = `
+            background:${canClaim ? 'rgba(0,180,0,0.4)' : 'rgba(100,100,100,0.2)'};
+            border-color:${canClaim ? '#44ff44' : '#555'};
+            font-size:12px;padding:8px 16px;
+            ${canClaim ? 'cursor:pointer;' : 'cursor:not-allowed;opacity:0.6;'}
+        `;
+        claimBtn.innerText = canClaim ? `🏗️ CLAIM (${claimCheck ? claimCheck.cost : 0} 🪙)` : '🔒 ' + (claimCheck ? claimCheck.reason : 'Unavailable');
+        if (canClaim) {
+            claimBtn.addEventListener('click', async () => {
+                if (game._worldSync) {
+                    await game._worldSync.claimSite(col, row);
+                    grid.getOrCreateSite(col, row, grid.playerId);
+                    openSiteDetail(game, col, row);
+                }
+            });
+        }
         actions.appendChild(claimBtn);
     }
 

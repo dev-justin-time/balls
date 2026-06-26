@@ -9,6 +9,7 @@ import { PART_CATEGORIES, getPartsByCategory } from './catalog.js';
 import { initBuilderXP, addBuilderXP, renderBuilderXPBar, calculateTrackBonusXP } from './builder_xp.js';
 import { WireframeImporter } from './wireframe_importer.js';
 import { setupBuilderShare } from './builder_networking.js';
+import { activate3DMode, activate2DMode } from './builder_3d_scene.js';
 
 /**
  * Render the full builder UI into the overlay.
@@ -145,6 +146,7 @@ export function renderBuilderUI(game) {
         <button id="builder-export-btn" class="menu-btn" aria-label="Export track" style="font-size:10px;padding:6px 10px;">📋 EXPORT</button>
         <button id="builder-workshop-btn" class="menu-btn" aria-label="Open 3D Workshop" style="font-size:10px;padding:6px 10px;background:rgba(220,120,0,0.4);border-color:#ff8800;">🎨 WORKSHOP</button>
         <button id="builder-ai-import-btn" class="menu-btn" aria-label="Import from AI" style="font-size:10px;padding:6px 10px;background:rgba(0,120,220,0.4);border-color:#4488ff;">🤖 AI IMPORT</button>
+        <button id="builder-3d-toggle-btn" class="menu-btn" aria-label="Toggle 3D view" style="font-size:10px;padding:6px 10px;background:rgba(120,60,220,0.4);border-color:#8844ff;">🌐 3D VIEW</button>
     `;
     sidebar.appendChild(actions);
 
@@ -391,6 +393,32 @@ function wireBuilderUIEvents(game) {
         aiImportBtn.addEventListener('click', () => {
             handleAIImport(game);
         });
+    }
+
+    // 3D View Toggle
+    const toggle3DBtn = document.getElementById('builder-3d-toggle-btn');
+    if (toggle3DBtn) {
+        const _updateToggleLabel = () => {
+            const is3D = game._builderIs3D;
+            toggle3DBtn.innerText = is3D ? '📐 2D VIEW' : '🌐 3D VIEW';
+            toggle3DBtn.style.background = is3D
+                ? 'rgba(60,200,120,0.4)'
+                : 'rgba(120,60,220,0.4)';
+            toggle3DBtn.style.borderColor = is3D ? '#44ff88' : '#8844ff';
+        };
+
+        toggle3DBtn.addEventListener('click', () => {
+            if (!game._builderIs3D) {
+                activate3DMode(game);
+            } else {
+                activate2DMode(game);
+            }
+            _updateToggleLabel();
+            updateBuilderStatus(game);
+        });
+
+        // Set initial label
+        _updateToggleLabel();
     }
 }
 

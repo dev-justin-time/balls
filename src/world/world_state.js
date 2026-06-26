@@ -11,6 +11,8 @@
    Site world-space center = (col * SITE_SIZE, 0, row * SITE_SIZE).
 */
 
+import { computeZone, getZoneOverride } from './world_zoning.js';
+
 // --- Constants ---
 export const SITE_SIZE = 120;       // world units per site side
 export const BORDER_OVERLAP = 10;   // shared border zone where tracks connect
@@ -38,10 +40,13 @@ export const WORLD_SKY_TYPES = ['day', 'sunset', 'night', 'void', 'storm', 'infe
  * Create a new site record for a given grid coordinate.
  */
 export function createSite(col, row, ownerId) {
+    const zoneId = computeZone(col, row);
+    const override = getZoneOverride(col, row);
     return {
         id: `${col}_${row}`,
         col,
         row,
+        zone: override || zoneId,
         ownerId: ownerId || null,
         ownerName: null,
         terrain: 'sky_high',

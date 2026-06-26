@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Master Development Plan — World Zoning</title>
+<style>
+  :root {
+    --bg: #0a0c19;
+    --card-bg: #14162a;
+    --text: #e0e0e0;
+    --dim: #888;
+    --accent: #8844ff;
+    --gold: #ffd700;
+    --green: #44ff88;
+    --blue: #44aaff;
+    --orange: #ff8844;
+    --pink: #ff44aa;
+    --red: #ff4444;
+    --purple: #aa88ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    padding: 0;
+  }
+  .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+  h1 { font-size: 2rem; margin-bottom: 8px; color: #fff; }
+  h2 { font-size: 1.4rem; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #ddd; }
+  h3 { font-size: 1.1rem; margin: 20px 0 8px; color: #ccc; }
+  .subtitle { color: var(--dim); font-size: 0.9rem; margin-bottom: 24px; }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .meta span { background: var(--card-bg); padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; color: var(--dim); border: 1px solid rgba(255,255,255,0.06); }
+  p { margin-bottom: 12px; }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card h3 { margin-top: 0; }
+  .zone-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .zone-card {
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 16px;
+    background: rgba(255,255,255,0.02);
+  }
+  .zone-card .icon { font-size: 1.4rem; }
+  .zone-card .name { font-size: 1rem; font-weight: 700; margin: 4px 0; }
+  .zone-card .desc { font-size: 0.78rem; color: var(--dim); }
+  .zone-card .stats { font-size: 0.72rem; color: var(--dim); margin-top: 6px; }
+  .zone-card .stats span { display: block; }
+  .phase-timeline { position: relative; padding-left: 24px; }
+  .phase-timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, var(--gold), var(--green), var(--blue), var(--orange), var(--pink), var(--purple));
+  }
+  .phase-item {
+    position: relative;
+    margin-bottom: 28px;
+    padding-left: 18px;
+  }
+  .phase-item::before {
+    content: '';
+    position: absolute;
+    left: -18px;
+    top: 6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--card-bg);
+    border: 2px solid #fff;
+  }
+  .phase-item.p1::before { border-color: var(--gold); background: var(--gold); }
+  .phase-item.p2::before { border-color: var(--green); background: var(--green); }
+  .phase-item.p3::before { border-color: var(--blue); background: var(--blue); }
+  .phase-item.p4::before { border-color: var(--orange); background: var(--orange); }
+  .phase-item.p5::before { border-color: var(--pink); background: var(--pink); }
+  .phase-item.p6::before { border-color: var(--purple); background: var(--purple); }
+  .phase-num { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.5; }
+  .phase-name { font-size: 1.1rem; font-weight: 700; color: #fff; }
+  .phase-desc { font-size: 0.82rem; color: var(--dim); margin-top: 4px; }
+  .phase-zones { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .phase-zones span {
+    font-size: 0.68rem;
+    padding: 3px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.82rem; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  th { color: var(--dim); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+  .map-visual {
+    background: var(--card-bg);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    font-family: monospace;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: var(--dim);
+    white-space: pre;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🏗️ Master Development Plan</h1>
+<p class="subtitle">World Zoning Architecture, Growth Strategy, and Implementation Roadmap</p>
+
+<div class="meta">
+  <span>📅 June 2026</span>
+  <span>📐 Version 1.0</span>
+  <span>🎯 Domain: World Architecture</span>
+  <span>🔒 Strategic Document</span>
+</div>
+
+<!-- ZONE OVERVIEW -->
+<h2>Zone Types</h2>
+<p>The world is divided into <strong>8 distinct zone types</strong>, each with unique rules for claiming, building, trading, and visibility. Zones radiate in concentric rings from the Origin Hub at (0,0).</p>
+
+<div class="zone-grid">
+
+<div class="zone-card" style="border-color: var(--gold);">
+  <div class="icon">🏛️</div>
+  <div class="name" style="color: var(--gold);">Origin Hub</div>
+  <div class="desc">Public hub with pre-built showcase tracks, tutorial portals, and central marketplace. Admin-curated — no private claims.</div>
+  <div class="stats">
+    <span>📍 Radius: 0–3</span>
+    <span>🔒 Claim: Not allowed</span>
+    <span>👥 Build: Admin only</span>
+  </div>
+</div>
+
+<div class="zone-card" style="border-color: var(--green);">
+  <div class="icon">🏡</div>
+  <div class="name" style="color: var(--green);">Starter Ring</div>
+  <div class="desc">First ring of claimable sites for new players. Low entry barrier — 10 coin claim cost, max 3 sites per player.</div>
+  <div class="stats">
+    <span>📍 Radius: 4–8</span>
+    <span>🪙 Claim: 10 coins</span>
+    <span>🏗️ Height limit: 40</span>
+    <span>📦 Parts limit: 300</span>
+  </div>
+</div>
+
+<div class="zone-card" style="border-color: var(--blue);">
+  <div class="icon">🏘️</div>
+  <div class="name" style="color: var(--blue);">Suburban Ring</div>
+  <div class="desc">Mid-tier residential. Full build height, marketplace trading enabled. More terrain types unlocked.</div>
+  <div class="stats">
+    <span>📍 Radius: 9–15</span>
+    <span>🪙 Claim: 50 coins</span>
+    <span>🏗️ Height limit: 80</span>
+    <span>📦 Parts limit: 500</span>
+  </div>
+</div>
+
+<div class="zone-card" style="border-color: #ffcc00;">
+  <div class="icon">🏪</div>
+  <div class="name" style="color: #ffcc00;">Commercial Corridor</div>
+  <div class="desc">High-traffic zones flanking transit paths. Premium terrain. Auto-listing after 7 days of inactivity.</div>
+  <div class="stats">
+    <span>📍 Radius: 16–20</span>
+    <span>🪙 Claim: 200 coins</span>
+    <span>⚡ Auto-list: 7 days inactive</span>
+    <span>📦 Parts limit: 500</span>
+  </div>
+</div>
+
+<div class="zone-card" style="border-color: var(--orange);">
+  <div class="icon">🏭</div>
+  <div class="name" style="color: var(--orange);">Industrial Sector</div>
+  <div class="desc">Workshop integration zone. Higher part limits. Shared asset libraries for 3D model creation.</div>
+  <div class="stats">
+    <span>📍 Radius: 21–28</span>
+    <span>🪙 Claim: 100 coins</span>
+    <span>📦 Parts limit: 1000</span>
+    <span>🔧 Workshop: Enabled</span>
+  </div>
+</div>
+
+<div class="zone-card" style="border-color: var(--pink);">
+  <div class="icon">🎮</div>
+  <div class="name" style="color: var(--pink);">Recreational Park</div>
+  <div class="desc">Public racing arenas. Community-built tracks. Voting system for track of the week. Leaderboards.</div>
+  <div class="stats">
+    <span>📍 Radius: 29–35</span>
+    <span>🔒 Claim: Community only</span>
+    <span>🏆 Voting: Enabled</span>
+    <span>📦 Parts limit: 800</span>
+  </div>
+</div>
+
+<div class="zone-card" style="border-color: var(--purple);">
+  <div class="icon">🚧</div>
+  <div class="name" style="color: var(--purple);">Frontier</div>
+  <div class="desc">Unzoned expansion territory. First-come first-served. Experimental terrain types. Future content drops.</div>
+  <div class="stats">
+    <span>📍 Radius: 36+</span>
+    <span>🪙 Claim: Free</span>
+    <span>🔬 Experimental: Yes</span>
+    <span>📦 Parts limit: 200</span>
+  </div>
+</div>
+
+<div class="zone-card" style="border-color: var(--red);">
+  <div class="icon">🛡️</div>
+  <div class="name" style="color: var(--red);">Admin Reserve</div>
+  <div class="desc">Admin-protected areas for featured content, seasonal events, and moderation tools. Not player-claimable.</div>
+  <div class="stats">
+    <span>📍 Scattered special areas</span>
+    <span>🔒 Claim: Not allowed</span>
+    <span>🎄 Events: Seasonal</span>
+    <span>⚙️ Moderation: Active</span>
+  </div>
+</div>
+
+</div>
+
+<!-- ZONE MAP -->
+<h2>Zone Map (Concentric Ring Model)</h2>
+<p>The world grid radiates from the Origin Hub (0,0). Each ring represents a development phase and zone transition.</p>
+
+<div class="map-visual">
+                          ┌─────────────────────────────────────────┐
+                          │             FRONTIER (36+)               │
+                          │  ┌───────────────────────────────────┐  │
+                          │  │       RECREATIONAL PARK (29-35)    │  │
+                          │  │  ┌─────────────────────────────┐  │  │
+                          │  │  │     INDUSTRIAL (21-28)       │  │  │
+                          │  │  │  ┌───────────────────────┐  │  │  │
+                          │  │  │  │   COMMERCIAL (16-20)   │  │  │  │
+                          │  │  │  │  ┌─────────────────┐  │  │  │  │
+                          │  │  │  │  │ SUBURBAN (9-15)  │  │  │  │  │
+                          │  │  │  │  │  ┌───────────┐  │  │  │  │  │
+                          │  │  │  │  │  │STARTER(4-8)│  │  │  │  │  │
+                          │  │  │  │  │  │ ┌───────┐ │  │  │  │  │  │
+                          │  │  │  │  │  │ │ HUB   │ │  │  │  │  │  │
+                          │  │  │  │  │  │ │ (0-3) │ │  │  │  │  │  │
+                          │  │  │  │  │  │ └───────┘ │  │  │  │  │  │
+                          │  │  │  │  │  └───────────┘  │  │  │  │  │
+                          │  │  │  │  └─────────────────┘  │  │  │  │
+                          │  │  │  └───────────────────────┘  │  │  │
+                          │  │  └─────────────────────────────┘  │  │
+                          │  └───────────────────────────────────┘  │
+                          └─────────────────────────────────────────┘
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background: var(--gold);"></div> Origin Hub</div>
+  <div class="legend-item"><div class="legend-dot" style="background: var(--green);"></div> Starter Ring</div>
+  <div class="legend-item"><div class="legend-dot" style="background: var(--blue);"></div> Suburban Ring</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #ffcc00;"></div> Commercial</div>
+  <div class="legend-item"><div class="legend-dot" style="background: var(--orange);"></div> Industrial</div>
+  <div class="legend-item"><div class="legend-dot" style="background: var(--pink);"></div> Recreational</div>
+  <div class="legend-item"><div class="legend-dot" style="background: var(--purple);"></div> Frontier</div>
+  <div class="legend-item"><div class="legend-dot" style="background: var(--red);"></div> Admin</div>
+</div>
+
+<!-- RULES MATRIX -->
+<h2>Zone Rules Matrix</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Zone</th>
+      <th>Claim Cost</th>
+      <th>Max Sites</th>
+      <th>Parts Limit</th>
+      <th>Build Height</th>
+      <th>Sellable</th>
+      <th>Claimable</th>
+      <th>Auto-List</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="color: var(--gold);">🏛️ Hub</td><td>—</td><td>0</td><td>0</td><td>0</td><td>✗</td><td>✗</td><td>Never</td>
+    </tr>
+    <tr>
+      <td style="color: var(--green);">🏡 Starter</td><td>10 🪙</td><td>3</td><td>300</td><td>40</td><td>✓</td><td>✓</td><td>30 days</td>
+    </tr>
+    <tr>
+      <td style="color: var(--blue);">🏘️ Suburban</td><td>50 🪙</td><td>5</td><td>500</td><td>80</td><td>✓</td><td>✓</td><td>21 days</td>
+    </tr>
+    <tr>
+      <td style="color: #ffcc00;">🏪 Commercial</td><td>200 🪙</td><td>3</td><td>500</td><td>80</td><td>✓</td><td>✓</td><td>7 days</td>
+    </tr>
+    <tr>
+      <td style="color: var(--orange);">🏭 Industrial</td><td>100 🪙</td><td>2</td><td>1000</td><td>80</td><td>✓</td><td>✓</td><td>14 days</td>
+    </tr>
+    <tr>
+      <td style="color: var(--pink);">🎮 Recreational</td><td>—</td><td>0</td><td>800</td><td>80</td><td>✗</td><td>✗</td><td>Never</td>
+    </tr>
+    <tr>
+      <td style="color: var(--purple);">🚧 Frontier</td><td>0 🪙</td><td>1</td><td>200</td><td>40</td><td>✗</td><td>✓</td><td>Never</td>
+    </tr>
+    <tr>
+      <td style="color: var(--red);">🛡️ Admin</td><td>—</td><td>0</td><td>0</td><td>0</td><td>✗</td><td>✗</td><td>Never</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- DEVELOPMENT PHASES -->
+<h2>Development Phases</h2>
+<p>Zones unlock progressively based on active player count, creating natural growth incentives and preventing sprawl.</p>
+
+<div class="phase-timeline">
+
+<div class="phase-item p1">
+  <div class="phase-num">Phase 1</div>
+  <div class="phase-name">🚀 Origin Launch</div>
+  <div class="phase-desc">Central hub and first residential ring open. Tutorial tracks available. Basic claiming active for new players.</div>
+  <div class="phase-zones">
+    <span>🏛️ Hub</span><span>🏡 Starter Ring</span>
+  </div>
+  <div style="margin-top:4px;font-size:0.7rem;color:var(--dim);">Min players: 0</div>
+</div>
+
+<div class="phase-item p2">
+  <div class="phase-num">Phase 2</div>
+  <div class="phase-name">🏘️ Suburban Expansion</div>
+  <div class="phase-desc">Suburban ring unlocks with full build height. Marketplace trading enabled. More terrain types available.</div>
+  <div class="phase-zones">
+    <span>🏛️ Hub</span><span>🏡 Starter</span><span>🏘️ Suburban</span>
+  </div>
+  <div style="margin-top:4px;font-size:0.7rem;color:var(--dim);">Min players: 50</div>
+</div>
+
+<div class="phase-item p3">
+  <div class="phase-num">Phase 3</div>
+  <div class="phase-name">💼 Commercial Boom</div>
+  <div class="phase-desc">Commercial corridor opens. Premium terrain types. Auto-listing for inactive sites drives market liquidity.</div>
+  <div class="phase-zones">
+    <span>🏛️ Hub</span><span>🏡 Starter</span><span>🏘️ Suburban</span><span>🏪 Commercial</span>
+  </div>
+  <div style="margin-top:4px;font-size:0.7rem;color:var(--dim);">Min players: 200</div>
+</div>
+
+<div class="phase-item p4">
+  <div class="phase-num">Phase 4</div>
+  <div class="phase-name">⚙️ Industrial Revolution</div>
+  <div class="phase-desc">Workshop integration zone. Higher part limits (1000). Shared 3D asset libraries for model creation.</div>
+  <div class="phase-zones">
+    <span>🏛️ Hub</span><span>🏡 Starter</span><span>🏘️ Suburban</span><span>🏪 Commercial</span><span>🏭 Industrial</span>
+  </div>
+  <div style="margin-top:4px;font-size:0.7rem;color:var(--dim);">Min players: 500</div>
+</div>
+
+<div class="phase-item p5">
+  <div class="phase-num">Phase 5</div>
+  <div class="phase-name">🎮 Recreational Boom</div>
+  <div class="phase-desc">Public racing arenas open. Community voting for track of the week. Leaderboards drive engagement.</div>
+  <div class="phase-zones">
+    <span>🏛️ Hub</span><span>🏡 Starter</span><span>🏘️ Suburban</span><span>🏪 Commercial</span><span>🏭 Industrial</span><span>🎮 Recreational</span>
+  </div>
+  <div style="margin-top:4px;font-size:0.7rem;color:var(--dim);">Min players: 1000</div>
+</div>
+
+<div class="phase-item p6">
+  <div class="phase-num">Phase 6</div>
+  <div class="phase-name">🌌 Frontier Opening</div>
+  <div class="phase-desc">Full expansion territory opens. Experimental terrain types. Future content drops and seasonal events.</div>
+  <div class="phase-zones">
+    <span>🏛️ Hub</span><span>🏡 Starter</span><span>🏘️ Suburban</span><span>🏪 Commercial</span><span>🏭 Industrial</span><span>🎮 Recreational</span><span>🚧 Frontier</span>
+  </div>
+  <div style="margin-top:4px;font-size:0.7rem;color:var(--dim);">Min players: 2500</div>
+</div>
+
+</div>
+
+<!-- MONETIZATION STRATEGY -->
+<h2>Monetization & Economy</h2>
+
+<div class="card">
+  <h3>🪙 Site Economy</h3>
+  <p>Claim costs scale with zone prestige. Commercial corridor sites (200 coins) are 20× more expensive than starter sites (10 coins). This creates a natural progression path — players earn coins by building popular tracks, then graduate to premium zones.</p>
+  <p>The auto-listing system (7-day inactivity in Commercial, 21-day in Suburban) prevents land hoarding and keeps the marketplace liquid. Inactive sites re-enter the economy.</p>
+</div>
+
+<div class="card">
+  <h3>📊 Network Effects (Metcalfe's Law)</h3>
+  <p>Each new player adds value to ALL existing players through shared tracks, marketplace liquidity, and community voting. The concentric ring model ensures density — new players cluster near existing ones rather than sprawling into empty space.</p>
+  <p>Phase-gating zones by player count creates a shared goal — the community works together to unlock new territory.</p>
+</div>
+
+<div class="card">
+  <h3>🎯 Behavioral Economics</h3>
+  <p><strong>Loss Aversion:</strong> Auto-listing after inactivity creates urgency — players return to maintain their premium Commercial sites.</p>
+  <p><strong>Endowed Progress:</strong> Starter sites are cheap (10 coins) but limited (3 per player). Players feel ownership early and are motivated to upgrade.</p>
+  <p><strong>Decoy Pricing:</strong> Frontier sites are free but limited — making Suburban sites at 50 coins feel like a bargain by comparison.</p>
+</div>
+
+<!-- TECHNICAL IMPLEMENTATION -->
+<h2>Technical Implementation</h2>
+
+<div class="card">
+  <h3>📁 File Architecture</h3>
+  <table>
+    <tr><th>File</th><th>Concern</th></tr>
+    <tr><td><code>src/world/world_zoning.js</code></td><td>Zone types, rules, computeZone(), canClaimSite(), development phases</td></tr>
+    <tr><td><code>src/world/world_state.js</code></td><td>World grid, site creation (now zone-aware), terrain presets</td></tr>
+    <tr><td><code>src/world/world_ui.js</code></td><td>Map UI with zone colors/badges, zone-aware claim buttons</td></tr>
+    <tr><td><code>src/builder/builder_3d_scene.js</code></td><td>3D perspective builder with orbit controls</td></tr>
+    <tr><td><code>src/builder/builder_ui.js</code></td><td>Builder UI with 3D/2D toggle button</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>🔒 Security Notes</h3>
+  <p>Zone rules are computed client-side for UX responsiveness but <strong>enforced server-side</strong> via <code>world_networking.js</code>. The <code>canClaimSite()</code> and <code>canBuildAtSite()</code> validators run on both client and server — the server response is authoritative.</p>
+  <p>Admin zones use override functions (<code>getZoneOverride()</code>) that can be injected server-side for seasonal events without client updates.</p>
+</div>
+
+<div class="card">
+  <h3>📈 Future Roadmap</h3>
+  <ul style="padding-left:20px;color:var(--dim);font-size:0.82rem;">
+    <li>Zone-based tax system — Commercial sites pay weekly coin tax</li>
+    <li>Zone-specific building restrictions — Industrial allows heavier physics objects</li>
+    <li>Dynamic zone expansion — New rings unlock automatically based on player density heatmaps</li>
+    <li>Cross-zone transit networks — Highway corridors connecting distant zones</li>
+    <li>Zone reputation system — Build quality scores affect site visibility</li>
+    <li>Event zones — Temporary seasonal zones (Halloween, Christmas) with unique terrain</li>
+  </ul>
+</div>
+
+</div>
+</body>
+</html>
