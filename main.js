@@ -49,18 +49,22 @@ import { NotificationManager } from './src/notification_manager.js';
 import { initPersistence, saveGame } from './src/persistence.js';
 import { initAudio, registerSfx, playSound } from './src/audio.js';
 import { initScene, getBallMaterial, applyBallSkin } from './engine/scene.js';
-import { initPhysics, updatePhysics, jump } from './src/physics.js';
+import { initPhysics, updatePhysics, jump,
+         updateFireSparks, updateHeatShimmer,
+         updateMeteors, checkMeteorCollisions } from './src/physics.js';
 import { onWindowResize, animate } from './src/rendering.js';
 import { initSpeedLines } from './src/speed_lines.js';
 import { initMotionBlur } from './src/motion_blur.js';
 import { initBloom } from './src/bloom.js';
-import { createLevel, clearLevel, addPlatform, addRamp, addCoins,
+import { createLevel, createInfiniteLevel, clearLevel,
+         addPlatform, addRamp, addCoins,
          addPendulum, addSpinner, addHammer, addMover, addWall,
          addTunnelWalls, addGlassPlatform, addCheckpoint, addBlade,
          placeFinishModel, spawnDroppedCoins, createShockwave,
          addLoopDeLoop, addSpiralTube, addSpringPad, addCurve,
          addStairs, addPortalRing, addHalfPipe, addCheckerboard,
-         addGlassLoopDeLoop, addGlassStairs, addGlassCurve } from './src/levelgen.js';
+         addGlassLoopDeLoop, addGlassStairs, addGlassCurve,
+         triggerDropFromObstacle } from './src/levelgen.js';
 import { BALL_DB } from './src/ball_db.js';
 
 // ============================================================================
@@ -342,6 +346,15 @@ class Game {
         import('./src/ui.js').then(mod => {
             try {
                 mod.setupUI(this, null);
+
+                // Bind game-state checking so the render loop in rendering.js can
+                // execute coin collection, checkpoint/respawn, fall-off timer,
+                // HUD updates, and win-condition detection every frame.
+                this.checkGameState = (dt) => mod.checkGameState(this, dt, null);
+
+                // Bind shop/purchase helpers called from ball_index_ui.js
+                this.handlePurchase = (type, key, price) => mod.handlePurchase(this, type, key, price);
+                this.levelUpSkin = (key, cost) => mod.levelUpSkin(this, key, cost);
             } catch (e) {
                 console.warn('UI setup error (non-critical):', e);
             }
@@ -415,6 +428,7 @@ class Game {
     jump() { jump(this); }
 
     createLevel(seed) { createLevel(this, seed); }
+    createInfiniteLevel(seed) { createInfiniteLevel(this, seed); }
     clearLevel() { clearLevel(this); }
     addPlatform(x, y, z, w, l, c) { addPlatform(this, x, y, z, w, l, c); }
     addGlassPlatform(x, y, z, w, l) { addGlassPlatform(this, x, y, z, w, l); }
@@ -445,6 +459,12 @@ class Game {
     createShockwave(z, i) { createShockwave(this, z, i); }
     playSound(name) { playSound(name); }
     save() { saveGame(this); }
+
+    // Sky-condition effect updaters (called from rendering.js render loop)
+    updateFireSparks(dt) { updateFireSparks(this, dt); }
+    updateHeatShimmer(dt) { updateHeatShimmer(this, dt); }
+    updateMeteors(dt) { updateMeteors(this, dt); }
+    checkMeteorCollisions() { checkMeteorCollisions(this); }
 
     getBallMaterial() { return getBallMaterial(this); }
     applyBallSkin(conf) { applyBallSkin(this, conf); }

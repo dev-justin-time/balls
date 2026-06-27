@@ -494,18 +494,74 @@ export function checkGameState(game, dt, room) {
             }
         }
 
-        // Checkpoint progress — unchanged from round-5. Note: with the round-6
-        // addCheckpoint change in src/levelgen.js, every checkpoint now has an
-        // invisible kinematic wall; the ball halts at the wall on contact.
-        // Once stopped at the wall, the proximity loop below still fires (ball
-        // IS at the checkpoint coords), so lastCheckpointPos is updated and
-        // the next fall-off jump teleports the player back here.
-        for (const cp of game.checkpoints) {
+        // Checkpoint progress + first-contact UX feedback (round-7 feel pass).
+        //
+        // Round-6 added invisible kinematic walls at every checkpoint (see
+        // src/levelgen.js:addCheckpoint) so the ball halts on contact. Without
+        // audio + a visible CP cue, players get confused by sudden halts. We
+        // fire a one-shot 'checkpoint' SFX + a brief "CP ✓" pulse on
+        // #distance-display the first frame the ball's xz falls inside a
+        // checkpoint cell. The Set is keyed by checkpoint index, so revisiting
+        // the same CP later (e.g. via fall-off → teleport → respawn at
+        // lastCheckpointPos) does NOT re-pulse.
+        if (!(game._reachedCpIndices instanceof Set)) game._reachedCpIndices = new Set();
+        // Hoist distEl so the pulse branch does not call getElementById per
+        // checkpoint per frame. The HUD block later re-reads it (same node).
+        const distElForPulse = document.getElementById('distance-display');
+        for (let i = 0; i < game.checkpoints.length; i++) {
+            const cp = game.checkpoints[i];
             const bx = game.ballBody.position.x;
             const bz = game.ballBody.position.z;
             if (Math.abs(bx - cp.x) < (cp.width / 2 + 1) && Math.abs(bz - cp.z) < 3) {
                 game.lastCheckpointPos.set(cp.x, cp.y + 1, cp.z);
+                if (!game._reachedCpIndices.has(i)) {
+                    game._reachedCpIndices.add(i);
+                    try { playSound('checkpoint'); } catch (_e) {}
+                    if (distElForPulse && !distElForPulse.classList.contains('cp-pulse')) {
+                        distElForPulse.classList.add('cp-pulse');
+                        if (distElForPulse._cpPulseTimer) clearTimeout(distElForPulse._cpPulseTimer);
+                        distElForPulse._cpPulseTimer = setTimeout(() => {
+                            distElForPulse.classList.remove('cp-pulse');
+                            distElForPulse._cpPulseTimer = null;
+                        }, 700);
+                    }
+                }
             }
+        }
+
+        // Lazy-inject cp-pulse keyframes once — keeps this feature atomic
+        // without editing /styles.css. The inline <style> lives in <head> so
+        // all `#distance-display.cp-pulse` overlays animate uniformly.
+        if (distElForPulse && !document.getElementById('cp-pulse-css')) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'cp-pulse-css';
+            styleEl.textContent = `
+                #distance-display.cp-pulse { position: relative; }
+                #distance-display.cp-pulse::before {
+                    content: 'CP ✓';
+                    position: absolute;
+                    inset: 0;
+                    background: linear-gradient(180deg, rgba(68,255,136,0.95), rgba(170,255,210,0.95));
+                    color: #082016;
+                    border-radius: 6px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 800;
+                    font-family: '5x5dots', 'Segoe UI', monospace;
+                    font-size: 13px;
+                    letter-spacing: 1px;
+                    box-shadow: 0 0 18px rgba(136,255,180,0.7);
+                    animation: cpPulseFade 700ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                    pointer-events: none;
+                }
+                @keyframes cpPulseFade {
+                    0%   { opacity: 0;   transform: scale(0.7); }
+                    18%  { opacity: 1;   transform: scale(1.12); }
+                    100% { opacity: 0;   transform: scale(1.0); }
+                }
+            `;
+            document.head.appendChild(styleEl);
         }
 
         // Distance tracking & HUD updates
@@ -724,6 +780,10 @@ export function reset(game) {
     game.ballBody.velocity.set(0, 0, 0);
     game.ballBody.angularVelocity.set(0, 0, 0);
     game.lastCheckpointPos.set(0, 5, 0);
+    // Clear the round-7 CP-pulse one-shot tracker so the next run starts
+    // fresh — previously-reached CPs will fire their audio + pulse again
+    // when the ball crosses them on this run.
+    game._reachedCpIndices = new Set();
     if (game._isInfinite) {
         createInfiniteLevel(game);
         if (game._updateSurvivalLabel) game._updateSurvivalLabel();
