@@ -28,15 +28,25 @@ import { playPortalSound } from './audio.js';
 // feel-pass 2026-06-26 round 4: player reported "way too slow still". +150% boost
 //   on top of round 1 = BALL_SPEED 10000 × 2.5 = 25000. MAX_VELOCITY stays at
 //   round-1 value 40 (still the top-end cap; fire-escape against runaway).
-// GRAVITY=-45 is now the SINGLE remaining physics invariant pinned by @jump-sim.mjs
-// — see tests/physics_regression.test.js before re-touching it.
+// GRAVITY=-45 is the SINGLE remaining physics invariant pinned by @jump-sim.mjs.
+// feel-pass 2026-06-27 round 5: USER DIRECTIVE — ball "won't even go uphill".
+//   +1000% (10x) on top of round 4: BALL_SPEED 25000 → 250000. To make the
+//   power USABLE (otherwise it just slams into the MAX_VELOCITY cap):
+//   - MAX_VELOCITY 40 → 80 (2x top-end so boost is felt)
+//   - angularDamping 0.95 → 0.18 (was eating the ball's rolling spin in <1s,
+//     which made it slide instead of climb)
+//   - linearDamping 0.15 → 0.05 (less foreground drag)
+//   - friction 1.0 → 0.3 (rolling friction is well below 1.0; old value was
+//     sapping all uphill momentum — ball would grind to a halt mid-ramp)
+//   - restitution 0.1 → 0.25 (small bump-boost off uneven surfaces)
+//   - STEER_SPEED/JUMP_FORCE unchanged (pinned by regression tests).
 const BALL_RADIUS = 0.5;
-const GRAVITY = -45; // per vision Part 3 (Keep-Balls Tightening reconciled)
-const BALL_SPEED = 25000; // 10000 → 25000 = +150% boost — feel-pass 2026-06-26 round 4
-const STEER_SPEED = 32; // was 22 — feel-pass 2026-06-26 round 2 (tracks MAX_VELOCITY=40)
+const GRAVITY = -45; // per vision Part 3 (Keep-Balls Tightening reconciled) — PINNED invariant
+const BALL_SPEED = 250000; // 25000 → 250000 = +1000% (×10) — feel-pass 2026-06-27 round 5 (user directive)
+const STEER_SPEED = 32; // was 22 — feel-pass 2026-06-26 round 2 (tracks MAX_VELOCITY band)
 const STEER_DAMPING = 0.96; // was 0.92 — feel-pass 2026-06-26 round 2 (less angular decay)
-export const MAX_VELOCITY = 40; // was 22 — feel-pass 2026-06-26 round 1 (top-end cap unchanged)
-const JUMP_FORCE = 28; // per vision Part 3
+export const MAX_VELOCITY = 80; // 40 → 80 — feel-pass 2026-06-27 round 5 (top-end cap 2x so 10x BALL_SPEED is usable)
+const JUMP_FORCE = 28; // per vision Part 3 — PINNED by physics_regression.test.js Scenario B
 
 export function initPhysics(game) {
     game.world = new CANNON.World();
@@ -46,8 +56,8 @@ export function initPhysics(game) {
     const ballMaterial = new CANNON.Material('ball');
     const groundMaterial = new CANNON.Material('ground');
     const contactMaterial = new CANNON.ContactMaterial(ballMaterial, groundMaterial, {
-        friction: 1.0,
-        restitution: 0.1
+        friction: 0.3,       // 1.0 → 0.3 — feel-pass 2026-06-27 round 5 (rolling, not grinding — ball can climb ramps)
+        restitution: 0.25    // 0.1 → 0.25 — feel-pass 2026-06-27 round 5 (light bump-boost off uneven surfaces)
     });
     game.world.addContactMaterial(contactMaterial);
 
@@ -56,8 +66,8 @@ export function initPhysics(game) {
         mass: 100,
         shape: sphereShape,
         material: ballMaterial,
-        angularDamping: 0.95,
-        linearDamping: 0.15  // feel-pass 2026-06-26 round 3 (was 0.5)
+        angularDamping: 0.18,  // 0.95 → 0.18 — feel-pass 2026-06-27 round 5 (let the ball ROLL up ramps; old value killed spin in <1s)
+        linearDamping: 0.05    // 0.15 → 0.05 — feel-pass 2026-06-27 round 5 (less drag so the new 10x power can be felt)
     });
     game.ballBody.position.set(0, 1, 0);
     game.world.addBody(game.ballBody);

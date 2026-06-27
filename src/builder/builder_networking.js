@@ -434,7 +434,8 @@ export async function rateTrack(game, trackId, rating) {
 
 /**
  * Build a map of trackId → { avg, count } from the remote track_ratings collection.
- */unction getTrackRatings(game) {
+ */
+function  getTrackRatings(game) {
     const data = {};
     const room = game._builderRoom || null;
     if (room && room.isReady && typeof room.collection === 'function') {

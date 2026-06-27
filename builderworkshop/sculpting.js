@@ -123,7 +123,7 @@ export function applySmoothTool(mesh, iterations = 1, factor = 0.5) {
 
     const tempPos = new Float32Array(pos.array.length);
     const avg = new THREE.Vector3();
-    const current = new THREE.Vector3();
+    const blended = new THREE.Vector3();
 
     for (let iter = 0; iter < iterations; iter++) {
         for (let i = 0; i < pos.count; i++) {
@@ -133,11 +133,42 @@ export function applySmoothTool(mesh, iterations = 1, factor = 0.5) {
                 tempPos[i * 3 + 1] = pos.getY(i);
                 tempPos[i * 3 + 2] = pos.getZ(i);
                 continue;
-            }
-            
-            const n = neighbors.get(i);
+            }            const n = neighbors.get(i);
             if (!n || n.size === 0) {
                 tempPos[i * 3]     = pos.getX(i);
                 tempPos[i * 3 + 1] = pos.getY(i);
                 tempPos[i * 3 + 2] = pos.getZ(i);
-                continue
+                continue;
+            }
+
+            // Average neighbor positions, then blend with current by `factor`
+            // (0=no change, 1=fully replaced -- Vector3.lerp(v, t) does
+            // `this += t*(v - this)`). Read from `pos.array` so subsequent
+            // iterations see the previous pass's smoothed values (set via
+            // pos.array.set(tempPos) at the bottom of each iter).
+            avg.set(0, 0, 0);
+            for (const neighborIdx of n) {
+                avg.x += pos.getX(neighborIdx);
+                avg.y += pos.getY(neighborIdx);
+                avg.z += pos.getZ(neighborIdx);
+            }
+            avg.divideScalar(n.size);
+
+            blended.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+            blended.lerp(avg, factor);
+
+            tempPos[i * 3]     = blended.x;
+            tempPos[i * 3 + 1] = blended.y;
+            tempPos[i * 3 + 2] = blended.z;
+        }
+
+        // Write-back at the end of the iteration so the next pass operates
+        // on smoothed inputs. Float32Array.set is a typed-array fast path.
+        pos.array.set(tempPos);
+    }
+
+    // Flag the geometry for GPU update and recalculate lighting normals
+    // (only once after all iterations, matching applySculptTool's tail).
+    pos.needsUpdate = true;
+    mesh.geometry.computeVertexNormals();
+}

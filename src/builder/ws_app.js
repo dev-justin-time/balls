@@ -226,41 +226,51 @@ export function initWorkshop(game) {
     // Attach to game so external code can generate thumbnails from the workshop
     game._workshopRefs = workshopRefs;
 
+    // Define enter() / exit() as local function declarations BEFORE the
+    // return statement so they hoist into the returned object literal AND
+    // can be exposed on `game` itself as game._enterWorkshop /
+    // game._exitWorkshop. Without these assignments the WORKSHOP tab button
+    // (src/builder/builder_ui.js #builder-workshop-btn) silently does
+    // nothing because its onClick guard is `typeof game._enterWorkshop ===
+    // 'function'`.
+    function _enter() {
+        // Hide game scene, show workshop scene
+        if (game.scene) game.scene.visible = false;
+        scene.visible = true;
+        // Show floating tool panels
+        if (game._panelWM) game._panelWM.showAll();
+        // Attach controls
+        orbit.enabled = true;
+        console.info(`Workshop v${THREE.REVISION}: entered`);
+    }
+    function _exit() {
+        scene.visible = false;
+        if (game.scene) game.scene.visible = true;
+        // Hide floating tool panels
+        if (game._panelWM) game._panelWM.hideAll();
+        // Detach transform controls
+        transform.detach();
+        orbit.enabled = false;
+        console.info(`Workshop v${THREE.REVISION}: exited`);
+    }
+    // Guard: initWorkshop(game) can be called multiple times across re-entries
+    // to the builder tab. Only assign once so we don't replace a still-bound
+    // handler if the game object survived.
+    if (typeof game._enterWorkshop !== 'function') {
+        game._enterWorkshop = _enter;
+        game._exitWorkshop = _exit;
+    }
+
     return {
         /**
          * Enter workshop mode — make scene visible and start rendering.
          */
-        enter() {
-            // Hide game scene, show workshop scene
-            if (game.scene) game.scene.visible = false;
-            scene.visible = true;
-
-            // Show floating tool panels
-            if (game._panelWM) game._panelWM.showAll();
-
-            // Attach controls
-            orbit.enabled = true;
-
-            console.info(`Workshop v${THREE.REVISION}: entered`);
-        },
+        enter: _enter,
 
         /**
          * Exit workshop mode — hide scene, restore game.
          */
-        exit() {
-            scene.visible = false;
-            if (game.scene) game.scene.visible = true;
-
-            // Hide floating tool panels
-            if (game._panelWM) game._panelWM.hideAll();
-
-            // Detach transform controls
-            transform.detach();
-            orbit.enabled = false;
-
-            console.info(`Workshop v${THREE.REVISION}: exited`);
-        },
-
+        exit: _exit,
         /**
          * Called from the game's render loop to update workshop state.
          * @param {number} dt - delta time in seconds

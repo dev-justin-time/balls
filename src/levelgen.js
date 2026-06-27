@@ -18,6 +18,30 @@ import { mulberry32, getParticleCount, saveGame } from './persistence.js';
 import { applySkyConfig, disposeMesh } from '../engine/scene.js';
 import { createRain, clearRain, createWind, clearWind, createFireSparks, clearFireSparks, createHeatShimmer, clearHeatShimmer, createMeteors, clearMeteors } from './physics.js';
 
+/**
+ * Canonical difficulty tiers used by `createLevel()` to pick which segment
+ * types are eligible per player level, and by external UIs (catalog_ui.js,
+ * openworld/openworld_ui.js) that need to label / badge / preview those
+ * same tiers. Edit ONLY here — the two UI consumers import this constant.
+ *
+ * Shape: `{ level: number, color: number /* hex int *\/, label: string, types: string[] }`
+ *
+ * `color` is a CANNON-style RGB int so it works from one place via
+ * `.toString(16)` (for fog tint and CSS strings alike) — downstream UIs
+ * convert to `'#rrggbb'` and pick their own contrast text / border.
+ */
+export const DIFFICULTY_TIERS = [
+    { level: 1,  color: 0x7cfc00, label: 'EASY',         types: ['straight', 'ramp', 'tunnel', 'speed_strip', 'jump_gap'] },
+    { level: 4,  color: 0x32cd32, label: 'NORMAL',       types: ['straight', 'ramp', 'tunnel', 'zigzag', 'bumpy', 'jump_gap', 'climb'] },
+    { level: 7,  color: 0x1e90ff, label: 'CHALLENGING',  types: ['zigzag', 'gap', 'archipelago', 'spinner', 'double_jump_gap', 'climb'] },
+    { level: 10, color: 0xffff00, label: 'HARD',         types: ['gap', 'spinner', 'pendulum', 'stairs', 'halfpipe', 'double_jump_gap'] },
+    { level: 13, color: 0xffa500, label: 'TOUGH',        types: ['pendulum', 'hammer_gauntlet', 'moving_rects', 'checkerboard', 'triple_jump_gap'] },
+    { level: 16, color: 0xff4500, label: 'EXPERT',       types: ['hammer_gauntlet', 'side_crusher', 'narrow', 'moving_rects', 'triple_jump_gap'] },
+    { level: 19, color: 0x8b0000, label: 'EXTREME',      types: ['narrow', 'side_crusher', 'checkerboard', 'archipelago', 'triple_jump_gap'] },
+    { level: 22, color: 0x4b0082, label: 'INSANE',       types: ['narrow', 'side_crusher', 'hammer_gauntlet', 'checkerboard', 'triple_jump_gap', 'loop_d_loop'] },
+    { level: 25, color: 0x000000, label: 'IMPOSSIBLE',   types: ['narrow', 'side_crusher', 'hammer_gauntlet', 'checkerboard', 'triple_jump_gap', 'loop_d_loop', 'spiral_tube'] }
+];
+
 /** Module-level RNG used by all helper functions. Overridden by createLevel() with a seeded RNG, restored afterward. */
 let _rand = Math.random.bind(Math);
 
@@ -132,21 +156,10 @@ export function createLevel(game, seed) {
         } catch (e) {}
     }
 
-    // Difficulty tiers
-    const difficultyTiers = [
-        { level: 1, color: 0x7cfc00, label: "EASY", types: ['straight', 'ramp', 'tunnel', 'speed_strip', 'jump_gap'] },
-        { level: 4, color: 0x32cd32, label: "NORMAL", types: ['straight', 'ramp', 'tunnel', 'zigzag', 'bumpy', 'jump_gap', 'climb'] },
-        { level: 7, color: 0x1e90ff, label: "CHALLENGING", types: ['zigzag', 'gap', 'archipelago', 'spinner', 'double_jump_gap', 'climb'] },
-        { level: 10, color: 0xffff00, label: "HARD", types: ['gap', 'spinner', 'pendulum', 'stairs', 'halfpipe', 'double_jump_gap'] },
-        { level: 13, color: 0xffa500, label: "TOUGH", types: ['pendulum', 'hammer_gauntlet', 'moving_rects', 'checkerboard', 'triple_jump_gap'] },
-        { level: 16, color: 0xff4500, label: "EXPERT", types: ['hammer_gauntlet', 'side_crusher', 'narrow', 'moving_rects', 'triple_jump_gap'] },
-        { level: 19, color: 0x8b0000, label: "EXTREME", types: ['narrow', 'side_crusher', 'checkerboard', 'archipelago', 'triple_jump_gap'] },
-        { level: 22, color: 0x4b0082, label: "INSANE", types: ['narrow', 'side_crusher', 'hammer_gauntlet', 'checkerboard', 'triple_jump_gap', 'loop_d_loop'] },
-        { level: 25, color: 0x000000, label: "IMPOSSIBLE", types: ['narrow', 'side_crusher', 'hammer_gauntlet', 'checkerboard', 'triple_jump_gap', 'loop_d_loop', 'spiral_tube'] }
-    ];
-
-    let tier = difficultyTiers[0];
-    for (const t of difficultyTiers) {
+    // Difficulty tiers — read from the module-scope `DIFFICULTY_TIERS` export
+    // (single source of truth also consumed by catalog_ui.js / openworld_ui.js).
+    let tier = DIFFICULTY_TIERS[0];
+    for (const t of DIFFICULTY_TIERS) {
         if (game.currentLevel >= t.level) tier = t;
     }
     game.currentTier = tier;

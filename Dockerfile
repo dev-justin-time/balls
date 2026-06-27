@@ -49,10 +49,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Install wasm-pack
-# Pin 0.12.1 (not 0.13.0): 0.13.0 pulls home-0.5.12 which requires Cargo's
-# edition2024 feature. edition2024 is stabilized in Rust 1.82+; our pinned
-# rust:1.75-slim base ships Cargo 1.75 which can't parse it. 0.12.1 was
-# released before the edition2024 propagation in wasm-pack's dep tree.
+# 0.12.1 (not 0.13.0): 0.13.0 transitively needs Cargo edition2024; rust:1.75-slim ships Cargo 1.75.
 RUN cargo install wasm-pack --version 0.12.1
 
 # Copy only Cargo files first for layer caching
@@ -86,9 +83,7 @@ RUN apt-get update && \
 FROM nginx:1.25-alpine@sha256:516475cc129da42866742567714ddc681e5eed7b9ee0b9e9c015e464b4221a00 AS frontend
 
 # Install openssl for self-signed cert generation
-# NOTE: Stage 4 base is nginx:1.25-alpine (Alpine, not Debian), so the
-# package manager is apk, not apt-get. The Stage 3 apt-get calls below
-# are correct because Stage 3 inherits the Debian-based rust:1.75-slim base.
+# Stage 4 base is nginx:1.25-alpine; Stages 2/3/5/6 use apt-get on their Debian bases.
 RUN apk add --no-cache openssl
 
 # Generate self-signed TLS certs for the nginx -t check and dev fallback

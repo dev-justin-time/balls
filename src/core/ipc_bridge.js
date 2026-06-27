@@ -83,11 +83,17 @@ export async function initializeQuadCore() {
         // JS physics integrator.
         //   DEV:  Vite dev server serves the path relative to this source file
         //   PROD: Plugin copies rust_core/pkg/ → dist/rust_wasm/
-        const wasmBase = import.meta.env.DEV
+        // Safe `import.meta.env.DEV` access: `import.meta` may be undefined in
+        // non-Vite environments (plain `<script type="module">` served by VS Code
+        // Live Server / python http.server / nginx). The previous direct read
+        // produced `Cannot read properties of undefined (reading 'DEV')` and
+        // aborted WASM init, forcing the JS fallback path.
+        const _isDev = typeof import.meta !== 'undefined' && !!import.meta.env && import.meta.env.DEV === true;
+        const wasmBase = _isDev
           ? '../../rust_core/pkg'
           : '/rust_wasm';
         const wasmUrl = wasmBase + '/quad_core_physics.js';
-        const wasmModule = await import(wasmUrl);
+        const wasmModule = await import(/* @vite-ignore */ wasmUrl);
         _wasmModule = wasmModule;
         await _wasmModule.default(); // Initialize the WASM module
 

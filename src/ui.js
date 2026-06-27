@@ -242,6 +242,35 @@ export function setupUI(game, room) {
         game._updateSurvivalLabel = updateSurvivalLabel;
     }
 
+    // --- Open World button (track-builder catalog + level-segments + shop tiers + dev plan) ---
+    // Dynamic-injected so this works whether or not index.html pre-declares it.
+    let openworldBtn = document.getElementById('openworld-btn');
+    if (!openworldBtn) {
+        openworldBtn = document.createElement('button');
+        openworldBtn.id = 'openworld-btn';
+        openworldBtn.className = 'menu-btn';
+        openworldBtn.setAttribute('aria-label', 'Open World — project plan, builder catalog, shop tiers, dev plan');
+        openworldBtn.innerText = '🌐 OPEN WORLD';
+        const topMenu = document.getElementById('top-menu');
+        if (topMenu) {
+            openworldBtn.style.cssText = 'font-size:10px;padding:6px 10px;background:rgba(80,40,200,0.4);border-color:#8844ff;';
+            topMenu.appendChild(openworldBtn);
+        } else {
+            openworldBtn.style.cssText = 'position:fixed;top:12px;right:12px;z-index:15000;font-size:10px;padding:6px 10px;background:rgba(80,40,200,0.6);border:1px solid #8844ff;color:#fff;border-radius:8px;cursor:pointer;';
+            document.body.appendChild(openworldBtn);
+        }
+    }
+    if (openworldBtn && !openworldBtn._openworldWired) {
+        openworldBtn._openworldWired = true; // guard so re-running setupUI doesn't double-bind
+        openworldBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            import('./openworld/openworld_ui.js').then((mod) => {
+                try { mod.renderOpenWorld(game); }
+                catch (err) { console.warn('[openworld] renderOpenWorld failed:', err); }
+            }).catch((err) => { console.warn('[openworld] module load failed:', err); });
+        });
+    }
+
     // --- Leaderboard button ---
     const lbBtn = document.getElementById('leaderboard-btn');
     if (lbBtn && overlay) {

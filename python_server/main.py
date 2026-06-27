@@ -64,9 +64,31 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Going Balls Quad-Core Backend", version="2.0.0", lifespan=lifespan)
 
+# CORS: env-driven production origin + a permissive dev allowance so the JS
+# bundle served from Vite (5173), VS Code Live Server (5500), the Docker nginx
+# (8080), and 127.0.0.1 variants all work without a hardcoded per-machine edit.
+# `allow_origin_regex` covers the 127.0.0.1:<port> family (Live Server defaults)
+# and anything matching `http://localhost:<port>`. In production, set
+# CLIENT_ORIGIN to the real frontend origin and the regex allows all of them
+# for free-tier devs; tighten as needed.
+_DEFAULT_DEV_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5500",
+    "http://localhost:8000",
+    "http://localhost:8080",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5500",
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8080",
+]
+_prod_origin = os.getenv("CLIENT_ORIGIN") or ""
+if _prod_origin:
+    _DEFAULT_DEV_ORIGINS.insert(0, _prod_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("CLIENT_ORIGIN", "http://localhost:5173")],
+    allow_origins=_DEFAULT_DEV_ORIGINS,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -370,9 +392,26 @@ async def health_check():
 async def generate_secure_level(
     req: LevelRequest,
     request: Request,
-    api_key: str = Depends(verify_api_key)
+    # Optional anonymous flow: dev / preview builds call this without a Bearer
+    # header (the JS QuadCore orchestrator in `src/core/ipc_bridge.js` does not
+    # mint an API key for unauthenticated play). Anon calls get a JS-local
+    # PRNG-derived payload — ggez-playable but without the secret-derived
+    # tamper-resistance of the authenticated path. Production deployments that
+    # surface this to the internet should set REQUIRE_API_KEY=1 and rotate the
+    # fallback off.
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
+        HTTPBearer(auto_error=False)
+    ),
 ):
     check_rate_limit(request.client.host)
+
+    require_key = os.getenv("REQUIRE_API_KEY", "0") == "1"
+    if require_key:
+        if not credentials or credentials.credentials != API_SECRET_KEY:
+            raise HTTPException(status_code=401, detail="Invalid API Key")
+    elif credentials and credentials.credentials and credentials.credentials != API_SECRET_KEY:
+        # Send a key but wrong one — still 401. Authenticated path is reserved.
+        raise HTTPException(status_code=401, detail="Invalid API Key")
 
     # Generate deterministic, encrypted level payload
     payload = generate_level_payload(req.level_index, req.tier, user_prompt=None)

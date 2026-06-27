@@ -8,6 +8,7 @@
  difficulty tier usage badges.
 */
 import { PART_CATEGORIES, PART_CATALOG } from './builder/catalog.js';
+import { DIFFICULTY_TIERS } from './levelgen.js';
 import { initVoiceToText, createMicButton } from './voice_to_text.js';
 
 /**
@@ -268,20 +269,66 @@ function createPartSwatch(part) {
 }
 
 /**
- * Difficulty tier data — matches the tiers in levelgen.js.
- * Each tier maps procedural segment types to catalog part keys.
+ * Per-tier UI overrides for the canonical DIFFICULTY_TIERS imported from
+ * levelgen.js. levelgen.js carries gameplay colors (fog tint + body
+ * backgroundColor) which sometimes look identical-to-background on the
+ * overlay (e.g. IMPOSSIBLE `0x000000` = same as backdrop), so the badge UI
+ * calibrates a small set per-level overrides here. Anything not in this map
+ * falls back to {@link deriveTierDisplay} (color CSS = fill + border black
+ * border + brightness-picked text). Edit the canonical data in
+ * levelgen.js; only override *appearance* here.
  */
-const DIFFICULTY_TIERS = [
-    { level: 1,  label: 'EASY',        color: '#7cfc00', border: '#7cfc00', text: '#000',   types: ['straight', 'ramp', 'tunnel', 'speed_strip', 'jump_gap'] },
-    { level: 4,  label: 'NORMAL',      color: '#32cd32', border: '#32cd32', text: '#000',   types: ['straight', 'ramp', 'tunnel', 'zigzag', 'bumpy', 'jump_gap', 'climb'] },
-    { level: 7,  label: 'CHALLENGING', color: '#1e90ff', border: '#1e90ff', text: '#fff',   types: ['zigzag', 'gap', 'archipelago', 'spinner', 'double_jump_gap', 'climb'] },
-    { level: 10, label: 'HARD',        color: '#cccc00', border: '#cccc00', text: '#000',   types: ['gap', 'spinner', 'pendulum', 'stairs', 'halfpipe', 'double_jump_gap'] },
-    { level: 13, label: 'TOUGH',       color: '#ff8c00', border: '#ff8c00', text: '#000',   types: ['pendulum', 'hammer_gauntlet', 'moving_rects', 'checkerboard', 'triple_jump_gap'] },
-    { level: 16, label: 'EXPERT',      color: '#ff4500', border: '#ff4500', text: '#fff',   types: ['hammer_gauntlet', 'side_crusher', 'narrow', 'moving_rects', 'triple_jump_gap'] },
-    { level: 19, label: 'EXTREME',     color: '#8b0000', border: '#8b0000', text: '#ff8888',types: ['narrow', 'side_crusher', 'checkerboard', 'archipelago', 'triple_jump_gap'] },
-    { level: 22, label: 'INSANE',      color: '#4b0082', border: '#9944ff', text: '#cc88ff',types: ['narrow', 'side_crusher', 'hammer_gauntlet', 'checkerboard', 'triple_jump_gap', 'loop_d_loop'] },
-    { level: 25, label: 'IMPOSSIBLE',  color: '#1a1a1a', border: '#555',    text: '#ff6666',types: ['narrow', 'side_crusher', 'hammer_gauntlet', 'checkerboard', 'triple_jump_gap', 'loop_d_loop', 'spiral_tube'] }
-];
+const TIER_DISPLAY_OVERRIDES = {
+    // level -> { color?, border?, text? } (all CSS strings)
+    10: { color: '#cccc00' },                          // HARD: darker yellow reads as gold not neon
+    19: { text: '#ff8888' },                           // EXTREME: warm-contrast text on dark red
+    22: { border: '#9944ff', text: '#cc88ff' },        // INSANE: purple-cyan glow instead of just fill
+    25: { color: '#1a1a1a', border: '#555', text: '#ff6666' } // IMPOSSIBLE: dark gray (vs 0x000000 black hole) + accent border/text
+};
+
+/**
+ * Convert a CANNON-style RGB int (e.g. 0x7cfc00) to a CSS `#rrggbb` string.
+ */
+function hexIntToCss(hex) {
+    return '#' + hex.toString(16).padStart(6, '0');
+}
+
+/**
+ * Derive the UI display fields for a canonical tier (color / border / text
+ * CSS strings). Honors TIER_DISPLAY_OVERRIDES; falls back to the canonical
+ * color with border-color = same-as-fill and brightness-picked text.
+ */
+function deriveTierDisplay(tier) {
+    const override = TIER_DISPLAY_OVERRIDES[tier.level] || {};
+    // The canonical .color may also be overridden (e.g. IMPOSSIBLE 0x000000
+    // would render invisibly on a dark backdrop) so go through the override
+    // first; if absent, convert the canonical hex int → CSS string.
+    const baseHex = override.color
+        ? parseInt(override.color.replace('#', ''), 16)
+        : tier.color;
+    const color = override.color || hexIntToCss(tier.color);
+    const border = override.border || color;
+    // Brightness from the EFFECTIVE color (override or canonical) so overrides
+    // pick a sensible text contrast too.
+    const r = (baseHex >> 16) & 0xff, g = (baseHex >> 8) & 0xff, b = baseHex & 0xff;
+    const brightness = r * 0.299 + g * 0.587 + b * 0.114;
+    const defaultText = brightness > 140 ? '#000' : '#fff';
+    const text = override.text || defaultText;
+    return { color, border, text };
+}
+
+/**
+ * Memoized view of the canonical DIFFICULTY_TIERS with derived display
+ * fields baked in. UI consumers can read this like the previous local
+ * constant: `tier.color`, `tier.border`, `tier.text`, `tier.types`.
+ * (Kept a local view so we don't mutate the canonical export.)
+ */
+const TIER_DISPLAY = DIFFICULTY_TIERS.map(t => ({
+    level: t.level,
+    label: t.label,
+    types: t.types,
+    ...deriveTierDisplay(t)
+}));
 
 /**
  * Maps procedural segment types (used in difficulty tiers) to catalog part keys.
@@ -318,7 +365,7 @@ const SEGMENT_TO_PART = {
  */
 function getPartTierBadges(partKey) {
     const tiers = [];
-    for (const tier of DIFFICULTY_TIERS) {
+    for (const tier of TIER_DISPLAY) {
         for (const segType of tier.types) {
             const mappedParts = SEGMENT_TO_PART[segType];
             if (mappedParts && mappedParts.includes(partKey)) {

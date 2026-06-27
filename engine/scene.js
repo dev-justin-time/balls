@@ -32,7 +32,9 @@ export function initScene(game) {
         game.renderer.toneMappingExposure = 1.0;
     } catch (e) {}
     game.renderer.shadowMap.enabled = true;
-    game.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // r184+ deprecates PCFSoftShadowMap in favor of PCFShadowMap for non-VSM scenes;
+    // keeping the visual behavior identical while honoring the deprecation warning.
+    try { game.renderer.shadowMap.type = (THREE.PCFShadowMap !== undefined) ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap; } catch (e) { game.renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
 
     // PMREM generator
     try {
@@ -297,9 +299,18 @@ export function applySkyConfig(game, sky) {
                 tex.needsUpdate = true;
             } catch (e) {}
 
+            // PMREMGenerator needs tex.image.width, but loadTexture returns a shell synchronously
+            // and the .webp decode lands async. Guard against the first-frame race where image
+            // is still null — fall back to a Color background and re-bake when the texture reports
+            // ready. Also, defer PMREM to a callback so we don't read .width on null.
+            const texImageReady = !!(tex && tex.image && (tex.image.width || tex.image.videoWidth));
+            // Closure-scoped flag so the deferred PMREM bake and the color-only fallback can
+            // both listen on `tex.image` 'load' without the latter clobbering the former's
+            // envMap write. Listener insertion order guarantees `recheck` runs first.
+            let pmremDeferredSuccess = false;
             let envMap = null;
             try {
-                if (game.pmremGenerator) {
+                if (game.pmremGenerator && texImageReady) {
                     const pmrem = game.pmremGenerator.fromEquirectangular(tex);
                     envMap = pmrem && pmrem.texture ? pmrem.texture : null;
                     if (envMap) {
@@ -308,6 +319,29 @@ export function applySkyConfig(game, sky) {
                         }
                         game._lastEnvMap = envMap;
                     }
+                } else if (game.pmremGenerator && tex && tex.image && !texImageReady) {
+                    // Image data hasn't decoded yet — defer PMREM bake to next tick so the
+                    // background still gets a valid Color until then (avoids "width of null").
+                    const recheck = () => {
+                        try {
+                            if (!tex.image || !(tex.image.width || tex.image.videoWidth)) { return; }
+                            const pmrem2 = game.pmremGenerator.fromEquirectangular(tex);
+                            const envMap2 = pmrem2 && pmrem2.texture ? pmrem2.texture : null;
+                            if (envMap2) {
+                                pmremDeferredSuccess = true;
+                                try { game.scene.background = envMap2; game.scene.environment = envMap2; } catch (e) {}
+                                if (game._lastEnvMap && game._lastEnvMap !== envMap2) {
+                                    try { game._lastEnvMap.dispose && game._lastEnvMap.dispose(); } catch (e) {}
+                                }
+                                game._lastEnvMap = envMap2;
+                            }
+                        } catch (e) { /* swallow — non-fatal bake retry */ }
+                    };
+                    try { tex.image.addEventListener && tex.image.addEventListener('load', recheck, { once: true }); } catch (e) {}
+                    try { tex.onUpdate && tex.onUpdate(recheck); } catch (e) {}
+                    // Fallback: poll once on the next animation frame for browsers that
+                    // neither fire 'load' on the Image nor expose onUpdate cleanly.
+                    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(recheck);
                 }
             } catch (e) {
                 console.warn('PMREM generation failed for equirectangular, continuing without envMap', e);
@@ -318,8 +352,20 @@ export function applySkyConfig(game, sky) {
                 if (envMap) {
                     game.scene.background = envMap;
                     game.scene.environment = envMap;
-                } else {
+                } else if (texImageReady) {
                     try { game.scene.background = tex; } catch (e) { game.scene.background = new THREE.Color(targetFogHex); }
+                } else {
+                    // No PMREM, no decoded image yet — solid color until tex reports ready.
+                    // Skip on PMREM deferred success (otherwise we'd overwrite the envMap with raw tex).
+                    game.scene.background = new THREE.Color(targetFogHex);
+                    const rebind = () => {
+                        if (pmremDeferredSuccess) return;
+                        if (tex && tex.image && (tex.image.width || tex.image.videoWidth)) {
+                            try { game.scene.background = tex; } catch (e) {}
+                        }
+                    };
+                    try { tex.image && tex.image.addEventListener && tex.image.addEventListener('load', rebind, { once: true }); } catch (e) {}
+                    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rebind);
                 }
             } catch (e) {
                 console.warn('Failed to set scene background/envMap', e);
