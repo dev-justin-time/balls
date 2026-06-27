@@ -76,7 +76,7 @@ services:
 
   # ── Puter File Storage (RustFS — S3-compatible) ─────────────────────
   puter-fs:
-    image: heyputer/rustfs:latest
+    image: rustfs/rustfs:latest@sha256:fa19210ac4697c79d7ccca1ec9b0eb91aebacc6691991ffb14014bb3c67e6cc3
     container_name: puter-fs
     restart: unless-stopped
     environment:
@@ -89,7 +89,7 @@ services:
 
   # ── Puter Backend API ───────────────────────────────────────────────
   puter-api:
-    image: heyputer/puter:latest
+    image: heyputer/puter:latest@sha256:cff8148356b0a614e87a8071213f18fdaa8464060c764186c5f059424da92ea8
     container_name: puter-api
     restart: unless-stopped
     depends_on:

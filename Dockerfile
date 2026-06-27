@@ -20,7 +20,7 @@
 #
 
 # --- STAGE 1: Frontend Builder (Node.js) ---
-FROM node:20-alpine@sha256:3f2b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b9b AS frontend-builder
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS frontend-builder
 
 WORKDIR /build
 
@@ -36,7 +36,7 @@ RUN npm run build
 RUN test -d dist && test -f dist/index.html
 
 # --- STAGE 2: WASM Builder (Rust) ---
-FROM rust:1.75-slim@sha256:84a188932ebe47063f2052f724f5130b7cf4fb3c0c9f7e30a0c3a5d5f4b5f3a9 AS wasm-builder
+FROM rust:1.75-slim@sha256:70c2a016184099262fd7cee46f3d35fec3568c45c62f87e37f7f665f766b1f74 AS wasm-builder
 
 WORKDIR /build
 
@@ -49,7 +49,11 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Install wasm-pack
-RUN cargo install wasm-pack --version 0.13.0
+# Pin 0.12.1 (not 0.13.0): 0.13.0 pulls home-0.5.12 which requires Cargo's
+# edition2024 feature. edition2024 is stabilized in Rust 1.82+; our pinned
+# rust:1.75-slim base ships Cargo 1.75 which can't parse it. 0.12.1 was
+# released before the edition2024 propagation in wasm-pack's dep tree.
+RUN cargo install wasm-pack --version 0.12.1
 
 # Copy only Cargo files first for layer caching
 COPY rust_core/Cargo.toml rust_core/Cargo.lock* ./
@@ -79,12 +83,13 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # --- STAGE 4: Frontend (Nginx + Static Files) ---
-FROM nginx:1.25-alpine@sha256:2c4e0e4a6b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b AS frontend
+FROM nginx:1.25-alpine@sha256:516475cc129da42866742567714ddc681e5eed7b9ee0b9e9c015e464b4221a00 AS frontend
 
 # Install openssl for self-signed cert generation
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends openssl && \
-    rm -rf /var/lib/apt/lists/*
+# NOTE: Stage 4 base is nginx:1.25-alpine (Alpine, not Debian), so the
+# package manager is apk, not apt-get. The Stage 3 apt-get calls below
+# are correct because Stage 3 inherits the Debian-based rust:1.75-slim base.
+RUN apk add --no-cache openssl
 
 # Generate self-signed TLS certs for the nginx -t check and dev fallback
 # In production, mount real certs over these at /etc/nginx/certs/
@@ -106,7 +111,7 @@ RUN nginx -t
 EXPOSE 80 443
 
 # --- STAGE 5: Production Runtime — CPU (Python 3.11-slim) ---
-FROM python:3.11-slim@sha256:7222f57e25d535167ce0da037ee5a21ccda7ebab7a3f08f8f97252a73d53aadf AS production
+FROM python:3.11-slim@sha256:cdbd05fb6f457ca275ff51ce00d93d865ca0b6a25f5ffb08262d94f6835771e5 AS production
 
 # Security: create non-root user
 RUN groupadd -r appuser && \
@@ -152,7 +157,7 @@ CMD ["uvicorn", "python_server.main:app", \
      "--forwarded-allow-ips", "*"]
 
 # --- STAGE 6: Production Runtime — GPU (NVIDIA CUDA 12.1) ---
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04@sha256:5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f5c5f AS production-gpu
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04@sha256:402700b179eb764da6d60d99fe106aa16c36874f7d7fb3e122251ff6aea8b2f7 AS production-gpu
 
 # Prevent interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive

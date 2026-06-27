@@ -66,7 +66,7 @@ services:
       - LEVEL_GEN_FERNET_KEY=${LEVEL_GEN_FERNET_KEY:?LEVEL_GEN_FERNET_KEY is required}
       - DATABASE_URL=postgresql://app_user:${DB_PASSWORD:?DB_PASSWORD is required}@db:5432/going_balls
       - REDIS_URL=redis://redis:6379/0
-      - CLIENT_ORIGIN=https://play.goingballs.io
+      - CLIENT_ORIGIN=${CLIENT_ORIGIN:?CLIENT_ORIGIN is required}
       - ENV=production
       # GPU/HAWP config
       - HAWP_WEIGHTS_PATH=/opt/models/hawp_v2.pth
@@ -102,7 +102,7 @@ services:
 
   # ── Database (PostgreSQL 16) ──────────────────────────────────────
   db:
-    image: postgres:16-alpine@sha256:b1b3b5b7b9b11b13b15b17b19b21b23b25b27b29b31b33b35b37b39b41b43b45b47b49b51
+    image: postgres:16-alpine@sha256:e013e867e712fec275706a6c51c966f0bb0c93cfa8f51000f85a15f9865a28cb
     environment:
       - POSTGRES_USER=app_user
       - POSTGRES_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
@@ -131,7 +131,7 @@ services:
 
   # ── Cache & Rate Limiting (Redis 7) ───────────────────────────────
   redis:
-    image: redis:7-alpine@sha256:a1a3a5a7a9a11a13a15a17a19a21a23a25a27a29a31a33a35a37b39b41b43b45b47b49b51
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     command: >
       redis-server
       --maxmemory 256mb
