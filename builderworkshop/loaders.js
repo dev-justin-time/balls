@@ -6,6 +6,7 @@ import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { state } from "./state.js";
 import { traverseMeshes } from "./controls.js";
 import { showModelInfo, updateModelInfoPanel, computeModelInfo } from "./modelInfo.js";
+import { MeshOperations } from "../src/builder/mesh_operations.js";
 
 const manager = new THREE.LoadingManager();
 const gltfLoader = new GLTFLoader(manager);
@@ -19,7 +20,7 @@ gltfLoader.setDRACOLoader(draco);
 export function setupLoaderUI() {
   const progressWrap = document.getElementById('loader-progress');
   const progressBar = document.getElementById('loader-progress-bar');
-  
+
   manager.onStart = () => { progressWrap.style.display = 'block'; progressBar.style.width = '0%'; };
   manager.onProgress = (url, loaded, total) => { progressBar.style.width = Math.round((loaded / total) * 100) + '%'; };
   manager.onLoad = () => { progressBar.style.width = '100%'; setTimeout(() => progressWrap.style.display = 'none', 300); };
@@ -28,6 +29,12 @@ export function setupLoaderUI() {
   document.getElementById('btn-load').addEventListener('click', () => document.getElementById('file-input').click());
   document.getElementById('file-input').addEventListener('change', handleFileSelect);
 }
+
+// Per-load MeshOperations instance. The class registers helper methods
+// on its `game` argument, but `setupLoaderUI()` doesn't have one — pass a
+// minimal stub so the constructor completes without throwing, then route
+// only the public `optimizeGeometry()` to avoid touching the stub.
+const _meshOps = new MeshOperations({ _builderScene: null });
 
 async function handleFileSelect(e) {
   const files = Array.from(e.target.files || []);
@@ -73,7 +80,7 @@ async function handleFileSelect(e) {
     files.forEach(f => URL.revokeObjectURL(urlMap[f.name]));
   }
 
-  function processLoaded(obj) {
+  async function processLoaded(obj) {
     const sceneObj = obj.scene || obj;
     state.modelRoot.add(sceneObj);
 
@@ -99,13 +106,61 @@ async function handleFileSelect(e) {
       m.receiveShadow = true;
     });
 
-    // Compute and display model info
+    // Feed every child geometry through MeshOperations.optimizeGeometry so
+    // freshly-loaded models share the same vertex-weld + degenerate-removal
+    // pipeline that WireframeImporter already uses. Catch per-mesh failures
+    // so a single broken geometry doesn't tank the whole import.
+    //
+    // We collect the optimization promises during the synchronous traverse
+    // (which iterates Object3D children synchronously) and Promise.all-await
+    // them BEFORE computing model info / logging. Three.js's Object3D.traverse
+    // is synchronous — passing an async function would fire-and-forget each
+    // promise and race with `computeModelInfo` below. The reviewer caught
+    // this when Δ stats reported 0 because the awaits hadn't resolved yet.
+    let optimizeTotalIn = 0;
+    let optimizeTotalOut = 0;
+    let optimizeTouched = 0;
+    let optimizeFailed = 0;
+    const optimizeOps = [];
+    traverseMeshes(sceneObj, (m) => {
+      if (!m.geometry || !m.geometry.attributes || !m.geometry.attributes.position) return;
+      optimizeTouched++;
+      const before = m.geometry.attributes.position.count;
+      optimizeTotalIn += before;
+      optimizeOps.push(
+        _meshOps.optimizeGeometry(m.geometry)
+          .then((optimized) => {
+            if (optimized && optimized !== m.geometry && optimized.attributes && optimized.attributes.position) {
+              const after = optimized.attributes.position.count;
+              optimizeTotalOut += after;
+              // Dispose the original to release GPU buffers consumed by the loader.
+              m.geometry.dispose();
+              m.geometry = optimized;
+              m.computeBoundingSphere?.();
+            } else {
+              optimizeTotalOut += before;
+            }
+          })
+          .catch((err) => {
+            optimizeFailed++;
+            console.warn(`[Loader] optimizeGeometry failed for mesh ${m.name || m.uuid}:`, err);
+          })
+      );
+    });
+    await Promise.all(optimizeOps);
+
+    // Compute and display model info (post-optimize so panel reflects final tri count)
     const info = computeModelInfo(sceneObj);
     state.modelInfo = info;
     updateModelInfoPanel(info);
     showModelInfo(true);
 
-    console.info(`[Loader] Model loaded: ${(maxDim > 0.01 ? maxDim.toFixed(1) : '?')} units max dim, ${info.triangles.toLocaleString()} tris, ${info.materials} materials`);
+    console.info(
+      `[Loader] Model loaded: ${(maxDim > 0.01 ? maxDim.toFixed(1) : '?')} units max dim, ` +
+      `${info.triangles.toLocaleString()} tris, ${info.materials} materials; ` +
+      `optimized ${optimizeTouched - optimizeFailed}/${optimizeTouched} meshes, ` +
+      `${optimizeTotalIn}→${optimizeTotalOut} verts (Δ=${optimizeTotalIn - optimizeTotalOut})`
+    );
   }
 
   function handleError(err) {

@@ -17,12 +17,25 @@ import { getParticleCount } from './persistence.js';
 import { playPortalSound } from './audio.js';
 
 // Physics constants (module-scoped for game feel tuning)
+//
+// feel-pass 2026-06-26 round 1: player reported the ball rolls too slowly.
+//   BALL_SPEED ↑ / MAX_VELOCITY ↑ — top-end feels faster.
+// feel-pass 2026-06-26 round 2: STEER_SPEED ↑ / STEER_DAMPING ↑ — re-ratio the
+//   angular/linear so steering input keeps up with the new top-end (40 m/s).
+// feel-pass 2026-06-26 round 3: linearDamping ↓ 0.5 → 0.15 — ball coasts between
+//   steers instead of stopping in <1s. Tests/physics_regression.test.js + @jump-sim.mjs
+//   retuned in lockstep (Scenario C baseline 0.5→0.15, sweep re-centered).
+// feel-pass 2026-06-26 round 4: player reported "way too slow still". +150% boost
+//   on top of round 1 = BALL_SPEED 10000 × 2.5 = 25000. MAX_VELOCITY stays at
+//   round-1 value 40 (still the top-end cap; fire-escape against runaway).
+// GRAVITY=-45 is now the SINGLE remaining physics invariant pinned by @jump-sim.mjs
+// — see tests/physics_regression.test.js before re-touching it.
 const BALL_RADIUS = 0.5;
 const GRAVITY = -45; // per vision Part 3 (Keep-Balls Tightening reconciled)
-const BALL_SPEED = 5000;
-const STEER_SPEED = 22;
-const STEER_DAMPING = 0.92; // angular velocity decay factor applied per frame
-export const MAX_VELOCITY = 22;
+const BALL_SPEED = 25000; // 10000 → 25000 = +150% boost — feel-pass 2026-06-26 round 4
+const STEER_SPEED = 32; // was 22 — feel-pass 2026-06-26 round 2 (tracks MAX_VELOCITY=40)
+const STEER_DAMPING = 0.96; // was 0.92 — feel-pass 2026-06-26 round 2 (less angular decay)
+export const MAX_VELOCITY = 40; // was 22 — feel-pass 2026-06-26 round 1 (top-end cap unchanged)
 const JUMP_FORCE = 28; // per vision Part 3
 
 export function initPhysics(game) {
@@ -44,7 +57,7 @@ export function initPhysics(game) {
         shape: sphereShape,
         material: ballMaterial,
         angularDamping: 0.95,
-        linearDamping: 0.5
+        linearDamping: 0.15  // feel-pass 2026-06-26 round 3 (was 0.5)
     });
     game.ballBody.position.set(0, 1, 0);
     game.world.addBody(game.ballBody);

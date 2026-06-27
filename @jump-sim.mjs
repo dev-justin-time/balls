@@ -2,7 +2,7 @@
 // motion at MAX_VELOCITY=22 so the comparison reflects actual gameplay feel.
 //
 // Ball body mirrors src/physics.js: mass=100, BALL_RADIUS=0.5,
-// linearDamping=0.5, angularDamping=0.95.
+// linearDamping=0.15, angularDamping=0.95.   // feel-pass 2026-06-26 round 3 (was 0.5)
 // JUMP_FORCE=28, dt=1/60.
 //
 // Airtime is measured as "first re-cross of starting altitude" so it's
@@ -22,7 +22,7 @@ import { resolve as resolvePath } from 'node:path';
 export function simulateJump(gravity, jumpForce, opts = {}) {
     const mass = opts.mass ?? 100;
     const ballRadius = opts.ballRadius ?? 0.5;
-    const linearDamping = opts.linearDamping ?? 0.5;
+    const linearDamping = opts.linearDamping ?? 0.15;  // feel-pass 2026-06-26 round 3 (was 0.5)
     const angularDamping = opts.angularDamping ?? 0.95;
     const horizontalVelocity = opts.horizontalVelocity ?? 0;
 
@@ -136,8 +136,9 @@ export function simulateJump(gravity, jumpForce, opts = {}) {
 //   apexDownTrackX, plus absolute and percentage deltas vs the baseline row.
 // ---------------------------------------------------------------------------
 export function simulateJumpDampingSweep(scenario = 'moving', opts = {}) {
-    const dampings = opts.dampings ?? [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7];
-    const baselineDamping = opts.baselineDamping ?? 0.5;
+    // feel-pass 2026-06-26 round 3: sweep re-centered on the new baseline 0.15.
+    const dampings = opts.dampings ?? [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35];
+    const baselineDamping = opts.baselineDamping ?? 0.15;
     const gravity = opts.gravity ?? -45;
     const jumpForce = opts.jumpForce ?? 28;
     const maxVelocity = scenario === 'moving' ? 22 : 0;
@@ -204,7 +205,7 @@ if (!isCliEntry) {
 
 function runCliReport() {
 console.log('=== JUMP-ARC SIMULATION ===');
-console.log('Ball: mass=100, BALL_RADIUS=0.5, linearDamp=0.5, angularDamp=0.95');
+console.log('Ball: mass=100, BALL_RADIUS=0.5, linearDamp=0.15, angularDamp=0.95');  // feel-pass 2026-06-26 round 3 (was 0.5)
 console.log('JUMP_FORCE=28, dt=1/60\n');
 console.log('SCENARIO A: stationary jump (vertical only)');
 const g45a = simulateJump(-45, 28);
@@ -237,7 +238,7 @@ console.log(`Air time delta:     +${dab.toFixed(3)} s  (${(dab / g48b.airTime * 
 console.log(`Apex down-track X:  ${dxb.toFixed(2)} m further when GRAVITY=-45  (apex sits later in flight)`);
 
 console.log('\n=== SCENARIO C: damping sensitivity sweep (moving jump at GRAVITY=-45) ===');
-const dampingSweep = simulateJumpDampingSweep('moving', { baselineDamping: 0.5 });
+const dampingSweep = simulateJumpDampingSweep('moving', { baselineDamping: 0.15 });  // feel-pass 2026-06-26 round 3
 console.table(dampingSweep.map((r) => ({
     damping:         r.damping,
     'peak (m)':      r.peakRelativeHeight,

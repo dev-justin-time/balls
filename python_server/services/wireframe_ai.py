@@ -4,9 +4,29 @@
 @concern:   HAWP Parsing, Topology Cleanup & Secure Level Gen
 @created:   2026-06-24T16:10:00Z
 @track:     7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d
-@version:   1.0.0
+@version:   1.1.0
 @security:  Server-Side (Thick Backend / Heavy Compute)
 =====================================================================
+
+Restored functions:
+  - `_run_hawp_inference`    — try-imports the (un-deployed) hawp package,
+                                raises NotImplementedError so the caller
+                                explicitly falls back to LSD rather than
+                                silently reporting an untrustworthy engine
+                                label.
+  - `_run_lsd_inference`      — OpenCV ximgproc.LineSegmentDetector with
+                                a corrected numpy-output unpacker (the prior
+                                `(inner,)` 1-tuple wrapper raised ValueError
+                                under opencv-python>=4.9; replaced with the
+                                same `for x1,y1,x2,y2 in inner` shape used
+                                by `_opencv_canny_fallback`).
+  - `_run_trained_topology`   — runs min-segment and snap thresholds derived
+                                from `python_server.training_data.compute_topology_priors`,
+                                then hands off to the existing spatial-hash
+                                cleaner.
+
+Subsequent cleanup is unchanged — `_cleanup_topology` (spatial hashing +
+snapping) is still the single source of truth for the cleaner.
 """
 
 import base64
@@ -21,6 +41,11 @@ from typing import List, Tuple, Dict, Any, Optional
 import cv2
 import numpy as np
 from PIL import Image
+
+# Training-data subpackage lives next door — used by `_run_trained_topology`
+# to apply statistical priors (median edge length, snap defaults, etc.)
+# extracted from canonical sketch samples.
+from python_server.training_data import compute_topology_priors
 
 # --- Anti-RE: Obfuscated Constants ---
 # In production, these are loaded from a secure vault.
@@ -79,29 +104,47 @@ def parse_wireframe_topology(
 ) -> Dict[str, Any]:
     """
     Parses an image into a clean, topological graph.
-    Uses HAWP for Pro users, falls back to OpenCV for Free users.
+
+    Tries the highest-quality engine available for the tier:
+      1. HAWP (Pro / Ultimate) — real neural wireframe parser
+      2. OpenCV LineSegmentDetector — sub-pixel accurate LSD
+      3. OpenCV Canny + HoughLinesP — universally-available fallback
+
+    After line extraction, `_run_trained_topology` filters the segments
+    through statistical priors extracted from the training-data corpus
+    (median edge length, min-segment threshold, snap defaults) before
+    the spatial-hash cleanup pass.
     """
     engine_used = "opencv_fallback"
 
     # 1. Extract Lines
+    lines: List[List[List[float]]]
     if raw_lines:
+        # Raw lines are passed in by the caller — no AI engine runs, so we
+        # intentionally leave `engine_used` at its "opencv_fallback" default
+        # (mirrors the pre-restoration behavior). Adding a new value like
+        # "raw_lines" wasn't picked up by JS clients (wireframe_importer.js
+        # unknown labels fall through to generic handling), so we don't
+        # introduce a new label here.
         lines = raw_lines
     elif image_b64:
         img = _decode_base64_image(image_b64)
-        if use_hawp and user_tier != "free":
+        if use_hawp and user_tier in ("pro", "ultimate"):
             try:
-                # lines = run_hawp_inference(img) # Requires torch/hawp
-                # engine_used = "hawp_ai"
-                raise ImportError("HAWP not loaded in this env")
-            except Exception:
-                lines = _opencv_canny_fallback(img)
+                lines, engine_used = _run_hawp_inference(img)
+            except NotImplementedError:
+                # HAWP package / weights not deployed — degrade to LSD, which
+                # produces substantially fewer hallucinated segments than Canny.
+                lines = _run_lsd_inference(img)
+                engine_used = "lsd_fallback"
         else:
             lines = _opencv_canny_fallback(img)
+            engine_used = "opencv_fallback"
     else:
         raise ValueError("Must provide image_b64 or raw_lines")
 
-    # 2. Topology Cleanup (Spatial Hashing & Snapping)
-    cleaned_nodes, cleaned_edges = _cleanup_topology(lines, snap_threshold)
+    # 2. Topology Cleanup (Spatial Hashing & Snapping + training-data priors)
+    cleaned_nodes, cleaned_edges = _run_trained_topology(lines, snap_threshold)
 
     return {
         "status": "success",
@@ -109,8 +152,114 @@ def parse_wireframe_topology(
         "node_count": len(cleaned_nodes),
         "edge_count": len(cleaned_edges),
         "nodes": cleaned_nodes,
-        "edges": cleaned_edges
+        "edges": cleaned_edges,
+        "priors_applied": True,
     }
+
+
+def _run_hawp_inference(img: np.ndarray) -> Tuple[List[List[List[float]]], str]:
+    """
+    Run the HAWP neural wireframe parser.
+
+    HAWP is not bundled in this service today (see requirements.txt — the
+    `hawp` package is commented out, and the proprietary weights live at
+    `_HAWP_MODEL_PATH`). When both are deployed, this function will return
+    the neural wireframe; until then we raise NotImplementedError so the
+    caller explicitly falls back to LSD rather than silently reporting an
+    engine label that no one can trust.
+
+    Callers MUST catch NotImplementedError; the controlled degradation is
+    documented in `parse_wireframe_topology`.
+    """
+    try:
+        import hawp  # type: ignore  # noqa: F401
+    except ImportError as exc:
+        raise NotImplementedError(
+            "HAWP neural wireframe parser is not installed. "
+            "Install with: pip install git+https://github.com/cherubicXN/hawp.git"
+        ) from exc
+
+    # Package is present but the inference wiring + proprietary weights
+    # are not part of this service's deployment. Until that lands in
+    # production, HAWP remains a stub — explicit NotImplementedError is
+    # more honest than a deceptive empty result.
+    raise NotImplementedError(
+        "HAWP package is importable but inference wiring / proprietary "
+        "weights are not yet deployed. Callers should fall back to LSD."
+    )
+
+
+def _run_lsd_inference(img: np.ndarray) -> List[List[List[float]]]:
+    """
+    OpenCV LineSegmentDetector — sub-pixel accurate ML-style line finder.
+
+    Falls back to Canny + HoughLinesP when the ximgproc module isn't
+    present (older opencv builds). Output format matches `_opencv_canny_fallback`
+    so downstream cleanup works the same way.
+    """
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
+
+    # ximgproc is shipped with opencv-python>=4.5 and absent from older builds.
+    if hasattr(cv2, "ximgproc") and hasattr(cv2.ximgproc, "createLineSegmentDetector"):
+        try:
+            lsd = cv2.ximgproc.createLineSegmentDetector(0)
+            lines_bgr = lsd.detect(gray)[0]
+            if lines_bgr is None:
+                return []
+            # OpenCV ximgproc LineSegmentDetector.detect() returns a tuple where
+            # element 0 is the lines array of shape (N, 1, 4) — each row is one
+            # [x1, y1, x2, y2] line. Iterate the array's first axis, then
+            # iterate the inner (1, 4) row the same way `_opencv_canny_fallback`
+            # iterates `HoughLinesP`. (Renaming to `inner` and dropping the
+            # `(inner,)` 1-tuple wrapper — the prior form raised ValueError
+            # under opencv-python>=4.9 where numpy treats the (1,4) sub-array
+            # as a single iterable element rather than four scalars.)
+            return [
+                [[float(x1), float(y1)], [float(x2), float(y2)]]
+                for inner in lines_bgr
+                for x1, y1, x2, y2 in inner
+            ]
+        except Exception:
+            # ximgproc exists but crashed (e.g., image too small for LSD) —
+            # fall through to canny so we always return something usable.
+            pass
+
+    return _opencv_canny_fallback(img)
+
+
+def _run_trained_topology(
+    lines: List,
+    snap_threshold: float,
+) -> Tuple[List, List]:
+    """
+    Filter + cleanup pass that combines the new training-data priors
+    with the existing spatial-hash cleaner.
+
+    Pipeline:
+      1. Compute (or load cached) topology priors from training_data.
+      2. Discard segments shorter than `priors['min_line_segment_px']`
+         — Canny & LSD both emit tiny noise fragments we don't want.
+      3. Hand off to `_cleanup_topology` which does the spatial-hash snap.
+
+    Returns the same `(nodes, edges)` shape as `_cleanup_topology`.
+    """
+    priors = compute_topology_priors()
+    min_segment = float(priors.get("min_line_segment_px", 6.0) or 6.0)
+
+    filtered: List = []
+    for line in lines:
+        if not isinstance(line, (list, tuple)) or len(line) != 2:
+            continue
+        p1, p2 = line[0], line[1]
+        try:
+            dist = math.hypot(float(p2[0]) - float(p1[0]), float(p2[1]) - float(p1[1]))
+        except (TypeError, ValueError, IndexError):
+            continue
+        if dist < min_segment:
+            continue
+        filtered.append([[float(p1[0]), float(p1[1])], [float(p2[0]), float(p2[1])]])
+
+    return _cleanup_topology(filtered, snap_threshold)
 
 
 def _decode_base64_image(b64_str: str) -> np.ndarray:
@@ -128,19 +277,20 @@ def _opencv_canny_fallback(img: np.ndarray) -> List[List[List[float]]]:
     """Standard Canny + Hough Lines fallback."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(gray, 50, 150, apertureSize=3)
-    lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=10, maxLineGap=5)
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=50, minLineLength=10, maxLineGap=5)
 
     if lines is None:
         return []
 
     # Convert to float list format
-    return [[[float(x1), float(y1)], [float(x2), float(y2)]] for line in lines for x1, y1, x2, y2 in line]
+    return [[[float(x1), float(y1)], [float(x2), float(y2)]]
+            for line in lines for x1, y1, x2, y2 in line]
 
 
 def _cleanup_topology(lines: List, snap_threshold: float) -> Tuple[List, List]:
     """
     High-performance spatial hashing to snap vertices and remove degenerate edges.
-    This is the core "Extreme Detail" algorithm.
+    This is the core \"Extreme Detail\" algorithm.
     """
     nodes = []
     edges = []

@@ -1,0 +1,3043 @@
+{
+  "_doc": "Curated 2D wireframe sketches for offline-trained inference.  Each entry is `(nodes, edges)` in raw pixel space (0..w, 0..h) — the same coordinate system that `_opencv_canny_fallback` returns. In production this would be a much larger corpus (image + topology pairs) stored in HDF5 or a parquet-backed bucket; the JSON mirror is deliberate so devs can diff-patch new samples without binary handlers. Schema versions below 1.0 are reserved for the legacy raw-pixel-image format.\n\nPer-sample `expected_nodes` / `expected_edges` fields (added on schema v1):\n  These document the AUTHORED topology — i.e., what `len(nodes)` / `len(edges)`   SHOULD be for this shape when drawn cleanly. They are passed-through metadata:   `_validate_sample` does not require or consume them, and `parse_wireframe_topology`   treats them as opaque. They equal `len(nodes)` / `len(edges)` by construction for   every authored sample, but the runtime cleaner (`_run_trained_topology` -> `_cleanup_topology`) may produce a final topology that matches expected_* exactly   (when all polyline segments exceed `priors['min_line_segment_px']=6.0`) or differs   slightly (a small handful of inner-spiral / tight-curve edges have chord < 6.0   and will be discarded; see the audit log printed by `tests/_tmp_build_samples.py`   for the exact count). The 32 samples added under schema v1 carry these fields;   the 8 original samples drawn before the metadata extension do not. Both groups   load and validate identically.\n\nSample categories (40 total):\n  - Polylines (8 original): square / triangle / line-pair / zigzag / pentagon /\n    L-wall / stairs / T-junction\n  - Curved strokes (10): semi-circle / shallow-arc / S-curve / J-curve /\n    C-clamp / hairpin-bend / sine-wave / fish-hook / spiral-coil /\n    roller-coaster-loop\n  - Multi-branch junctions (11): Y / X-cross / K / arrow-head / H-shape /\n    double-Y-bar / 5-arm-star / 6-arm-asterisk / trident / 2-level binary\n    tree / 3-level complete binary tree\n  - Isometric projections (11): cube-wireframe / open-top-box / pyramid /\n    octahedron / ramp / diamond / hex-plane / grid-plane / 3-step-stairs /\n    L-block / table-top\n",
+  "schema_version": 1,
+  "samples": [
+    {
+      "id": "simple_square",
+      "name": "Closed square frame",
+      "description": "Single 100x100 quad outline. Used as sanity-check for topology cleaner.",
+      "image_size": [
+        120,
+        120
+      ],
+      "nodes": [
+        [
+          10,
+          10
+        ],
+        [
+          110,
+          10
+        ],
+        [
+          110,
+          110
+        ],
+        [
+          10,
+          110
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "equilateral_triangle",
+      "name": "Equilateral triangle",
+      "description": "Three vertices centred around (60,55) with side ~80px. Used to test rotation invariance.",
+      "image_size": [
+        120,
+        120
+      ],
+      "nodes": [
+        [
+          60,
+          12
+        ],
+        [
+          100,
+          95
+        ],
+        [
+          20,
+          95
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "line_pair",
+      "name": "Two parallel lines",
+      "description": "Two horizontal segments — used to verify the cleaner doesn't merge parallel-but-distant lines.",
+      "image_size": [
+        120,
+        120
+      ],
+      "nodes": [
+        [
+          10,
+          30
+        ],
+        [
+          110,
+          30
+        ],
+        [
+          10,
+          90
+        ],
+        [
+          110,
+          90
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "id": "zigzag",
+      "name": "Zigzag polyline",
+      "description": "Six-vertex zigzag used to validate polyline ordering under noise.",
+      "image_size": [
+        160,
+        100
+      ],
+      "nodes": [
+        [
+          10,
+          80
+        ],
+        [
+          40,
+          20
+        ],
+        [
+          70,
+          80
+        ],
+        [
+          100,
+          20
+        ],
+        [
+          130,
+          80
+        ],
+        [
+          160,
+          20
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "id": "pentagon",
+      "name": "Regular pentagon",
+      "description": "Pentagon outline — exercises the spatial-hash cleaner on non-rectangular topology.",
+      "image_size": [
+        140,
+        140
+      ],
+      "nodes": [
+        [
+          70,
+          10
+        ],
+        [
+          130,
+          60
+        ],
+        [
+          108,
+          125
+        ],
+        [
+          32,
+          125
+        ],
+        [
+          10,
+          60
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "L_wall",
+      "name": "L-shaped wall",
+      "description": "Right-angle wall segment — common in track-builder track outlines.",
+      "image_size": [
+        140,
+        140
+      ],
+      "nodes": [
+        [
+          10,
+          10
+        ],
+        [
+          120,
+          10
+        ],
+        [
+          120,
+          50
+        ],
+        [
+          120,
+          90
+        ],
+        [
+          10,
+          90
+        ],
+        [
+          80,
+          90
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "id": "stairs",
+      "name": "Stair-step outline",
+      "description": "Seven-vertex stair outline — exercises the spatial-hash on repeated perpendicular turns.",
+      "image_size": [
+        220,
+        120
+      ],
+      "nodes": [
+        [
+          10,
+          110
+        ],
+        [
+          40,
+          110
+        ],
+        [
+          40,
+          80
+        ],
+        [
+          70,
+          80
+        ],
+        [
+          70,
+          50
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          100,
+          20
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ]
+      ]
+    },
+    {
+      "id": "T_junction",
+      "name": "T junction",
+      "description": "T-shaped junction — exercises branch topology. Node 2 is the junction.",
+      "image_size": [
+        160,
+        120
+      ],
+      "nodes": [
+        [
+          10,
+          60
+        ],
+        [
+          80,
+          60
+        ],
+        [
+          80,
+          20
+        ],
+        [
+          80,
+          100
+        ],
+        [
+          150,
+          60
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          4
+        ]
+      ]
+    },
+    {
+      "id": "semi_circle",
+      "name": "Semi-circle (opening up)",
+      "description": "Half-circle drawn from (40,120) up to (100,60) and back down to (160,120). 9 polyline samples at 22.5° intervals; chord ≈ 23.4 px so each segment clears priors['min_line_segment_px']=6.0 by ~4×.",
+      "image_size": [
+        200,
+        140
+      ],
+      "nodes": [
+        [
+          40,
+          120
+        ],
+        [
+          45,
+          143
+        ],
+        [
+          58,
+          162
+        ],
+        [
+          77,
+          175
+        ],
+        [
+          100,
+          180
+        ],
+        [
+          123,
+          175
+        ],
+        [
+          142,
+          162
+        ],
+        [
+          155,
+          143
+        ],
+        [
+          160,
+          120
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ]
+      ],
+      "expected_nodes": 9,
+      "expected_edges": 8
+    },
+    {
+      "id": "shallow_arc",
+      "name": "Shallow arc (gentle bow)",
+      "description": "Five-vertex gentle arch — minimum-density curve sample. Tests the cleaner's ability to keep few-vertex curves without spuriously splitting corners.",
+      "image_size": [
+        200,
+        100
+      ],
+      "nodes": [
+        [
+          30,
+          60
+        ],
+        [
+          65,
+          35
+        ],
+        [
+          100,
+          28
+        ],
+        [
+          135,
+          35
+        ],
+        [
+          170,
+          60
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "expected_nodes": 5,
+      "expected_edges": 4
+    },
+    {
+      "id": "s_curve",
+      "name": "S-curve (figure-S)",
+      "description": "Eleven control points tracing an S — twice-reverses curvature. Tests that the cleaner preserves ordering on open paths that fold back over themselves without exceeding the spatial-hash snap window.",
+      "image_size": [
+        220,
+        200
+      ],
+      "nodes": [
+        [
+          20,
+          60
+        ],
+        [
+          60,
+          30
+        ],
+        [
+          90,
+          50
+        ],
+        [
+          75,
+          90
+        ],
+        [
+          40,
+          110
+        ],
+        [
+          60,
+          140
+        ],
+        [
+          95,
+          160
+        ],
+        [
+          120,
+          170
+        ],
+        [
+          155,
+          150
+        ],
+        [
+          180,
+          165
+        ],
+        [
+          210,
+          150
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          10
+        ]
+      ],
+      "expected_nodes": 11,
+      "expected_edges": 10
+    },
+    {
+      "id": "j_curve",
+      "name": "J-curve (hook)",
+      "description": "Seven-vertex J: vertical drop then leftward curl. Single inflection; tests that downward-then-upward paths survive cleaner pass with an open endpoint.",
+      "image_size": [
+        120,
+        160
+      ],
+      "nodes": [
+        [
+          60,
+          20
+        ],
+        [
+          60,
+          60
+        ],
+        [
+          60,
+          90
+        ],
+        [
+          50,
+          110
+        ],
+        [
+          35,
+          125
+        ],
+        [
+          20,
+          115
+        ],
+        [
+          25,
+          90
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ]
+      ],
+      "expected_nodes": 7,
+      "expected_edges": 6
+    },
+    {
+      "id": "c_clamp",
+      "name": "C-clamp (opening right)",
+      "description": "Twelve polyline samples spanning 240° around (100,100), forming a C-shape with the right side open. Tests the cleaner's handling of partial loops where endpoint-1 and endpoint-N are spatially distant (no spurious closure).",
+      "image_size": [
+        180,
+        200
+      ],
+      "nodes": [
+        [
+          100,
+          160
+        ],
+        [
+          79,
+          156
+        ],
+        [
+          61,
+          146
+        ],
+        [
+          48,
+          130
+        ],
+        [
+          41,
+          110
+        ],
+        [
+          41,
+          90
+        ],
+        [
+          48,
+          70
+        ],
+        [
+          61,
+          54
+        ],
+        [
+          79,
+          44
+        ],
+        [
+          100,
+          40
+        ],
+        [
+          121,
+          44
+        ],
+        [
+          139,
+          54
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          10,
+          11
+        ]
+      ],
+      "expected_nodes": 12,
+      "expected_edges": 11
+    },
+    {
+      "id": "hairpin_bend",
+      "name": "Hairpin bend (U-turn)",
+      "description": "Eight-vertex U-turn: vertical drop → tight half-circle on left → vertical rise on right, but ending at (75,80) above the start so the polyline stays open. Tests two reversals within a short span.",
+      "image_size": [
+        120,
+        140
+      ],
+      "nodes": [
+        [
+          60,
+          30
+        ],
+        [
+          60,
+          60
+        ],
+        [
+          60,
+          80
+        ],
+        [
+          45,
+          100
+        ],
+        [
+          35,
+          115
+        ],
+        [
+          60,
+          130
+        ],
+        [
+          75,
+          115
+        ],
+        [
+          75,
+          80
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ]
+      ],
+      "expected_nodes": 8,
+      "expected_edges": 7
+    },
+    {
+      "id": "sine_wave",
+      "name": "Sine wave (one period)",
+      "description": "Thirteen-sample sin curve, amplitude 30 px, one full period across 220 px horizontal. Tests polyline sampling at near-uniform segment lengths (~21 px) on a smooth curve.",
+      "image_size": [
+        240,
+        100
+      ],
+      "nodes": [
+        [
+          10,
+          50
+        ],
+        [
+          28,
+          65
+        ],
+        [
+          47,
+          76
+        ],
+        [
+          65,
+          80
+        ],
+        [
+          83,
+          76
+        ],
+        [
+          102,
+          65
+        ],
+        [
+          120,
+          50
+        ],
+        [
+          138,
+          35
+        ],
+        [
+          157,
+          24
+        ],
+        [
+          175,
+          20
+        ],
+        [
+          193,
+          24
+        ],
+        [
+          212,
+          35
+        ],
+        [
+          230,
+          50
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          12
+        ]
+      ],
+      "expected_nodes": 13,
+      "expected_edges": 12
+    },
+    {
+      "id": "fish_hook",
+      "name": "Fish-hook",
+      "description": "Nine-vertex hook with a long descending tail and a narrowly-curled hook returning upward. Tests very tight inflection in the lower curl region without snapping the hook into a closed ring.",
+      "image_size": [
+        150,
+        180
+      ],
+      "nodes": [
+        [
+          70,
+          20
+        ],
+        [
+          70,
+          50
+        ],
+        [
+          70,
+          90
+        ],
+        [
+          60,
+          120
+        ],
+        [
+          40,
+          140
+        ],
+        [
+          25,
+          130
+        ],
+        [
+          40,
+          105
+        ],
+        [
+          65,
+          100
+        ],
+        [
+          75,
+          80
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ]
+      ],
+      "expected_nodes": 9,
+      "expected_edges": 8
+    },
+    {
+      "id": "spiral_coil",
+      "name": "Spiral coil (1.25 turns)",
+      "description": "Sixteen-sample Archimedean spiral (r = 10 + 5θ) covering 1.25 turns. Each step grows radius by ~31 px in arc length, so consecutive polyline segments stay well above the 6 px min. Tests inward-then-outward curvature reversal at each loop crossing.",
+      "image_size": [
+        220,
+        220
+      ],
+      "nodes": [
+        [
+          120,
+          110
+        ],
+        [
+          121,
+          116
+        ],
+        [
+          118,
+          123
+        ],
+        [
+          110,
+          128
+        ],
+        [
+          100,
+          128
+        ],
+        [
+          90,
+          122
+        ],
+        [
+          84,
+          110
+        ],
+        [
+          85,
+          96
+        ],
+        [
+          95,
+          83
+        ],
+        [
+          110,
+          76
+        ],
+        [
+          128,
+          79
+        ],
+        [
+          144,
+          91
+        ],
+        [
+          151,
+          110
+        ],
+        [
+          148,
+          132
+        ],
+        [
+          133,
+          150
+        ],
+        [
+          110,
+          159
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          12
+        ],
+        [
+          12,
+          13
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          14,
+          15
+        ]
+      ],
+      "expected_nodes": 16,
+      "expected_edges": 15
+    },
+    {
+      "id": "rollercoaster_loop",
+      "name": "Rollercoaster loop (closed loop + tails)",
+      "description": "15-vertex closed loop (radius 40) bracketed by 2 tail nodes — total 17 nodes. Tests that the cleaner does NOT collapse the AND 0→14 closure when the path is genuinely closed while still preserving the open tails on either side.",
+      "image_size": [
+        200,
+        160
+      ],
+      "nodes": [
+        [
+          10,
+          80
+        ],
+        [
+          140,
+          80
+        ],
+        [
+          137,
+          96
+        ],
+        [
+          127,
+          110
+        ],
+        [
+          112,
+          118
+        ],
+        [
+          96,
+          120
+        ],
+        [
+          80,
+          115
+        ],
+        [
+          68,
+          104
+        ],
+        [
+          61,
+          88
+        ],
+        [
+          61,
+          72
+        ],
+        [
+          68,
+          56
+        ],
+        [
+          80,
+          45
+        ],
+        [
+          96,
+          40
+        ],
+        [
+          112,
+          42
+        ],
+        [
+          127,
+          50
+        ],
+        [
+          137,
+          64
+        ],
+        [
+          190,
+          80
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          12
+        ],
+        [
+          12,
+          13
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          14,
+          15
+        ],
+        [
+          15,
+          16
+        ]
+      ],
+      "expected_nodes": 17,
+      "expected_edges": 16
+    },
+    {
+      "id": "y_junction",
+      "name": "Y junction",
+      "description": "Four-vertex Y: one trunk segment splits into two diverging arms. Single degree-3 center node (node 0).",
+      "image_size": [
+        140,
+        120
+      ],
+      "nodes": [
+        [
+          70,
+          110
+        ],
+        [
+          40,
+          30
+        ],
+        [
+          70,
+          50
+        ],
+        [
+          100,
+          30
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "expected_nodes": 4,
+      "expected_edges": 3
+    },
+    {
+      "id": "x_cross",
+      "name": "X cross (two crossing diagonals)",
+      "description": "Five-vertex X: two diagonals intersecting at the central node (node 0 or node 2 depending on convention). Exercises 4-way branch.",
+      "image_size": [
+        140,
+        140
+      ],
+      "nodes": [
+        [
+          70,
+          70
+        ],
+        [
+          20,
+          20
+        ],
+        [
+          120,
+          20
+        ],
+        [
+          20,
+          120
+        ],
+        [
+          120,
+          120
+        ]
+      ],
+      "edges": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          0,
+          4
+        ]
+      ],
+      "expected_nodes": 5,
+      "expected_edges": 4
+    },
+    {
+      "id": "k_junction",
+      "name": "K junction",
+      "description": "Five-vertex K — vertical stroke with two diagonally diverging arms at midpoint. Degree-3 vertical stroke.",
+      "image_size": [
+        120,
+        160
+      ],
+      "nodes": [
+        [
+          60,
+          30
+        ],
+        [
+          40,
+          90
+        ],
+        [
+          60,
+          160
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          100,
+          130
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ]
+      ],
+      "expected_nodes": 5,
+      "expected_edges": 4
+    },
+    {
+      "id": "arrow_head",
+      "name": "Arrowhead (V)",
+      "description": "Four-vertex arrowhead V — two diagonal arms meeting at the tip (node 0). Open polyline, no shaft.",
+      "image_size": [
+        120,
+        120
+      ],
+      "nodes": [
+        [
+          60,
+          20
+        ],
+        [
+          20,
+          90
+        ],
+        [
+          60,
+          60
+        ],
+        [
+          100,
+          90
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "expected_nodes": 4,
+      "expected_edges": 3
+    },
+    {
+      "id": "h_shape",
+      "name": "H-shape (two parallel verticals)",
+      "description": "Six-vertex H: two vertical strokes plus a horizontal crossbar between them. Two degree-3 nodes (the crossbar endpoints). Tests parallel-vertical topology that must NOT be collapsed into a single line by spatial-hash.",
+      "image_size": [
+        120,
+        130
+      ],
+      "nodes": [
+        [
+          25,
+          20
+        ],
+        [
+          25,
+          100
+        ],
+        [
+          95,
+          20
+        ],
+        [
+          95,
+          100
+        ],
+        [
+          25,
+          60
+        ],
+        [
+          95,
+          60
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          4,
+          5
+        ]
+      ],
+      "expected_nodes": 6,
+      "expected_edges": 3
+    },
+    {
+      "id": "double_y_bar",
+      "name": "Double-Y bar",
+      "description": "Six-vertex double-Y: two parallel verticals (left and right) joined by a single horizontal crossbar. Two degree-3 nodes (crossbar endpoints) — similar topology to H but conceptually emphasizes multi-branch convergence.",
+      "image_size": [
+        120,
+        130
+      ],
+      "nodes": [
+        [
+          25,
+          30
+        ],
+        [
+          25,
+          90
+        ],
+        [
+          95,
+          30
+        ],
+        [
+          95,
+          90
+        ],
+        [
+          25,
+          60
+        ],
+        [
+          95,
+          60
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          4,
+          5
+        ]
+      ],
+      "expected_nodes": 6,
+      "expected_edges": 3
+    },
+    {
+      "id": "star_5_arms",
+      "name": "5-arm star",
+      "description": "Six-vertex 5-arm star: spokes radiating from center node 0 at 72° intervals. Single degree-5 center node — tests spatial-hash under high-degree branching.",
+      "image_size": [
+        120,
+        120
+      ],
+      "nodes": [
+        [
+          60,
+          60
+        ],
+        [
+          60,
+          10
+        ],
+        [
+          108,
+          45
+        ],
+        [
+          89,
+          100
+        ],
+        [
+          31,
+          100
+        ],
+        [
+          12,
+          45
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "expected_nodes": 6,
+      "expected_edges": 5
+    },
+    {
+      "id": "asterisk_6_arms",
+      "name": "6-arm asterisk",
+      "description": "Seven-vertex 6-arm asterisk: 60°-spaced spokes. Degree-6 center node. Exposes the spatial-hash to maximum branching without exceeding its design cap (thinker memo: ≥7 arms add noise without benefit).",
+      "image_size": [
+        140,
+        140
+      ],
+      "nodes": [
+        [
+          70,
+          70
+        ],
+        [
+          125,
+          70
+        ],
+        [
+          98,
+          118
+        ],
+        [
+          43,
+          118
+        ],
+        [
+          15,
+          70
+        ],
+        [
+          42,
+          22
+        ],
+        [
+          98,
+          22
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          0,
+          6
+        ]
+      ],
+      "expected_nodes": 7,
+      "expected_edges": 6
+    },
+    {
+      "id": "trident",
+      "name": "Trident (3-prong fork)",
+      "description": "Five-vertical trident: shaft ends at a degree-4 junction (node 1), three prongs branching upward at -60°/0°/60° from vertical. Single high-degree hub.",
+      "image_size": [
+        120,
+        150
+      ],
+      "nodes": [
+        [
+          60,
+          130
+        ],
+        [
+          60,
+          70
+        ],
+        [
+          25,
+          25
+        ],
+        [
+          60,
+          15
+        ],
+        [
+          95,
+          25
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ]
+      ],
+      "expected_nodes": 5,
+      "expected_edges": 4
+    },
+    {
+      "id": "tree_2_level",
+      "name": "Binary tree (2 levels)",
+      "description": "Seven-vertex 2-level binary tree (root + 2 children + 4 leaves). Tests mixed-degree topology: 2 degree-2 (root-to-children segments from leaves' perspective) and 2 degree-3 internal nodes plus a degree-2 root.",
+      "image_size": [
+        160,
+        160
+      ],
+      "nodes": [
+        [
+          80,
+          140
+        ],
+        [
+          30,
+          80
+        ],
+        [
+          130,
+          80
+        ],
+        [
+          10,
+          30
+        ],
+        [
+          50,
+          30
+        ],
+        [
+          110,
+          30
+        ],
+        [
+          150,
+          30
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ]
+      ],
+      "expected_nodes": 7,
+      "expected_edges": 6
+    },
+    {
+      "id": "tree_3_level_binary",
+      "name": "Binary tree (3 levels, complete)",
+      "description": "Fifteen-vertex 3-level complete binary tree (1 root + 2 + 4 + 8 leaves). Tests mixed-degree topology with one degree-2 root, two degree-3 internal-1 nodes, four degree-3 internal-2 nodes, and eight degree-1 leaves.",
+      "image_size": [
+        200,
+        230
+      ],
+      "nodes": [
+        [
+          100,
+          200
+        ],
+        [
+          50,
+          140
+        ],
+        [
+          150,
+          140
+        ],
+        [
+          25,
+          80
+        ],
+        [
+          75,
+          80
+        ],
+        [
+          125,
+          80
+        ],
+        [
+          175,
+          80
+        ],
+        [
+          12,
+          25
+        ],
+        [
+          38,
+          25
+        ],
+        [
+          62,
+          25
+        ],
+        [
+          88,
+          25
+        ],
+        [
+          112,
+          25
+        ],
+        [
+          138,
+          25
+        ],
+        [
+          162,
+          25
+        ],
+        [
+          188,
+          25
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ]
+      ],
+      "expected_nodes": 15,
+      "expected_edges": 14
+    },
+    {
+      "id": "iso_cube_wireframe",
+      "name": "Isometric cube wireframe",
+      "description": "Eight-vertex / twelve-edge wireframe of a 30°-projected cube (a 3D unit cube). Hexagonal silhouette with three internal connectors meeting at the center. Tests 3D-projected 2D closed-loop topology.",
+      "image_size": [
+        200,
+        200
+      ],
+      "nodes": [
+        [
+          100,
+          100
+        ],
+        [
+          152,
+          130
+        ],
+        [
+          100,
+          160
+        ],
+        [
+          48,
+          130
+        ],
+        [
+          100,
+          40
+        ],
+        [
+          152,
+          70
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          48,
+          70
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ]
+      ],
+      "expected_nodes": 8,
+      "expected_edges": 12
+    },
+    {
+      "id": "iso_open_box",
+      "name": "Isometric open-top box",
+      "description": "Open-top iso box: bottom face + 4 verticals + 3 top edges (back-top edge missing). Eight nodes / eleven edges. Tests partial-loop topology where the cleaner should NOT auto-close the open side.",
+      "image_size": [
+        200,
+        200
+      ],
+      "nodes": [
+        [
+          100,
+          100
+        ],
+        [
+          152,
+          130
+        ],
+        [
+          100,
+          160
+        ],
+        [
+          48,
+          130
+        ],
+        [
+          100,
+          40
+        ],
+        [
+          152,
+          70
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          48,
+          70
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ]
+      ],
+      "expected_nodes": 8,
+      "expected_edges": 11
+    },
+    {
+      "id": "iso_pyramid",
+      "name": "Isometric pyramid",
+      "description": "5-vertex isometric pyramid (square base + apex). 4 base edges + 4 apex spokes = 8 edges total. Tests radial branch from apex (degree-4) without merger into the base edges.",
+      "image_size": [
+        200,
+        200
+      ],
+      "nodes": [
+        [
+          100,
+          60
+        ],
+        [
+          169,
+          100
+        ],
+        [
+          100,
+          140
+        ],
+        [
+          31,
+          100
+        ],
+        [
+          100,
+          20
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "expected_nodes": 5,
+      "expected_edges": 8
+    },
+    {
+      "id": "iso_octahedron",
+      "name": "Isometric octahedron",
+      "description": "6-vertex / 12-edge regular octahedron in 30° iso projection. Two degree-4 poles + 4 degree-4 equator nodes (each connects to both poles and two equator neighbors). Tests the densest vertex-degree topology in the corpus.",
+      "image_size": [
+        220,
+        220
+      ],
+      "nodes": [
+        [
+          110,
+          150
+        ],
+        [
+          110,
+          70
+        ],
+        [
+          145,
+          130
+        ],
+        [
+          75,
+          130
+        ],
+        [
+          75,
+          90
+        ],
+        [
+          145,
+          90
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          2
+        ]
+      ],
+      "expected_nodes": 6,
+      "expected_edges": 12
+    },
+    {
+      "id": "iso_ramp",
+      "name": "Isometric ramp (sloped wedge)",
+      "description": "6-vertex isometric ramp/wedge: rectangular base + 2 vertical strokes at back + 2 diagonal slope strokes from front-bottom to back-top. Tests diagonal topology across a non-coplanar 3D structure.",
+      "image_size": [
+        220,
+        200
+      ],
+      "nodes": [
+        [
+          100,
+          60
+        ],
+        [
+          169,
+          100
+        ],
+        [
+          100,
+          140
+        ],
+        [
+          31,
+          100
+        ],
+        [
+          169,
+          60
+        ],
+        [
+          100,
+          20
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          5
+        ]
+      ],
+      "expected_nodes": 6,
+      "expected_edges": 9
+    },
+    {
+      "id": "iso_diamond_plane",
+      "name": "Isometric diamond (rhombus plane)",
+      "description": "4-vertex isometric rhombus representing a horizontal square viewed at 30°. Tests the spatial-hash on collapsed-planar 2D projections where vertex pairs map to nearly-coincident pixel locations under low snap thresholds.",
+      "image_size": [
+        220,
+        160
+      ],
+      "nodes": [
+        [
+          110,
+          60
+        ],
+        [
+          197,
+          110
+        ],
+        [
+          110,
+          160
+        ],
+        [
+          23,
+          110
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ]
+      ],
+      "expected_nodes": 4,
+      "expected_edges": 4
+    },
+    {
+      "id": "iso_hex_plane",
+      "name": "Isometric hex plane",
+      "description": "Seven-vertex hex plane: central node 0 with 6 evenly-spaced spokes AND a 6-edge outer ring. Tests radial-spoke outer-ring topology — high average node degree on a planar shape.",
+      "image_size": [
+        180,
+        180
+      ],
+      "nodes": [
+        [
+          110,
+          110
+        ],
+        [
+          160,
+          110
+        ],
+        [
+          135,
+          153
+        ],
+        [
+          85,
+          153
+        ],
+        [
+          60,
+          110
+        ],
+        [
+          85,
+          67
+        ],
+        [
+          135,
+          67
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          1
+        ]
+      ],
+      "expected_nodes": 7,
+      "expected_edges": 12
+    },
+    {
+      "id": "iso_cross_plane",
+      "name": "Isometric grid plane (3×3)",
+      "description": "Nine-vertex iso projection of a 3×3 grid at varying depth (z coordinate). Linear arrangement along x/z but squashed by the iso projection. Tests dense planar topology with multiple degree-3+4 internal nodes.",
+      "image_size": [
+        240,
+        240
+      ],
+      "nodes": [
+        [
+          120,
+          90
+        ],
+        [
+          94,
+          105
+        ],
+        [
+          68,
+          120
+        ],
+        [
+          146,
+          105
+        ],
+        [
+          120,
+          120
+        ],
+        [
+          94,
+          135
+        ],
+        [
+          172,
+          120
+        ],
+        [
+          146,
+          135
+        ],
+        [
+          120,
+          150
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          7
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          5,
+          8
+        ]
+      ],
+      "expected_nodes": 9,
+      "expected_edges": 12
+    },
+    {
+      "id": "iso_stairs_3d",
+      "name": "Isometric 3-step staircase",
+      "description": "Twelve-vertex 3-step staircase in iso projection. Tests repeated rectangular tops + 2-unit stride risers between them — does not break under snap_threshold=1.5 because each stride is ~30+ px apart.",
+      "image_size": [
+        240,
+        240
+      ],
+      "nodes": [
+        [
+          100,
+          100
+        ],
+        [
+          113,
+          108
+        ],
+        [
+          100,
+          115
+        ],
+        [
+          87,
+          108
+        ],
+        [
+          126,
+          95
+        ],
+        [
+          139,
+          102
+        ],
+        [
+          126,
+          110
+        ],
+        [
+          113,
+          102
+        ],
+        [
+          152,
+          90
+        ],
+        [
+          165,
+          98
+        ],
+        [
+          152,
+          105
+        ],
+        [
+          139,
+          98
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          4,
+          8
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          6,
+          10
+        ],
+        [
+          7,
+          11
+        ]
+      ],
+      "expected_nodes": 12,
+      "expected_edges": 20
+    },
+    {
+      "id": "iso_l_block",
+      "name": "Isometric L-block (slab + wall)",
+      "description": "Nine-vertex iso L-shaped 3D block: horizontal slab + vertical wall rising from left edge, with 2 bottom-slab corners and the wall's right edge forming additional nodes. Tests a rectilinear non-cubic shape with adjacency between vertical and horizontal faces.",
+      "image_size": [
+        240,
+        220
+      ],
+      "nodes": [
+        [
+          100,
+          100
+        ],
+        [
+          165,
+          138
+        ],
+        [
+          122,
+          162
+        ],
+        [
+          57,
+          125
+        ],
+        [
+          100,
+          20
+        ],
+        [
+          122,
+          32
+        ],
+        [
+          78,
+          58
+        ],
+        [
+          57,
+          45
+        ],
+        [
+          122,
+          112
+        ],
+        [
+          78,
+          138
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          5,
+          8
+        ],
+        [
+          6,
+          9
+        ],
+        [
+          8,
+          9
+        ]
+      ],
+      "expected_nodes": 10,
+      "expected_edges": 14
+    },
+    {
+      "id": "iso_table",
+      "name": "Isometric table (top slab)",
+      "description": "Eight-vertex / twelve-edge iso-projected table top (no legs in this v1 sample — covering the tabletop slab). Rectangular-prism topology projected at 30°, with 4 vertical edges bridging the top and bottom faces.",
+      "image_size": [
+        220,
+        220
+      ],
+      "nodes": [
+        [
+          110,
+          2
+        ],
+        [
+          197,
+          52
+        ],
+        [
+          110,
+          102
+        ],
+        [
+          23,
+          52
+        ],
+        [
+          110,
+          10
+        ],
+        [
+          197,
+          60
+        ],
+        [
+          110,
+          110
+        ],
+        [
+          23,
+          60
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          4
+        ]
+      ],
+      "expected_nodes": 8,
+      "expected_edges": 12
+    }
+  ],
+  "priors": {
+    "expected_node_count_min": 3,
+    "expected_node_count_max": 17,
+    "typical_edge_length_px": 49.74,
+    "snap_threshold_recommendation": 1.5,
+    "min_line_segment_px": 6.0,
+    "min_line_segment_px_corpus_estimate": 8.38,
+    "average_node_degree": 2.073
+  }
+}

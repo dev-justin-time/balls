@@ -1,12 +1,18 @@
 // Physics regression tests for Going Balls.
 //
 // Pins the GRAVITY=-45 behavior documented in Vision Part 3 of the platform
-// vision doc. A change to GRAVITY (or JUMP_FORCE, mass, damping, BALL_RADIUS,
-// MAX_VELOCITY) should FAIL this file unless the snapshot is intentionally
-// updated alongside the physics.js change.
+// vision doc. A change to GRAVITY (or JUMP_FORCE, mass, BALL_RADIUS, MAX_VELOCITY)
+// should FAIL this file unless the snapshot is intentionally updated alongside
+// the physics.js change. linearDamping is no longer pinned here — see the
+// matching @jump-sim.mjs default (0.15) and src/physics.js Body for the
+// canonical value, and Scenario C for the sensitivity sweep.
 //
 // Snapshot bands are intentionally looser than the rounding step (toFixed(2)/(3))
 // to allow for numerical jitter but tight enough to catch GRAVITY -45 → -88 drift.
+//
+// feel-pass 2026-06-26 round 3: linearDamping 0.5 → 0.15. Snapshot values
+// retuned: peak 6.55→7.92m, airTime 1.083→1.20s, apexDownTrackX 5.85→7.73m.
+// Body fidelity wide bounds widened [4,8]→[4,9] for jitter margin.
 
 import { describe, it, expect } from 'vitest';
 import { simulateJump, simulateJumpDampingSweep } from '../@jump-sim.mjs';
@@ -29,14 +35,14 @@ const r = simulateJump(-45, 28);
 const rB = simulateJump(-45, 28, { horizontalVelocity: 22 });
 
 describe('Scenario A — stationary jump (GRAVITY=-45)', () => {
-    it(`peak height ≈ 6.55 m (±${TOLERANCE.PEAK_M})`, () => {
-        expect(r.peakRelativeHeight).toBeGreaterThan(6.55 - TOLERANCE.PEAK_M);
-        expect(r.peakRelativeHeight).toBeLessThan   (6.55 + TOLERANCE.PEAK_M);
+    it(`peak height ≈ 7.92 m (±${TOLERANCE.PEAK_M}) — feel-pass 2026-06-26 round 3 (was 6.55)`, () => {
+        expect(r.peakRelativeHeight).toBeGreaterThan(7.92 - TOLERANCE.PEAK_M);
+        expect(r.peakRelativeHeight).toBeLessThan   (7.92 + TOLERANCE.PEAK_M);
     });
 
-    it(`air time ≈ 1.083 s (±${TOLERANCE.AIR_TIME_S})`, () => {
-        expect(r.airTime).toBeGreaterThan(1.083 - TOLERANCE.AIR_TIME_S);
-        expect(r.airTime).toBeLessThan   (1.083 + TOLERANCE.AIR_TIME_S);
+    it(`air time ≈ 1.20 s (±${TOLERANCE.AIR_TIME_S}) — feel-pass 2026-06-26 round 3 (was 1.083)`, () => {
+        expect(r.airTime).toBeGreaterThan(1.20 - TOLERANCE.AIR_TIME_S);
+        expect(r.airTime).toBeLessThan   (1.20 + TOLERANCE.AIR_TIME_S);
     });
 });
 
@@ -45,9 +51,9 @@ describe('Scenario B — jump while running at MAX_VELOCITY=22', () => {
         expect(rB.apexDownTrackX).toBeGreaterThan(0);
     });
 
-    it(`apex down-track X ≈ 5.85 m (±${TOLERANCE.APEX_DOWNTRACK_M})`, () => {
-        expect(rB.apexDownTrackX).toBeGreaterThan(5.85 - TOLERANCE.APEX_DOWNTRACK_M);
-        expect(rB.apexDownTrackX).toBeLessThan   (5.85 + TOLERANCE.APEX_DOWNTRACK_M);
+    it(`apex down-track X ≈ 7.73 m (±${TOLERANCE.APEX_DOWNTRACK_M}) — feel-pass 2026-06-26 round 3 (was 5.85)`, () => {
+        expect(rB.apexDownTrackX).toBeGreaterThan(7.73 - TOLERANCE.APEX_DOWNTRACK_M);
+        expect(rB.apexDownTrackX).toBeLessThan   (7.73 + TOLERANCE.APEX_DOWNTRACK_M);
     });
 });
 
@@ -77,19 +83,20 @@ describe('Differential sensitivity (proves snapshot bands can fail)', () => {
     });
 });
 
-describe('Body fidelity — linearDamping=0.5 mid-flight', () => {
-    // No-damping apex-X = 22 × 0.5 = 11 m. With c=0.5, cannon-es yields 5.85 m.
-    // Fully-damped apex-X → 0. Bounds [4, 8] catch accidental drift in either
-    // direction that the tighter snapshot band (5.85 ± 0.10) might miss.
-    it('apex sits between 4 m and 8 m down-track (damping in ballpark)', () => {
+describe('Body fidelity — linearDamping=0.15 mid-flight', () => {
+    // feel-pass 2026-06-26 round 3: damping 0.5 → 0.15, apex-X rises from
+    // 5.85 → 7.73 m (closer to the no-damping ceiling of 22×0.5=11 m but
+    // still damped below it). Bounds widened [4,8]→[4,9] to give jitter
+    // margin across cannon-es numerical integration versions.
+    it('apex sits between 4 m and 9 m down-track (damping in ballpark)', () => {
         expect(rB.apexDownTrackX).toBeGreaterThan(4);
-        expect(rB.apexDownTrackX).toBeLessThan(8);
+        expect(rB.apexDownTrackX).toBeLessThan(9);
     });
 });
 
 describe('Scenario C — damping sensitivity sweep', () => {
     // Property-based assertions — drift-robust across cannon-es minor versions.
-    const sweep = simulateJumpDampingSweep('moving', { baselineDamping: 0.5 });
+    const sweep = simulateJumpDampingSweep('moving', { baselineDamping: 0.15 });  // feel-pass 2026-06-26 round 3 (was 0.5)
 
     it('peak, airTime, apexX monotonically decrease as damping increases', () => {
         for (const metric of ['peakRelativeHeight', 'airTime', 'apexDownTrackX']) {

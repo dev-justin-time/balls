@@ -102,8 +102,26 @@ function mirrorDir(srcDir, destDir) {
             }
         }
     }
+    // Orphan cleanup: vendor entries with no source counterpart would
+    // accumulate forever across npm upgrades (committed /vendor/ never
+    // shrinks). In check mode we report them as drift without deleting.
+    if (fs.existsSync(destDir)) {
+        const srcNames = new Set(fs.readdirSync(srcDir).map(n => n));
+        for (const entry of fs.readdirSync(destDir, { withFileTypes: true })) {
+            if (srcNames.has(entry.name)) continue;
+            const orphan = path.join(destDir, entry.name);
+            if (CHECK_MODE) {
+                console.error(`✗ orphan in vendor/: ${orphan}`);
+                return 'drift';
+            }
+            if (entry.isDirectory()) fs.rmSync(orphan, { recursive: true, force: true });
+            else fs.unlinkSync(orphan);
+            status = 'drift';
+        }
+    }
     return status;
 }
+
 
 function mirrorFile(srcPath, destPath) {
     if (!fs.existsSync(srcPath)) return 'missing';
@@ -201,6 +219,7 @@ function walkAddonDeps(seeds) {
 
 function main() {
     let anyDrift = false;
+    let anyMissing = false;
 
     // Verify node_modules present so we fail fast with a clear message.
     if (!fs.existsSync(NM)) {
@@ -264,8 +283,11 @@ function main() {
         );
         const label = `vendor/three/examples/jsm/${stem}.js`;
         if (status === 'missing') {
-            // Source missing — surface but continue (a stale import in the project).
-            console.warn(`! addon source missing: ${stem}.js (referenced transitively?)`);
+            // Transitive reference points to a file that doesn't exist in node_modules.
+            // The page would 404 at runtime in the static deploy, so fail the vendor
+            // run (CI catches the issue rather than a runtime browser console error).
+            console.error(`✗ addon source missing (referenced transitively): ${stem}.js`);
+            anyMissing = true;
         } else if (status === 'drift') {
             if (CHECK_MODE) { console.error(`✗ ${label}`); anyDrift = true; }
             else console.log(`+ ${label}`);
@@ -275,13 +297,17 @@ function main() {
     }
 
     if (CHECK_MODE) {
-        if (anyDrift) {
-            console.error('\nVendor drift detected. Run `npm run vendor:deps` to refresh.');
+        if (anyDrift || anyMissing) {
+            console.error('\nVendor check failed. Run `npm run vendor:deps` to refresh / fix.');
             process.exit(1);
         }
         console.log(`\n✓ Vendor in sync (${deps.length} addon files + 4 leaf packages)`);
     } else {
         console.log(`\nDone. ${seeds.length} three/addons paths referenced; ${deps.length} addon files vendored; 4 leaf packages mirrored.`);
+    }
+    if (anyMissing) {
+        console.error('\nOne or more transitive addons are missing in node_modules — the static-deploy would 404 at runtime.');
+        process.exit(1);
     }
 }
 
