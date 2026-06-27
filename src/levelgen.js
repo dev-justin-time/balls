@@ -881,6 +881,30 @@ function weightedCoinTier() {
 
 export function addCheckpoint(game, x, y, z, width) {
     game.checkpoints.push({ x, y, z, width });
+
+    // Checkpoint-as-wall (feel-pass 2026-06-27 round 6): user directive
+    // "stop ball at checkpoints do not pass". Spawn an invisible kinematic
+    // CANNON.Box at the checkpoint plane so the ball halts on contact.
+    // mass:0 makes the wall static; the global gravity contact material
+    // (restitution=0.25) applies, but the ball approaches horizontally so
+    // micro-bounce is harmless. Wall height (7 units) comfortably fits under
+    // the jump apex (JUMP_FORCE²/(2*|g|) + BALL_RADIUS = 8.71 + 0.5 = 9.21m
+    // = ~1.7m clearance over the wall top), so skilled launches clear it
+    // but normal rolling contact halts the ball at the checkpoint.
+    const wallThick = 0.2;
+    const wallHeight = 7;
+    const wallWidth = Math.max(2.5, width + 1.5);
+    const wallShape = new CANNON.Box(new CANNON.Vec3(wallWidth / 2, wallHeight / 2, wallThick / 2));
+    const wallBody = new CANNON.Body({ mass: 0, shape: wallShape });
+    // Place slightly upstream of the checkpoint plane so the ball touches
+    // the wall just as it REACHES the checkpoint (a hair of overlap with
+    // the checkpoint cell) — prevents the ball clipping through on the
+    // exact frame contact is made.
+    wallBody.position.set(x, y + wallHeight / 2 + 0.5, z);
+    game.world.addBody(wallBody);
+    // Push into levelObjects so clearLevel() removes it on level regen.
+    // No mesh is allocated — the wall is invisible.
+    game.levelObjects.push({ mesh: null, body: wallBody, isCheckpointWall: true });
 }
 
 export function placeFinishModel(game) {

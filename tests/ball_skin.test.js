@@ -72,7 +72,16 @@ vi.mock('three/addons/loaders/GLTFLoader.js', () => ({
 
 vi.mock('../src/audio.js', () => ({ playSound: vi.fn() }));
 vi.mock('../src/persistence.js', () => ({ saveGame: vi.fn() }));
-vi.mock('../src/levelgen.js', () => ({ createLevel: vi.fn() }));
+// src/ui.js pulls in src/catalog_ui.js which imports DIFFICULTY_TIERS at
+// module-load time. If vi.mock for src/levelgen.js doesn't supply
+// DIFFICULTY_TIERS, vitest's static-analysis/collection pass throws
+// "No 'DIFFICULTY_TIERS' export is defined on the '../src/levelgen.js' mock".
+// Empty array is enough because this test never exercises the catalog UI.
+vi.mock('../src/levelgen.js', () => ({
+  createLevel: vi.fn(),
+  createInfiniteLevel: vi.fn(),
+  DIFFICULTY_TIERS: [],
+}));
 vi.mock('./ball_index_ui.js', () => ({ renderBallIndexUI: vi.fn() }));
 
 // ─── Imports under test ───

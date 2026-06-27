@@ -389,7 +389,7 @@ export function checkGameState(game, dt, room) {
         }
         for (let i = game.coins.length - 1; i >= 0; i--) {
             const coin = game.coins[i];
-            if (!coin || coin.userData.collected) continue;
+            if (!coin || coin.userData.collected || coin.userData.dropping) continue;
             const dist = game.ballMesh.position.distanceTo(coin.position);
             if (dist < 1.2) {
                 const value = Math.round((coin.userData.value || 2) * coinMult);
@@ -435,15 +435,71 @@ export function checkGameState(game, dt, room) {
             }
         }
 
-        // Checkpoint respawn
+        // Checkpoint respawn + fall-off coin-drop animation.
+        //
+        // feel-pass 2026-06-27 round 6 (user directive): instead of instantly
+        // teleporting when ballY < -15, run a 3-second "falling" timer that
+        // only triggers the teleport if the ball remains below the threshold
+        // AND is actively falling (vy < -10) AND not grounded, for THREE full
+        // seconds. While the timer accumulates, every uncollected coin is
+        // flagged `coin.userData.dropping = true` and animated straight down
+        // (with small lateral jitter) so it visually "falls away" with the
+        // ball — the user's "all coins fall away" directive. The timer resets
+        // to 0 if the ball re-grounds OR climbs above the threshold, so a
+        // brief dip below the floor (animation glitch, jump edge case) does
+        // NOT trigger restart. On the 3-second mark: teleport to the last
+        // checkpoint, zero velocity, then sweep scene+array of all dropping
+        // coins (the player has lost them).
         const ballY = game.ballBody.position.y;
-        if (ballY < -15) {
+        const ballVelY = game.ballBody.velocity.y;
+        const FALL_Y_THRESHOLD = -15;
+        const FALL_VEL_THRESHOLD = -10;
+        const FALL_TIME_THRESHOLD = 3.0;
+        const isFalling = ballY < FALL_Y_THRESHOLD
+            && ballVelY < FALL_VEL_THRESHOLD
+            && !game.isGrounded;
+
+        if (isFalling) {
+            game._fallTimer = (game._fallTimer || 0) + dt;
+            // Mark every uncollected coin as dropping, then animate down for
+            // the rest of this frame. We do not splice mid-loop.
+            for (const coin of game.coins) {
+                if (!coin || coin.userData.collected || coin.userData.dropping) continue;
+                coin.userData.dropping = true;
+            }
+            for (const coin of game.coins) {
+                if (coin && coin.userData.dropping) {
+                    coin.position.y -= 25 * dt;
+                    coin.position.x += (Math.random() - 0.5) * 0.6 * dt;
+                }
+            }
+        } else if (game._fallTimer) {
+            game._fallTimer = 0;
+        }
+
+        if (game._fallTimer >= FALL_TIME_THRESHOLD) {
             game.ballBody.position.copy(game.lastCheckpointPos);
             game.ballBody.velocity.set(0, 0, 0);
             game.ballBody.angularVelocity.set(0, 0, 0);
+            game._fallTimer = 0;
+            // Cleanup: remove dropping coins from scene + array — the player
+            // has lost them by falling off track.
+            if (game.coins && game.coins.length > 0) {
+                for (const coin of game.coins) {
+                    if (coin && coin.userData && coin.userData.dropping) {
+                        try { game.scene.remove(coin); } catch (_e) {}
+                    }
+                }
+                game.coins = game.coins.filter((c) => !(c && c.userData && c.userData.dropping));
+            }
         }
 
-        // Checkpoint progress
+        // Checkpoint progress — unchanged from round-5. Note: with the round-6
+        // addCheckpoint change in src/levelgen.js, every checkpoint now has an
+        // invisible kinematic wall; the ball halts at the wall on contact.
+        // Once stopped at the wall, the proximity loop below still fires (ball
+        // IS at the checkpoint coords), so lastCheckpointPos is updated and
+        // the next fall-off jump teleports the player back here.
         for (const cp of game.checkpoints) {
             const bx = game.ballBody.position.x;
             const bz = game.ballBody.position.z;

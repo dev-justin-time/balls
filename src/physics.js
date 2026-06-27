@@ -29,23 +29,23 @@ import { playPortalSound } from './audio.js';
 //   on top of round 1 = BALL_SPEED 10000 × 2.5 = 25000. MAX_VELOCITY stays at
 //   round-1 value 40 (still the top-end cap; fire-escape against runaway).
 // GRAVITY=-45 is the SINGLE remaining physics invariant pinned by @jump-sim.mjs.
-// feel-pass 2026-06-27 round 5: USER DIRECTIVE — ball "won't even go uphill".
-//   +1000% (10x) on top of round 4: BALL_SPEED 25000 → 250000. To make the
-//   power USABLE (otherwise it just slams into the MAX_VELOCITY cap):
-//   - MAX_VELOCITY 40 → 80 (2x top-end so boost is felt)
-//   - angularDamping 0.95 → 0.18 (was eating the ball's rolling spin in <1s,
-//     which made it slide instead of climb)
-//   - linearDamping 0.15 → 0.05 (less foreground drag)
-//   - friction 1.0 → 0.3 (rolling friction is well below 1.0; old value was
-//     sapping all uphill momentum — ball would grind to a halt mid-ramp)
-//   - restitution 0.1 → 0.25 (small bump-boost off uneven surfaces)
-//   - STEER_SPEED/JUMP_FORCE unchanged (pinned by regression tests).
+// feel-pass 2026-06-27 round 6: USER DIRECTIVE — "add 3x resistance to ball
+//   travel". Round-5 MAX_VELOCITY=80 + linearDamping=0.05 unrestrained the
+//   ball enough that the player couldn't feel the fall-off restart (3-sec
+//   timer in src/ui.js). Triple the drag + cap top-end at ~1/3 of round-5:
+//   - linearDamping 0.05 → 0.15 (3x background drag; ball coasts ~1/3 as far)
+//   - MAX_VELOCITY 80 → 27 (literal ~1/3 cap; stops runaway speeding)
+//   KEPT unchanged from round-5 (still allows ramp climbs + checkpoints):
+//   - angularDamping 0.18 (rolling)
+//   - friction 0.3 (ground contact)
+//   - restitution 0.25 (micro-bumps)
+//   - BALL_SPEED=250000 BALL_RADIUS BALL_MASS JUMP_FORCE GRAVITY (pinned/regression-tested)
 const BALL_RADIUS = 0.5;
 const GRAVITY = -45; // per vision Part 3 (Keep-Balls Tightening reconciled) — PINNED invariant
 const BALL_SPEED = 250000; // 25000 → 250000 = +1000% (×10) — feel-pass 2026-06-27 round 5 (user directive)
 const STEER_SPEED = 32; // was 22 — feel-pass 2026-06-26 round 2 (tracks MAX_VELOCITY band)
 const STEER_DAMPING = 0.96; // was 0.92 — feel-pass 2026-06-26 round 2 (less angular decay)
-export const MAX_VELOCITY = 80; // 40 → 80 — feel-pass 2026-06-27 round 5 (top-end cap 2x so 10x BALL_SPEED is usable)
+export const MAX_VELOCITY = 27; // 80 → 27 — feel-pass 2026-06-27 round 6 (USER "3x resistance" — caps top-speed at ~1/3 of round-5 so the player FEELS the slow-down)
 const JUMP_FORCE = 28; // per vision Part 3 — PINNED by physics_regression.test.js Scenario B
 
 export function initPhysics(game) {
@@ -66,8 +66,8 @@ export function initPhysics(game) {
         mass: 100,
         shape: sphereShape,
         material: ballMaterial,
-        angularDamping: 0.18,  // 0.95 → 0.18 — feel-pass 2026-06-27 round 5 (let the ball ROLL up ramps; old value killed spin in <1s)
-        linearDamping: 0.05    // 0.15 → 0.05 — feel-pass 2026-06-27 round 5 (less drag so the new 10x power can be felt)
+        angularDamping: 0.18,  // 0.95 → 0.18 — keep round-5 (let the ball ROLL; not affected by 3x resistance to TRAVEL distance)
+        linearDamping: 0.15    // 0.05 → 0.15 — feel-pass 2026-06-27 round 6 (USER "3x resistance to ball travel" — literal 3x damping so the ball coasts ~1/3 as far)
     });
     game.ballBody.position.set(0, 1, 0);
     game.world.addBody(game.ballBody);
